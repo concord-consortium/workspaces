@@ -1,0 +1,12 @@
+#drawing-tool .dt-container .dt-tools {
+  display: inline-block;
+  vertical-align: top;
+  width: 40px;
+  margin: 0;
+  position: fixed;
+  z-index: 2;
+}
+#drawing-tool .dt-canvas-container {
+  position:absolute;
+  left: 50px;
+}
