@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>CollabSpace Drawing Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="favicon.ico" type="image/vnd.microsoft.icon">
+    <link rel="stylesheet" type="text/css" href="vendor/drawing-tool/drawing-tool.css"/>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+
+      .drawing-tool-wrapper {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        overflow: hidden;
+      }
+
+      #drawing-tool-container {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="drawing-tool"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/1.7.11/fabric.js"></script>
+    <script src="vendor/drawing-tool/drawing-tool.js"></script>
+  </body>
+</html>
