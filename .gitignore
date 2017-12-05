@@ -1,3 +1,6 @@
 collabspace/node_modules
 collabspace/dist
 collabspace/functions/node_modules
+
+**/.DS_Store
+.vscode/
