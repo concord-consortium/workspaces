@@ -93,14 +93,13 @@ const getDemoUserFromJWTToken = (request, response, callback) => {
 const createDemoUser = (userId) => {
   if (userId < 1000) {
     return {
-      id: userId,
-      email: `no-email-${userId}@concord.org`,
+      id: `http://example.com/users/${userId}`,
       first_name: "Student",
       last_name: `${userId}`
     };
   }
   return {
-    id: userId,
+    id: `http://example.com/users/${userId}`,
     first_name: "Teacher",
     last_name: `${userId - 999}`
   };
