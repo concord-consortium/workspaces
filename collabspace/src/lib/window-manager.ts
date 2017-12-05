@@ -7,11 +7,11 @@ import { IFramePhoneLib,
   MessageContent,
   MessageType,
   Listener,
-  CollabSpaceClientInitRequestMessage,
-  CollabSpaceClientInitResponseMessage,
-  CollabSpaceClientInitRequest,
-  CollabSpaceClientInitResponse
- } from "./collabspace-client"
+  WorkspaceClientInitRequestMessage,
+  WorkspaceClientInitResponseMessage,
+  WorkspaceClientInitRequest,
+  WorkspaceClientInitResponse
+ } from "../../../shared/workspace-client"
 
  const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
 
@@ -427,7 +427,8 @@ export class WindowManager {
       dataRef: this.document.getWindowsDataRef("iframeData").child(window.id),
       phone: IFramePhoneFactory.ParentEndpoint(element, () => {
         window.iframe.connected = true
-        const initRequest:CollabSpaceClientInitRequest = {
+        const initRequest:WorkspaceClientInitRequest = {
+          type: "collabspace",
           version: "1.0.0",
           id: window.id,
           readonly: this.document.isReadonly,
@@ -436,10 +437,10 @@ export class WindowManager {
             dataPath: window.iframe.dataRef.toString().substring(window.iframe.dataRef.root.toString().length)
           }
         }
-        window.iframe.phone.addListener(CollabSpaceClientInitResponseMessage, (resp:CollabSpaceClientInitResponse) => {
+        window.iframe.phone.addListener(WorkspaceClientInitResponseMessage, (resp:WorkspaceClientInitResponse) => {
           // TODO
         })
-        window.iframe.phone.post(CollabSpaceClientInitRequestMessage, initRequest)
+        window.iframe.phone.post(WorkspaceClientInitRequestMessage, initRequest)
       })
     }
   }

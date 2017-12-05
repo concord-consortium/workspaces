@@ -14,7 +14,7 @@ import { PortalUser, PortalUserMap, PortalActivity, PortalUserConnectionStatusMa
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
-import { CollabSpaceClientPublishRequest, CollabSpaceClientPublishRequestMessage } from "../lib/collabspace-client"
+import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
@@ -342,12 +342,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
             if (publicationId) {
 
               // and finally tell all the child windows so they can generate artifacts
-              const publishRequest:CollabSpaceClientPublishRequest = {
+              const publishRequest:WorkspaceClientPublishRequest = {
                 publicationsPath: getPublicationsPath(portalActivity, publicationId),
                 artifactStoragePath: getArtifactsStoragePath(portalActivity, publicationId)
               }
               this.windowManager.postToAllWindows(
-                CollabSpaceClientPublishRequestMessage,
+                WorkspaceClientPublishRequestMessage,
                 publishRequest
               )
             }
