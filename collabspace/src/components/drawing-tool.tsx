@@ -1,5 +1,5 @@
 import * as React from "react"
-import {CollabSpaceClient, CollabSpaceClientInitRequest, CollabSpaceClientPublishResponse, CollabSpaceClientThumbnailWidth} from "../lib/collabspace-client"
+import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth} from "../../../shared/workspace-client"
 import * as firebase from "firebase"
 import * as _ from "lodash"
 
@@ -42,7 +42,7 @@ export interface DrawingToolComponentState {
 export class DrawingToolComponent extends React.Component<DrawingToolComponentProps, DrawingToolComponentState> {
   drawingTool: any|null
   resizeTimeout: number|null
-  collabSpaceClient: CollabSpaceClient
+  WorkspaceClient: WorkspaceClient
 
   constructor (props:DrawingToolComponentProps) {
     super(props)
@@ -66,16 +66,16 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
     this.resize()
     window.addEventListener("resize", this.debounceResize, false)
 
-    this.collabSpaceClient = new CollabSpaceClient({
+    this.WorkspaceClient = new WorkspaceClient({
       init: (req) => {
-        const firebaseStorage = new FirebaseStorage(this.collabSpaceClient.dataRef, req.readonly)
+        const firebaseStorage = new FirebaseStorage(this.WorkspaceClient.dataRef, req.readonly)
         this.drawingTool.addStore(firebaseStorage)
         return {}
       },
 
       publish: (publication) => {
         const mimeType = "image/png"
-        return new Promise<CollabSpaceClientPublishResponse>( (resolve, reject) => {
+        return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
           const drawingCanvas:HTMLCanvasElement = this.drawingTool.canvas.getElement()
 
           const drawingBlobPromise = new Promise<Blob>((resolve, reject) => {
@@ -87,8 +87,8 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
 
           const thumbnailBlobPromise = new Promise<Blob>((resolve, reject) => {
             const thumbnailCanvas:HTMLCanvasElement = document.createElement("canvas")
-            thumbnailCanvas.width = CollabSpaceClientThumbnailWidth
-            thumbnailCanvas.height = CollabSpaceClientThumbnailWidth * (drawingCanvas.height / drawingCanvas.width)
+            thumbnailCanvas.width = WorkspaceClientThumbnailWidth
+            thumbnailCanvas.height = WorkspaceClientThumbnailWidth * (drawingCanvas.height / drawingCanvas.width)
 
             const thumbnailContext = thumbnailCanvas.getContext("2d")
             if (thumbnailContext) {

@@ -1,6 +1,6 @@
-collabspace/node_modules
-collabspace/dist
-collabspace/functions/node_modules
+/node_modules
+/dist
+/collabspace/functions/node_modules
 
 **/.DS_Store
 .vscode/

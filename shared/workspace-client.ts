@@ -1,12 +1,10 @@
-import { FirebaseConfig } from "./firebase-config"
-import { FirebaseArtifact, FirebasePublication } from "./document"
+import { FirebaseArtifact, FirebasePublication } from "../collabspace/src/lib/document"
 import * as firebase from "firebase"
 import { v4 as uuidV4 } from "uuid"
-import { PortalActivity, PortalUser } from "./auth";
 
 const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
 
-export const CollabSpaceClientThumbnailWidth = 50
+export const WorkspaceClientThumbnailWidth = 50
 
 export interface IFramePhoneLib {
   ParentEndpoint(iframe:HTMLIFrameElement, afterConnectedCallback?: (args:any) => void):  IFramePhoneParent
@@ -38,13 +36,16 @@ export interface IFramePhoneParent {
 }
 
 
-export const CollabSpaceClientInitRequestMessage = "CollabSpaceClientInitRequest"
-export const CollabSpaceClientInitResponseMessage = "CollabSpaceClientInitResponse"
+export const WorkspaceClientInitRequestMessage = "WorkspaceClientInitRequest"
+export const WorkspaceClientInitResponseMessage = "WorkspaceClientInitResponse"
 
-export const CollabSpaceClientPublishRequestMessage = "CollabSpaceClientPublishRequest"
-export const CollabSpaceClientPublishResponseMessage = "CollabSpaceClientPublishResponse"
+export const WorkspaceClientPublishRequestMessage = "WorkspaceClientPublishRequest"
+export const WorkspaceClientPublishResponseMessage = "WorkspaceClientPublishResponse"
 
-export interface CollabSpaceClientInitRequest {
+export type WorkspaceClientInitRequest = WorkspaceClientCollabSpaceInitRequest | WorkspaceClientStandaloneInitRequest
+
+export interface WorkspaceClientCollabSpaceInitRequest {
+  type: "collabspace"
   version: string
   id: string
   readonly: boolean
@@ -53,52 +54,61 @@ export interface CollabSpaceClientInitRequest {
     dataPath: string
   }
 }
-export interface CollabSpaceClientInitResponse {
+export interface WorkspaceClientStandaloneInitRequest {
+  type: "standalone"
+  version: string
+  id: string
+  readonly: boolean
 }
 
-export interface CollabSpaceClientPublishRequest {
+export interface WorkspaceClientInitResponse {
+}
+
+export interface WorkspaceClientPublishRequest {
   publicationsPath: string
   artifactStoragePath: string
 }
 
-export interface CollabSpaceClientPublishResponse {
+export interface WorkspaceClientPublishResponse {
 }
 
-export interface CollabSpaceClientConfig {
-  init(req: CollabSpaceClientInitRequest): CollabSpaceClientInitResponse|Promise<CollabSpaceClientInitResponse>
-  publish(publication: CollabSpaceClientPublication): CollabSpaceClientPublishResponse|Promise<CollabSpaceClientPublishResponse>
+export interface WorkspaceClientConfig {
+  init(req: WorkspaceClientInitRequest): WorkspaceClientInitResponse|Promise<WorkspaceClientInitResponse>
+  publish(publication: WorkspaceClientPublication): WorkspaceClientPublishResponse|Promise<WorkspaceClientPublishResponse>
 }
 
-export class CollabSpaceClient {
+export class WorkspaceClient {
   windowId: string
-  config: CollabSpaceClientConfig
+  config: WorkspaceClientConfig
   phone: IFramePhoneChild
   dataRef: firebase.database.Reference
 
-  constructor (config:CollabSpaceClientConfig) {
+  constructor (config:WorkspaceClientConfig) {
     this.config = config
     this.phone = IFramePhoneFactory.getIFrameEndpoint()
-    this.phone.addListener(CollabSpaceClientInitRequestMessage, this.clientInit.bind(this))
-    this.phone.addListener(CollabSpaceClientPublishRequestMessage, this.clientPublish.bind(this))
+    this.phone.addListener(WorkspaceClientInitRequestMessage, this.clientInit.bind(this))
+    this.phone.addListener(WorkspaceClientPublishRequestMessage, this.clientPublish.bind(this))
     this.phone.initialize()
   }
 
-  clientInit(req:CollabSpaceClientInitRequest) {
+  clientInit(req:WorkspaceClientInitRequest) {
     this.windowId = req.id
-    firebase.initializeApp(req.firebase.config)
-    this.dataRef = firebase.database().ref(req.firebase.dataPath)
+    if (req.type === "collabspace") {
+      firebase.initializeApp(req.firebase.config)
+      this.dataRef = firebase.database().ref(req.firebase.dataPath)
+    }
 
     const resp = this.config.init(req)
     Promise.resolve(resp).then((resp) => {
-      this.phone.post(CollabSpaceClientInitResponseMessage, resp)
+      this.phone.post(WorkspaceClientInitResponseMessage, resp)
     })
   }
 
-  clientPublish(req:CollabSpaceClientPublishRequest) {
-    const publication = new CollabSpaceClientPublication(this, req)
+  clientPublish(req:WorkspaceClientPublishRequest) {
+    const publication = new WorkspaceClientPublication(this, req)
     const resp = this.config.publish(publication)
     Promise.resolve(resp).then((resp) => {
-      this.phone.post(CollabSpaceClientPublishResponseMessage, resp)
+      this.phone.post(WorkspaceClientPublishResponseMessage, resp)
     })
   }
 }
@@ -111,12 +121,12 @@ export interface SaveArtifactBlobOptions {
   thumbnailPNGBlob?: Blob
 }
 
-export class CollabSpaceClientPublication {
+export class WorkspaceClientPublication {
   publicationsRef: firebase.database.Reference
   artifactsRef: firebase.database.Reference
   artifactsStoragePath: string
 
-  constructor (client: CollabSpaceClient, req:CollabSpaceClientPublishRequest) {
+  constructor (client: WorkspaceClient, req:WorkspaceClientPublishRequest) {
     this.publicationsRef = firebase.database().ref(req.publicationsPath)
     this.artifactsRef = this.publicationsRef.child("windows").child(client.windowId).child("artifacts")
     this.artifactsStoragePath = req.artifactStoragePath

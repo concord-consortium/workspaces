@@ -5,7 +5,7 @@ import { WindowManager } from "../lib/window-manager"
 import { PortalActivity, PortalUser, PortalUserMap } from "../lib/auth"
 import { getPublicationsRef, getArtifactsRef } from "../lib/refs"
 import { FirebasePublication, FirebasePublicationWindow, FirebaseArtifact } from "../lib/document"
-import { CollabSpaceClientThumbnailWidth } from "../lib/collabspace-client"
+import { WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 
 const timeago = require("timeago.js")
@@ -47,7 +47,7 @@ export class SidebarPublicationArtifactComponent extends React.Component<Sidebar
     const url = artifact.thumbnailUrl || artifact.url
     return (
       <div className="artifact" onClick={this.toggleViewArtifact}>
-        <img src={url} title={artifact.title} style={{width: CollabSpaceClientThumbnailWidth}} draggable={false} />
+        <img src={url} title={artifact.title} style={{width: WorkspaceClientThumbnailWidth}} draggable={false} />
       </div>
     )
   }

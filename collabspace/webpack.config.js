@@ -1,10 +1,13 @@
 const webpack = require("webpack");
 const ExtractTextPlugin = require("extract-text-webpack-plugin");
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 const isDev = process.env.NODE_ENV === "development";
 const cssFilename = isDev ? "[name].css" : "[name].[contenthash].css";
 const jsFilename = isDev ? "[name].js" : "[name].[chunkhash].js";
+
+const distPath = __dirname + "/../dist/collabspace";
 
 const extractSass = new ExtractTextPlugin({
    filename: cssFilename,
@@ -21,7 +24,7 @@ module.exports = [
 
         output: {
             filename: jsFilename,
-            path: __dirname + "/dist/assets"
+            path: distPath + "/assets"
         },
 
         // Enable sourcemaps for debugging webpack's output.
@@ -62,7 +65,10 @@ module.exports = [
             new HtmlWebpackPlugin({
                 filename: '../index.html',
                 template: 'src/index.template.html'
-            })
+            }),
+            new CopyWebpackPlugin([
+                {from: 'src/public', to: distPath}
+            ])
         ]
     },
     {
@@ -73,7 +79,7 @@ module.exports = [
 
         output: {
             filename: jsFilename,
-            path: __dirname + "/dist/assets"
+            path: distPath + "/assets"
         },
 
         // Enable sourcemaps for debugging webpack's output.

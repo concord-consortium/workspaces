@@ -1,5 +1,5 @@
 import { Document } from "./document"
-import { IFramePhoneParent } from "./collabspace-client"
+import { IFramePhoneParent } from "../../../shared/workspace-client"
 import * as firebase from "firebase"
 
 export interface FirebaseWindowAttrs {
