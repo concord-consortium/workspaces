@@ -56,7 +56,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const classUserLookup:PortalUserMap = {}
     if (portalActivity) {
       portalActivity.classInfo.students.forEach((student) => {
-        classUserLookup[escapeFirebaseKey(student.email)] = student
+        classUserLookup[escapeFirebaseKey(student.id)] = student
       })
     }
 
@@ -116,8 +116,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       this.groupUsersRef = groupRef.child("users")
       this.groupUsersRef.on("value", this.handleGroupUsersChange)
 
-      if (portalUser && portalUser.type === "student") {
-        this.userRef = this.groupUsersRef.child(escapeFirebaseKey(portalUser.email))
+      if (portalUser) {
+        this.userRef = this.groupUsersRef.child(escapeFirebaseKey(portalUser.id))
         this.connectedRef = firebase.database().ref(".info/connected")
         this.connectedRef.on("value", this.handleConnected)
       }
@@ -330,7 +330,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
             const publication:FirebasePublication = {
               activityId: portalActivity.id,
               group: group,
-              creator: portalUser.email,
+              creator: portalUser.id,
               groupMembers: groupUsers,
               createdAt: firebase.database.ServerValue.TIMESTAMP,
               documentId: document.id,
@@ -387,14 +387,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       return null
     }
     const users:JSX.Element[] = []
-    Object.keys(groupUsers).forEach((email) => {
-      const groupUser = groupUsers[email]
-      const portalUser = this.state.classUserLookup[escapeFirebaseKey(email)]
+    Object.keys(groupUsers).forEach((id) => {
+      const groupUser = groupUsers[id]
+      const portalUser = this.state.classUserLookup[escapeFirebaseKey(id)]
       if (portalUser) {
         const {connected} = groupUser
         const className = `group-user ${groupUser.connected ? "connected" : "disconnected"}`
         const titleSuffix = groupUser.connected ? `connected ${timeagoInstance.format(groupUser.connectedAt)}` : `disconnected ${timeagoInstance.format(groupUser.disconnectedAt)}`
-        users.push(<div key={email} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
+        users.push(<div key={id} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
       }
     })
     return (

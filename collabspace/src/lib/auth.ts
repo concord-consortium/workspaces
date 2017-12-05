@@ -13,10 +13,9 @@ export interface AuthQueryParams {
 }
 
 export interface PortalAPIClassUser {
-  id: number
+  id: string
   first_name: string
   last_name: string
-  email?: string
 }
 
 export interface PortalAPIClassInfo {
@@ -59,6 +58,7 @@ export interface PortalUserMap {
 
 export interface TeacherUser {
   type: "teacher"
+  id: string
   firstName: string
   lastName: string
   fullName: string
@@ -67,10 +67,10 @@ export interface TeacherUser {
 
 export interface StudentUser {
   type: "student"
+  id: string
   firstName: string
   lastName: string
   fullName: string
-  email: string
   initials: string
 }
 
@@ -86,20 +86,36 @@ export interface PortalInfo {
   activity: PortalActivity|null
 }
 
-export interface PortalJWTClaims {
-  "alg": string
-  "iss": string
-  "sub": string
-  "aud": string
-  "iat": number
-  "exp": number
-  "uid": number
-  "domain": string
-  "externalId": number
-  "returnUrl": string
-  "logging": boolean
-  "domain_uid": number
-  "class_info_url": string
+export interface PortalJWTStudentClaims {
+  user_type: "learner"
+  user_id: string
+  domain: string
+  externalId: number
+  returnUrl: string
+  logging: boolean
+  domain_uid: number
+  class_info_url: string
+  class_hash: string
+}
+export interface PortalJWTTeacherClaims {
+  user_type: "teacher"
+  user_id: string
+  domain: string
+  domain_uid: number
+  class_list_url: string
+  class_hashes: string[]
+}
+export type PortalJWTClaims = PortalJWTStudentClaims | PortalJWTTeacherClaims
+
+export interface PortalJWT {
+  alg: string
+  iss: string
+  sub: string
+  aud: string
+  iat: number
+  exp: number
+  uid: number
+  claims: PortalJWTClaims
 }
 
 export const portalAuth = () => {
@@ -119,31 +135,38 @@ export const portalAuth = () => {
 
     const isDemo = params.domain.indexOf("cloudfunctions") !== -1
 
+    const getErrorMessage = (err: any, res:superagent.Response) => {
+      return (res.body ? res.body.message : null) || err
+    }
+
     const generateJWTUrl = `${params.domain}${isDemo ? "demoGetFakeFirebaseJWT" : "api/v1/jwt/firebase?firebase_app=collabspace"}`
     superagent
       .get(generateJWTUrl)
       .set("Authorization", `Bearer ${params.token}`)
       .end((err, res) => {
         if (err) {
-          reject(err)
+          reject(getErrorMessage(err, res))
         }
         else if (!res.body || !res.body.token) {
           reject("No token found in JWT request response")
         }
         else {
-          const jwtClaims:PortalJWTClaims = jwt.decode(res.body.token) as any
-          if (!jwtClaims || !jwtClaims.class_info_url) {
+          const portalJWT:PortalJWT = jwt.decode(res.body.token) as PortalJWT
+          const jwtClaims = portalJWT ? portalJWT.claims : null
+          if (!jwtClaims) {
             reject("Invalid token found in JWT request response")
+          }
+          else if (jwtClaims.user_type !== "learner") {
+            reject("Teacher login to an activity is not yet available")
           }
           else {
             const classInfoUrl = `${jwtClaims.class_info_url}${isDemo && params.demo ? `?demo=${params.demo}` : ""}`
             superagent
               .get(classInfoUrl)
-              //.set("Authorization", `Bearer ${params.token}`)
-              .set("Authorization", `Bearer/JWT ${res.body.token}`)
+              .set("Authorization", `Bearer ${params.token}`)
               .end((err, res) => {
                 if (err) {
-                  reject(err)
+                  reject(getErrorMessage(err, res))
                 }
                 else if (!res.body || !res.body.class_hash) {
                   reject("Invalid class info response")
@@ -162,12 +185,13 @@ export const portalAuth = () => {
                       const fullName = `${apiTeacher.first_name} ${apiTeacher.last_name}`
                       const teacher:TeacherUser = {
                         type: "teacher",
+                        id: apiTeacher.id,
                         firstName: apiTeacher.first_name,
                         lastName: apiTeacher.last_name,
                         fullName,
                         initials: initials(fullName)
                       }
-                      if (apiTeacher.id === jwtClaims.uid) {
+                      if (apiTeacher.id === jwtClaims.user_id) {
                         user = teacher
                       }
                       return teacher
@@ -176,13 +200,13 @@ export const portalAuth = () => {
                       const fullName = `${apiStudent.first_name} ${apiStudent.last_name}`
                       const student:StudentUser = {
                         type: "student",
+                        id: apiStudent.id,
                         firstName: apiStudent.first_name,
                         lastName: apiStudent.last_name,
                         fullName,
-                        initials: initials(fullName),
-                        email: apiStudent.email || ""
+                        initials: initials(fullName)
                       }
-                      if (apiStudent.id === jwtClaims.uid) {
+                      if (apiStudent.id === jwtClaims.user_id) {
                         user = student
                       }
                       return student

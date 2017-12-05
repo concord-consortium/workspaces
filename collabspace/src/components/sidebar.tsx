@@ -162,8 +162,8 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
     this.setState({expanded: !this.state.expanded})
   }
 
-  getUserName(email:string) {
-    const user = this.props.userMap[escapeFirebaseKey(email)]
+  getUserName(id:string) {
+    const user = this.props.userMap[escapeFirebaseKey(id)]
     return user ? user.fullName : "Unknown Student"
   }
 
@@ -199,10 +199,10 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
   renderGroupUsers() {
     const {publication} = this.props.publicationItem
     const groupUsers:string[] = []
-    const escapedCreatorEmail = escapeFirebaseKey(publication.creator)
-    Object.keys(publication.groupMembers).forEach((email) => {
-      if (email !== escapedCreatorEmail) {
-        groupUsers.push(this.getUserName(email))
+    const escapedCreatorId = escapeFirebaseKey(publication.creator)
+    Object.keys(publication.groupMembers).forEach((id) => {
+      if (id !== escapedCreatorId) {
+        groupUsers.push(this.getUserName(id))
       }
     })
     if (groupUsers.length === 0) {
@@ -273,8 +273,8 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
 
     this.userMap = {}
     this.props.portalActivity.classInfo.students.forEach((student) => {
-      this.userMap[student.email] = student
-      this.userMap[escapeFirebaseKey(student.email)] = student
+      this.userMap[student.id] = student
+      this.userMap[escapeFirebaseKey(student.id)] = student
     })
   }
 
@@ -303,14 +303,13 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   getFilteredPublicationItems() {
     const {publicationItems, filter} = this.state
     const {portalActivity, portalUser, group} = this.props
-    const email = portalUser.type === "student" ? portalUser.email : ""
     return publicationItems.filter((publicationItem) => {
       const {publication} = publicationItem
       switch (filter) {
         case "group":
           return publication.group === group
         case "mine":
-          return publication.creator === email
+          return publication.creator === portalUser.id
         default:
           return true
       }
