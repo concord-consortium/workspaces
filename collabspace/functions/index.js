@@ -90,16 +90,17 @@ const getDemoUserFromJWTToken = (request, response, callback) => {
   });
 };
 
-const createDemoUser = (userId) => {
+const createDemoUser = (userId, useExtendedId) => {
+  const id = useExtendedId ? `http://example.com/users/${userId}` : userId;
   if (userId < 1000) {
     return {
-      id: `http://example.com/users/${userId}`,
+      id: id,
       first_name: "Student",
       last_name: `${userId}`
     };
   }
   return {
-    id: `http://example.com/users/${userId}`,
+    id: id,
     first_name: "Teacher",
     last_name: `${userId - 999}`
   };
@@ -128,12 +129,17 @@ exports.demoGetFakeFirebaseJWT = functions.https.onRequest((request, response) =
         "iat": now,
         "exp": oneHourFromNow,
         "uid": user.id,
-        "domain": demoInfo.rootUrl,
-        "externalId": 1,
-        "returnUrl": `${demoInfo.rootUrl}dataservice/external_activity_data/debc99c7-daa2-4758-86f7-2ca4f3726c66`,
-        "logging": false,
-        "domain_uid": user.id,
-        "class_info_url": `${demoInfo.rootUrl}demoGetFakeClassInfo`
+        "claims": {
+          "user_type": "learner",
+          "user_id": `http://example.com/users/${user.id}`,
+          "domain": demoInfo.rootUrl,
+          "externalId": 1,
+          "returnUrl": `${demoInfo.rootUrl}dataservice/external_activity_data/debc99c7-daa2-4758-86f7-2ca4f3726c66`,
+          "logging": false,
+          "domain_uid": user.id,
+          "class_info_url": `${demoInfo.rootUrl}demoGetFakeClassInfo`,
+          "class_hash": "demo"
+        }
       };
 
       jwt.sign(claims, fakePrivateKey, {algorithm: "RS256"}, function(err, token) {
@@ -150,7 +156,7 @@ exports.demoGetFakeFirebaseJWT = functions.https.onRequest((request, response) =
 
 exports.demoGetFakeClassInfo = functions.https.onRequest((request, response) => {
   cors(request, response, () => {
-    getDemoUserFromJWTToken(request, response, (err, user) => {
+    getDemoUserFromAuthToken(request, response, (err, user) => {
       if (err) {
         sendError(response, err, 403);
         return;
@@ -166,10 +172,10 @@ exports.demoGetFakeClassInfo = functions.https.onRequest((request, response) => 
       };
 
       for (let i = 0; i < demoInfo.numTeachers; i++) {
-        classInfo.teachers.push(createDemoUser(1000 + i));
+        classInfo.teachers.push(createDemoUser(1000 + i, true));
       }
       for (let i = 0; i < demoInfo.numStudents; i++) {
-        classInfo.students.push(createDemoUser(1 + i));
+        classInfo.students.push(createDemoUser(1 + i, true));
       }
 
       response.json(classInfo);

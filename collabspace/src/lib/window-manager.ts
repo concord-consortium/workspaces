@@ -470,9 +470,9 @@ export class WindowManager {
         .then((snapshot) => {
           const windows:FirebaseWindows|null = snapshot.val()
           const attrs = windows && windows.attrs && windows.attrs[windowId] ? windows.attrs[windowId] : null
-          const iframeData = windows && windows.iframeData && windows.iframeData[windowId] ? windows.iframeData[windowId] : null
+          const iframeData = windows && windows.iframeData && windows.iframeData[windowId] ? windows.iframeData[windowId] : undefined
 
-          if (!attrs || !iframeData) {
+          if (!attrs) {
             return reject("Cannot find window in publication!")
           }
           else {
