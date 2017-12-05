@@ -74,7 +74,7 @@ module.exports = [
     {
         entry: {
             "drawing-tool": "./src/drawing-tool.tsx",
-            "drawing-tool-globals": ["firebase"]
+            "drawing-tool-globals": ["react", "react-dom", "firebase", "lodash"]
         },
 
         output: {
