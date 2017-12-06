@@ -86,12 +86,12 @@ export class WorkspaceClient {
   constructor (config:WorkspaceClientConfig) {
     this.config = config
     this.phone = IFramePhoneFactory.getIFrameEndpoint()
-    this.phone.addListener(WorkspaceClientInitRequestMessage, this.clientInit.bind(this))
-    this.phone.addListener(WorkspaceClientPublishRequestMessage, this.clientPublish.bind(this))
+    this.phone.addListener(WorkspaceClientInitRequestMessage, this.handleClientInit)
+    this.phone.addListener(WorkspaceClientPublishRequestMessage, this.handleClientPublish)
     this.phone.initialize()
   }
 
-  clientInit(req:WorkspaceClientInitRequest) {
+  handleClientInit = (req:WorkspaceClientInitRequest) => {
     this.windowId = req.id
     if (req.type === "collabspace") {
       firebase.initializeApp(req.firebase.config)
@@ -104,7 +104,7 @@ export class WorkspaceClient {
     })
   }
 
-  clientPublish(req:WorkspaceClientPublishRequest) {
+  handleClientPublish = (req:WorkspaceClientPublishRequest) => {
     const publication = new WorkspaceClientPublication(this, req)
     const resp = this.config.publish(publication)
     Promise.resolve(resp).then((resp) => {

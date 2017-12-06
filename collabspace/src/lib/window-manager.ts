@@ -89,13 +89,6 @@ export class WindowManager {
       topWindow: null
     }
 
-    this.handleAttrsRef = this.handleAttrsRef.bind(this)
-    this.handleAttrsRefChildAdded = this.handleAttrsRefChildAdded.bind(this)
-    this.handleOrderRef = this.handleOrderRef.bind(this)
-    this.handleOrderChange = this.handleOrderChange.bind(this)
-    this.handleMinimizedOrderRef = this.handleMinimizedOrderRef.bind(this)
-    this.handleMinimizedOrderChange = this.handleMinimizedOrderChange.bind(this)
-
     this.attrsRef = this.document.getWindowsDataRef("attrs")
     this.orderRef = this.document.getWindowsDataRef("order")
     this.minimizedOrderRef = this.document.getWindowsDataRef("minimizedOrder")
@@ -157,7 +150,7 @@ export class WindowManager {
     return orderMap
   }
 
-  handleAttrsRefChildAdded(snapshot:firebase.database.DataSnapshot) {
+  handleAttrsRefChildAdded = (snapshot:firebase.database.DataSnapshot) => {
     const windowId = snapshot.key
     const attrs:FirebaseWindowAttrs|null = snapshot.val()
     if (windowId && !this.windows[windowId] && attrs) {
@@ -170,7 +163,7 @@ export class WindowManager {
     }
   }
 
-  handleAttrsRef(snapshot:firebase.database.DataSnapshot) {
+  handleAttrsRef = (snapshot:firebase.database.DataSnapshot) => {
     const attrsMap:FirebaseWindowAttrsMap|null = snapshot.val()
     const updatedWindows:WindowMap = {}
 
@@ -212,13 +205,13 @@ export class WindowManager {
   // This is because we don't want to be rewriting entire arrays in Firebase as that doesn't
   // handle writes by simulataneous users.  Instead we keep a map in Firebase so we can use
   // update to set the order and then an array in the manager to simplify the loops of windows
-  handleOrderRef(snapshot:firebase.database.DataSnapshot) {
+  handleOrderRef = (snapshot:firebase.database.DataSnapshot) => {
     const windowOrderMap:FirebaseOrderMap = snapshot.val() || {}
     const windowOrder = this.firebaseOrderMapToArray(windowOrderMap)
     this.handleOrderChange(windowOrder)
   }
 
-  handleOrderChange(windowOrder:string[]) {
+  handleOrderChange = (windowOrder:string[]) => {
     this.windowOrder = windowOrder
     this.state.allOrderedWindows = []
     this.state.topWindow = null
@@ -240,13 +233,13 @@ export class WindowManager {
     this.notifyStateChange()
   }
 
-  handleMinimizedOrderRef(snapshot:firebase.database.DataSnapshot) {
+  handleMinimizedOrderRef = (snapshot:firebase.database.DataSnapshot) => {
     const minimizedWindowOrderMap:FirebaseOrderMap = snapshot.val() || {}
     const minimizedWindowOrder = this.firebaseOrderMapToArray(minimizedWindowOrderMap)
     this.handleMinimizedOrderChange(minimizedWindowOrder)
   }
 
-  handleMinimizedOrderChange(minimizedWindowOrder:string[]) {
+  handleMinimizedOrderChange = (minimizedWindowOrder:string[]) => {
     this.minimizedWindowOrder = minimizedWindowOrder
     this.state.minimizedWindows = []
 

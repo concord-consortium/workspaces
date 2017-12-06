@@ -61,9 +61,6 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       template: null
     }
     this.startingTitle = document.title
-    this.setTitle = this.setTitle.bind(this)
-    this.handleChoseGroup = this.handleChoseGroup.bind(this)
-    this.leaveGroup = this.leaveGroup.bind(this)
   }
 
   refs: {
@@ -79,8 +76,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       return firebaseAuth().then((firebaseUser) => {
         this.setState({firebaseUser})
 
-        this.parseHash()
-        window.addEventListener("hashchange", this.parseHash.bind(this))
+        this.handleParseHash()
+        window.addEventListener("hashchange", this.handleParseHash)
       })
     })
     .catch((error) => {
@@ -88,12 +85,12 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
     })
   }
 
-  setTitle(documentName?:string|null) {
+  handleSetTitle = (documentName?:string|null) => {
     const suffix = documentName ? `: ${documentName}` : ""
     document.title = this.startingTitle + suffix
   }
 
-  parseHash() {
+  handleParseHash = () => {
     const params:AppHashParams = queryString.parse(window.location.hash)
 
     if (this.state.document) {
@@ -107,7 +104,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       demoId: params.demo || null
     })
 
-    this.setTitle()
+    this.handleSetTitle()
 
     if (params.template) {
       const parsedParam = Document.ParseTemplateHashParam(params.template)
@@ -126,7 +123,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
     }
   }
 
-  handleChoseGroup(e:React.ChangeEvent<HTMLFormElement>) {
+  handleChoseGroup = (e:React.ChangeEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (this.refs.group) {
       const group = parseInt(this.refs.group.value)
@@ -143,7 +140,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
     }
   }
 
-  leaveGroup() {
+  handleLeaveGroup = () => {
     this.setState({groupChosen: false, group: 0, document: null})
   }
 
@@ -195,7 +192,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                   setTitle={null}
                   group={this.state.group}
                   groupRef={this.state.groupRef}
-                  leaveGroup={this.leaveGroup}
+                  leaveGroup={this.handleLeaveGroup}
                 />
               }
               return this.renderProgress("Loading collaborative space group document...")
@@ -219,7 +216,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                     groupRef={null}
                     firebaseUser={this.state.firebaseUser}
                     document={this.state.template}
-                    setTitle={this.setTitle}
+                    setTitle={this.handleSetTitle}
                  />
         }
         return this.renderProgress("Loading collaborative space template...")

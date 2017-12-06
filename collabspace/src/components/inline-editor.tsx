@@ -21,11 +21,6 @@ export class InlineEditorComponent extends React.Component<InlineEditorComponent
       text: this.props.text,
       uneditedText: this.props.text
     }
-    this.handleDoubleClick = this.handleDoubleClick.bind(this)
-    this.handleChange = this.handleChange.bind(this)
-    this.handleBlur = this.handleBlur.bind(this)
-    this.handleKeyUp = this.handleKeyUp.bind(this)
-    this.handleMouseDown = this.handleMouseDown.bind(this)
   }
 
   refs: {
@@ -52,7 +47,7 @@ export class InlineEditorComponent extends React.Component<InlineEditorComponent
     }
   }
 
-  handleDoubleClick() {
+  handleDoubleClick = () => {
     this.setState({editing: true}, () => {
       const {text} = this.refs
       text.focus()
@@ -60,15 +55,15 @@ export class InlineEditorComponent extends React.Component<InlineEditorComponent
     })
   }
 
-  handleChange() {
+  handleChange = () => {
     this.setState({text: this.refs.text.value})
   }
 
-  handleBlur() {
+  handleBlur = () => {
     this.doneEditing(true)
   }
 
-  handleKeyUp(e:React.KeyboardEvent<HTMLInputElement>) {
+  handleKeyUp = (e:React.KeyboardEvent<HTMLInputElement>) => {
     if ((e.keyCode === 9) || (e.keyCode === 13)) {
       this.doneEditing(true)
     }
@@ -77,7 +72,7 @@ export class InlineEditorComponent extends React.Component<InlineEditorComponent
     }
   }
 
-  handleMouseDown(e:React.MouseEvent<HTMLInputElement>) {
+  handleMouseDown = (e:React.MouseEvent<HTMLInputElement>) => {
     e.stopPropagation()
   }
 

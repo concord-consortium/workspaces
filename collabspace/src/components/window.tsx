@@ -17,7 +17,6 @@ export class WindowIframeComponent extends React.Component<WindowIframeComponent
 
   constructor (props:WindowIframeComponentProps) {
     super(props);
-    this.loaded = this.loaded.bind(this)
     this.state = {}
     this.firstLoad = true
   }
@@ -26,7 +25,7 @@ export class WindowIframeComponent extends React.Component<WindowIframeComponent
     iframe: HTMLIFrameElement
   }
 
-  loaded() {
+  handleLoaded = () => {
     if (this.firstLoad) {
       this.props.loaded(this.refs.iframe)
       this.firstLoad = false
@@ -38,7 +37,7 @@ export class WindowIframeComponent extends React.Component<WindowIframeComponent
   }
 
   render() {
-    return <iframe ref='iframe' src={this.props.src} onLoad={this.loaded}></iframe>
+    return <iframe ref='iframe' src={this.props.src} onLoad={this.handleLoaded}></iframe>
   }
 }
 
@@ -61,21 +60,6 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       editingTitle: false,
       attrs: props.window.attrs
     }
-
-    this.handleAttrsChanged = this.handleAttrsChanged.bind(this)
-    this.handleMoveWindowToTop = this.handleMoveWindowToTop.bind(this)
-    this.handleDragWindow = this.handleDragWindow.bind(this)
-    this.handleDragLeft = this.handleDragLeft.bind(this)
-    this.handleDragRight = this.handleDragRight.bind(this)
-    this.handleDragTop = this.handleDragTop.bind(this)
-    this.handleDragBottom = this.handleDragBottom.bind(this)
-    this.handleDragBottomLeft = this.handleDragBottomLeft.bind(this)
-    this.handleDragBottomRight = this.handleDragBottomRight.bind(this)
-    this.handleMinimize = this.handleMinimize.bind(this)
-    this.handleMaximize = this.handleMaximize.bind(this)
-    this.handleClose = this.handleClose.bind(this)
-    this.handleChangeTitle = this.handleChangeTitle.bind(this)
-    this.handleIframeLoaded = this.handleIframeLoaded.bind(this)
   }
 
   refs: {
@@ -90,15 +74,15 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     this.props.window.onAttrsChanged = null
   }
 
-  handleAttrsChanged(newAttrs:FirebaseWindowAttrs) {
+  handleAttrsChanged = (newAttrs:FirebaseWindowAttrs) => {
     this.setState({attrs: newAttrs})
   }
 
-  handleMoveWindowToTop() {
+  handleMoveWindowToTop = () => {
     this.props.windowManager.moveToTop(this.props.window)
   }
 
-  handleDragWindow(e:React.MouseEvent<HTMLDivElement>) {
+  handleDragWindow = (e:React.MouseEvent<HTMLDivElement>) => {
     if (this.props.window.attrs.maximized) {
       return
     }
@@ -115,49 +99,49 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     this.props.windowManager.registerDragWindow(this.props.window, DragType.Position)
   }
 
-  handleDragLeft(e:React.MouseEvent<HTMLDivElement>) {
+  handleDragLeft = (e:React.MouseEvent<HTMLDivElement>) => {
     this.props.windowManager.registerDragWindow(this.props.window, DragType.GrowLeft)
   }
 
-  handleDragRight(e:React.MouseEvent<HTMLDivElement>) {
+  handleDragRight = (e:React.MouseEvent<HTMLDivElement>) => {
     this.props.windowManager.registerDragWindow(this.props.window, DragType.GrowRight)
   }
 
-  handleDragTop(e:React.MouseEvent<HTMLDivElement>) {
+  handleDragTop = (e:React.MouseEvent<HTMLDivElement>) => {
     this.props.windowManager.registerDragWindow(this.props.window, DragType.GrowUp)
   }
 
-  handleDragBottom(e:React.MouseEvent<HTMLDivElement>) {
+  handleDragBottom = (e:React.MouseEvent<HTMLDivElement>) => {
     this.props.windowManager.registerDragWindow(this.props.window, DragType.GrowDown)
   }
 
-  handleDragBottomLeft(e:React.MouseEvent<HTMLDivElement>) {
+  handleDragBottomLeft = (e:React.MouseEvent<HTMLDivElement>) => {
     this.props.windowManager.registerDragWindow(this.props.window, DragType.GrowDownLeft)
   }
 
-  handleDragBottomRight(e:React.MouseEvent<HTMLDivElement>) {
+  handleDragBottomRight = (e:React.MouseEvent<HTMLDivElement>) => {
     this.props.windowManager.registerDragWindow(this.props.window, DragType.GrowDownRight)
   }
 
-  handleMinimize(e:React.MouseEvent<HTMLSpanElement>) {
+  handleMinimize = (e:React.MouseEvent<HTMLSpanElement>) => {
     this.props.windowManager.setState(this.props.window, true, !!this.props.window.attrs.maximized)
   }
 
-  handleMaximize(e:React.MouseEvent<HTMLSpanElement>) {
+  handleMaximize = (e:React.MouseEvent<HTMLSpanElement>) => {
     this.props.windowManager.setState(this.props.window, false, !this.props.window.attrs.maximized)
   }
 
-  handleClose(e:React.MouseEvent<HTMLSpanElement>) {
+  handleClose = (e:React.MouseEvent<HTMLSpanElement>) => {
     if (e.ctrlKey || confirm("Are you sure you want to close the window?")) {
       this.props.windowManager.close(this.props.window)
     }
   }
 
-  handleChangeTitle(newTitle: string) {
+  handleChangeTitle = (newTitle: string) => {
     this.props.windowManager.changeTitle(this.props.window, newTitle)
   }
 
-  handleIframeLoaded(iframe:HTMLIFrameElement) {
+  handleIframeLoaded = (iframe:HTMLIFrameElement) => {
     this.props.windowManager.windowLoaded(this.props.window, iframe)
   }
 
