@@ -276,10 +276,22 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  constructRelativeUrl(filename:string) {
+    const {location} = window
+    return `${location.origin}${location.pathname}${filename}`
+  }
+
   handleAddDrawingButton() {
     const title = (prompt("Enter the title of the drawing", "Untitled Drawing") || "").trim()
     if (title.length > 0) {
-      this.windowManager.add(`${window.location.origin}/drawing-tool.html`, title)
+      this.windowManager.add(this.constructRelativeUrl("drawing-tool.html"), title)
+    }
+  }
+
+  handleAddCaseTable = () => {
+    const title = (prompt("Enter the title of the table", "Untitled Table") || "").trim()
+    if (title.length > 0) {
+      this.windowManager.add(this.constructRelativeUrl("neo-codap.html"), title)
     }
   }
 
@@ -433,6 +445,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="buttons">
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
+          <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
         </div>
         <div className="right-buttons">
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}

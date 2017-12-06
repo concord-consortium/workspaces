@@ -155,7 +155,7 @@ export const DataSet = types.model('DataSet', {
     const index = caseIDMap[caseID];
     if (index == null) { return undefined; }
 
-    let aCase = { id: caseID };
+    let aCase: ICase = { id: caseID };
     self.attributes.forEach((attr) => {
       aCase[attr.name] = attr.value(index);
     });
@@ -166,7 +166,7 @@ export const DataSet = types.model('DataSet', {
     const index = caseIDMap[caseID];
     if (index == null) { return undefined; }
 
-    let aCase = { id: caseID };
+    let aCase: ICase = { id: caseID };
     self.attributes.forEach((attr) => {
       aCase[attr.id] = attr.value(index);
     });
