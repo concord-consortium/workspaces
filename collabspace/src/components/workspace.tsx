@@ -2,7 +2,7 @@ import * as React from "react"
 import * as firebase from "firebase"
 import * as queryString from "query-string"
 
-import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap } from "../lib/document"
+import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap, FirebaseDocument } from "../lib/document"
 import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap } from "../lib/window"
 import { WindowComponent } from "./window"
 import { MinimizedWindowComponent } from "./minimized-window"
@@ -286,6 +286,22 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.open(`${window.location.origin}/#${queryString.stringify(hashParams)}`)
   }
 
+  handleSyncLocalWindowState = (firebaseDocument:FirebaseDocument) => {
+    if (firebaseDocument.data && firebaseDocument.data.windows) {
+      const {windows} = firebaseDocument.data
+      if (windows.attrs) {
+        Object.keys(windows.attrs).forEach((windowId) => {
+          const localWindow = this.windowManager.windows[windowId]
+          if (localWindow) {
+            windows.attrs[windowId] = localWindow.attrs
+          }
+        })
+      }
+      windows.order = this.windowManager.windowOrder
+      windows.minimizedOrder = this.windowManager.minimizedWindowOrder
+    }
+  }
+
   handlePublishButton = () => {
     const {groupUsers} = this.state
     const {portalActivity, portalUser, groupRef, group} = this.props
@@ -302,8 +318,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
     this.setState({publishing: true})
 
-    // copy the doc
-    this.props.document.copy(getDocumentPath(portalActivity))
+    // copy the doc with local window state
+    this.props.document.copy(getDocumentPath(portalActivity), this.handleSyncLocalWindowState)
       .then((document) => {
 
         // open the doc to get the windows

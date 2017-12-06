@@ -220,23 +220,27 @@ export class Document {
     })
   }
 
-  copy(newBasePath:string): Promise<Document> {
+  copy(newBasePath:string, documentFilter?:(firebaseDocument:FirebaseDocument) => void): Promise<Document> {
     return new Promise<Document>((resolve, reject) => {
       const newRef = firebase.database().ref(newBasePath).push()
       const newId = newRef.key as string
 
       this.ref.once("value", (snapshot) => {
-        const documentValue = snapshot.val()
-        if (!documentValue) {
+        const firebaseDocument:FirebaseDocument|null = snapshot.val()
+        if (!firebaseDocument) {
           reject("Cannot copy document")
         }
         else {
-          newRef.set(documentValue, (err) => {
+          if (documentFilter) {
+            documentFilter(firebaseDocument)
+          }
+
+          newRef.set(firebaseDocument, (err) => {
             if (err) {
               reject(err)
             }
             else {
-              resolve(new Document(newId, documentValue, `${newBasePath}/${newId}`))
+              resolve(new Document(newId, firebaseDocument, `${newBasePath}/${newId}`))
             }
           })
         }
