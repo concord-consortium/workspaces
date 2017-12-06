@@ -35,10 +35,9 @@ export class SidebarPublicationArtifactComponent extends React.Component<Sidebar
   constructor (props:SidebarPublicationArtifactComponentProps) {
     super(props)
     this.state = {}
-    this.toggleViewArtifact = this.toggleViewArtifact.bind(this)
   }
 
-  toggleViewArtifact() {
+  handleToggleViewArtifact = () => {
     this.props.toggleViewArtifact(this.props.artifact)
   }
 
@@ -46,7 +45,7 @@ export class SidebarPublicationArtifactComponent extends React.Component<Sidebar
     const {artifact} = this.props
     const url = artifact.thumbnailUrl || artifact.url
     return (
-      <div className="artifact" onClick={this.toggleViewArtifact}>
+      <div className="artifact" onClick={this.handleToggleViewArtifact}>
         <img src={url} title={artifact.title} style={{width: WorkspaceClientThumbnailWidth}} draggable={false} />
       </div>
     )
@@ -76,8 +75,6 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
       artifactItems: []
     }
     this.artifactsRef = getPublicationsRef(this.props.portalActivity, this.props.publicationId).child("windows").child(this.props.windowId).child("artifacts")
-    this.handleArtifactAdded = this.handleArtifactAdded.bind(this)
-    this.handleCopyIntoDocument = this.handleCopyIntoDocument.bind(this)
   }
 
   componentWillMount() {
@@ -88,7 +85,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
     this.artifactsRef.off("child_added", this.handleArtifactAdded)
   }
 
-  handleArtifactAdded(snapshot:firebase.database.DataSnapshot) {
+  handleArtifactAdded = (snapshot:firebase.database.DataSnapshot) => {
     // we have to listen for added artifacts as the user might click on the published item
     // before the artifact is created and we only listen for publication child_added not value
     const artifact:FirebaseArtifact = snapshot.val()
@@ -97,7 +94,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
     this.setState({artifactItems})
   }
 
-  handleCopyIntoDocument() {
+  handleCopyIntoDocument = () => {
     const title = `${this.props.window.title} by ${this.props.creatorName} in group ${this.props.publication.group}`
     this.props.windowManager.copyWindowFromPublication(this.props.portalActivity, this.props.publication, this.props.windowId, title)
       .catch((err:any) => alert(err.toString()))
@@ -155,10 +152,9 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
       expanded: false,
       creatorName: this.getUserName(this.props.publicationItem.publication.creator)
     }
-    this.handleToggle = this.handleToggle.bind(this)
   }
 
-  handleToggle() {
+  handleToggle = () => {
     this.setState({expanded: !this.state.expanded})
   }
 
@@ -269,7 +265,6 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
       filter: "activity"
     }
     this.publicationsRef = getPublicationsRef(this.props.portalActivity)
-    this.handlePublicationAdded = this.handlePublicationAdded.bind(this)
 
     this.userMap = {}
     this.props.portalActivity.classInfo.students.forEach((student) => {
@@ -286,7 +281,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     this.publicationsRef.off("child_added", this.handlePublicationAdded)
   }
 
-  handlePublicationAdded(snapshot:firebase.database.DataSnapshot) {
+  handlePublicationAdded = (snapshot:firebase.database.DataSnapshot) => {
     const {publicationItems} = this.state
     const publication:FirebasePublication = snapshot.val()
     if (publication.activityId === this.props.portalActivity.id) {

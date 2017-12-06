@@ -24,7 +24,6 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
     this.state = {
       title: null
     }
-    this.handleInfoRef = this.handleInfoRef.bind(this)
   }
 
   componentWillMount() {
@@ -36,7 +35,7 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
     this.infoRef.off("value", this.handleInfoRef)
   }
 
-  handleInfoRef(snapshot:firebase.database.DataSnapshot) {
+  handleInfoRef = (snapshot:firebase.database.DataSnapshot) => {
     const info:FirebaseDocumentInfo|null = snapshot.val()
     if (info) {
       this.setState({title: info.name})

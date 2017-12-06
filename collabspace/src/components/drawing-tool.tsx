@@ -47,8 +47,6 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
   constructor (props:DrawingToolComponentProps) {
     super(props)
     this.state = {}
-    this.debounceResize = this.debounceResize.bind(this)
-    this.resize = this.resize.bind(this)
   }
 
   refs: {
@@ -63,8 +61,8 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
       },
       parseSVG: true
     })
-    this.resize()
-    window.addEventListener("resize", this.debounceResize, false)
+    this.handleResize()
+    window.addEventListener("resize", this.handleDebounceResize, false)
 
     this.WorkspaceClient = new WorkspaceClient({
       init: (req) => {
@@ -121,23 +119,23 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
   }
 
   componentWillUnmount() {
-    window.removeEventListener("resize", this.debounceResize, false)
+    window.removeEventListener("resize", this.handleDebounceResize, false)
   }
 
   shouldComponentUpdate() {
     return false
   }
 
-  debounceResize() {
+  handleDebounceResize = () => {
     if (!this.resizeTimeout) {
       this.resizeTimeout = window.setTimeout(() => {
         this.resizeTimeout = null
-        this.resize()
+        this.handleResize()
       }, 300)
     }
   }
 
-  resize() {
+  handleResize = () => {
     if (this.drawingTool) {
       const {container} = this.refs
       this.drawingTool.setDimensions(container.clientWidth - 65, container.clientHeight)
