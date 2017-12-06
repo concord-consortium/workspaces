@@ -283,6 +283,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleAddCaseTable = () => {
+    const title = (prompt("Enter the title of the table", "Untitled Table") || "").trim()
+    if (title.length > 0) {
+      this.windowManager.add(`${window.location.origin}/neo-codap.html`, title)
+    }
+  }
+
   handleCreateDemoButton() {
     const hashParams:AppHashParams = {
       template: this.props.document.getTemplateHashParam(),
@@ -433,6 +440,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="buttons">
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
+          <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
         </div>
         <div className="right-buttons">
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
