@@ -26,7 +26,15 @@
     "url": "https://github.com/concord-consortium/workspaces/issues"
   },
   "homepage": "https://github.com/concord-consortium/workspaces#readme",
-  "dependencies": {},
+  "dependencies": {
+    "ag-grid": "^14.2.0",
+    "ag-grid-react": "^14.2.0",
+    "mobx": "^3.4.0",
+    "mobx-state-tree": "^1.2.1",
+    "react-dom-factories": "^1.0.2",
+    "react-scripts-ts": "2.8.0",
+    "uuid": "^3.1.0"
+  },
   "devDependencies": {
     "@types/jsonwebtoken": "^7.2.3",
     "@types/lodash": "^4.14.85",
