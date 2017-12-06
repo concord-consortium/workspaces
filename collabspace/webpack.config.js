@@ -9,6 +9,8 @@ const jsFilename = isDev ? "[name].js" : "[name].[chunkhash].js";
 
 const distPath = __dirname + "/../dist/collabspace";
 
+const globalsList = ["react", "react-dom", "firebase", "lodash", "query-string", "uuid"];
+
 const extractSass = new ExtractTextPlugin({
    filename: cssFilename,
    disable: isDev
@@ -19,7 +21,7 @@ module.exports = [
         entry: {
             app: "./src/app.tsx",
             styles: "./src/styles/app.scss",
-            globals: ["react", "react-dom", "firebase"]
+            globals: globalsList
         },
 
         output: {
@@ -74,7 +76,7 @@ module.exports = [
     {
         entry: {
             "drawing-tool": "./src/drawing-tool.tsx",
-            "drawing-tool-globals": ["react", "react-dom", "firebase", "lodash"]
+            "drawing-tool-globals": globalsList
         },
 
         output: {
@@ -115,7 +117,7 @@ module.exports = [
     {
         entry: {
             "neo-codap": "../neo-codap/src/index.tsx",
-            "neo-codap-globals": ["react", "react-dom", "firebase"]
+            "neo-codap-globals": globalsList
         },
 
         output: {
