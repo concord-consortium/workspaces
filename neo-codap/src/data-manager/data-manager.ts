@@ -338,18 +338,18 @@ export const DataSet = types.model('DataSet', {
                   const caseID = aCase.id;
                   let srcCase = srcDataSet && caseID && srcDataSet.getCase(caseID);
                   if (caseID && srcCase) {
-                    const shouldInclude = !filter || filter(srcCase),
+                    const filteredCase = filter ? filter(srcCase) : srcCase,
                           doesInclude = caseIDMap[caseID] != null;
                     // identify cases that now pass the filter after change
-                    if (shouldInclude && !doesInclude) {
-                      casesToAdd.push(srcCase);
+                    if (filteredCase && !doesInclude) {
+                      casesToAdd.push(filteredCase);
                       // determine beforeIDs so that cases end up in correct locations
                       const srcBeforeID = srcDataSet && srcDataSet.nextCaseID(caseID),
                             dstBeforeID = mapBeforeID(srcDataSet, srcBeforeID);
                       beforeIDs.push(dstBeforeID);
                     }
                     // identify cases that no longer pass the filter after change
-                    if (!shouldInclude && doesInclude) {
+                    if (!filteredCase && doesInclude) {
                       casesToRemove.push(caseID);
                     }
                   }

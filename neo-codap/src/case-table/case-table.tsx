@@ -37,9 +37,14 @@ function getColumnDefs(dataSet: IDataSet): ColDef[] {
                   longitude: 75,
                   temperature: 90,
                   chlorophyll: 80,
-                  curviness: 75
+                  curviness: 75,
+
+                  Mammal: 180,
+                  Order: 140,
+                  LifeSpan: 100,
+                  Habitat: 100
                 },
-                defaultWidth = 70;
+                defaultWidth = 80;
           return {
             key: attr.name,
             headerName: attr.name,
@@ -134,34 +139,25 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
 
   render() {
     return (
-      <div style={{ width: '100%', height: '100%' }}>
-        <div
-          style={{
-            boxSizing: 'border-box',
-            height: '100%',
-            width: '100%'
-          }}
-          className="ag-theme-fresh"
-        >
-          <AgGridReact
-            columnDefs={this.state.columnDefs}
-            enableColResize={true}
-            rowBuffer={this.state.rowBuffer}
-            getRowNodeId={this.getRowNodeId}
-            debug={false}
-            rowSelection={this.state.rowSelection}
-            rowDeselection={true}
-            rowModelType={this.state.rowModelType}
-            rowData={this.state.rowData}
-            deltaRowDataMode={true}
-            paginationPageSize={this.state.paginationPageSize}
-            cacheOverflowSize={this.state.cacheOverflowSize}
-            maxConcurrentDatasourceRequests={this.state.maxConcurrentDatasourceRequests}
-            infiniteInitialRowCount={this.state.infiniteInitialRowCount}
-            maxBlocksInCache={this.state.maxBlocksInCache}
-            onGridReady={this.onGridReady}
-          />
-        </div>
+      <div className="neo-codap-case-table ag-theme-fresh">
+        <AgGridReact
+          columnDefs={this.state.columnDefs}
+          enableColResize={true}
+          rowBuffer={this.state.rowBuffer}
+          getRowNodeId={this.getRowNodeId}
+          debug={false}
+          rowSelection={this.state.rowSelection}
+          rowDeselection={true}
+          rowModelType={this.state.rowModelType}
+          rowData={this.state.rowData}
+          deltaRowDataMode={true}
+          paginationPageSize={this.state.paginationPageSize}
+          cacheOverflowSize={this.state.cacheOverflowSize}
+          maxConcurrentDatasourceRequests={this.state.maxConcurrentDatasourceRequests}
+          infiniteInitialRowCount={this.state.infiniteInitialRowCount}
+          maxBlocksInCache={this.state.maxBlocksInCache}
+          onGridReady={this.onGridReady}
+        />
       </div>
     );
   }
