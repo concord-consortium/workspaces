@@ -312,7 +312,7 @@ function createEvens(source: IDataSet) {
                       });
 }
 
-test('Data Manager derived DataSet synchronization functionality', () => {
+test('Data Manager derived DataSet synchronization (subset attributes)', () => {
   const source = createDataSet('source'),
         odds = createOdds(source);
 
@@ -388,7 +388,7 @@ test('Data Manager derived DataSet synchronization functionality', () => {
     });
 });
 
-test('Data Manager derived DataSet synchronization functionality', () => {
+test('Data Manager derived DataSet synchronization (all attributes)', () => {
   const source = createDataSet('source'),
         evens = createEvens(source),
         bCaseID = evens.cases[1].id;
@@ -438,6 +438,34 @@ test('Data Manager derived DataSet synchronization functionality', () => {
     .then(() => {
       // test destruction
       destroy(evens);
+    });
+});
+
+test('Data Manager derived DataSet synchronization (no filter)', () => {
+  const source = createDataSet('source'),
+        derived = source.derive('derived', { synchronize: true });
+  
+  addCasesToDataSet(source, [{ str: 'g', num: 7 }]);
+  expect(source.cases.length).toBe(6);
+  let fCaseID: string;
+  const gCaseID = source.cases[5].id;
+  derived.onSynchronized()
+    .then(() => {
+      expect(derived.cases.length).toBe(6);
+      expect(derived.getCase(gCaseID)).toEqual({ id: gCaseID, str: 'g', num: 7 });
+      addCasesToDataSet(source, [{ str: 'f', num: 7 }], gCaseID);
+      fCaseID = source.cases[5].id;
+      return derived.onSynchronized();
+    })
+    .then(() => {
+      expect(derived.cases.length).toBe(7);
+      expect(derived.getCaseAtIndex(5)).toEqual({ id: fCaseID, str: 'f', num: 7 });
+      source.setCaseValues([{ id: fCaseID, num: 6 }]);
+      return derived.onSynchronized();
+    })
+    .then(() => {
+      expect(derived.getCase(fCaseID)).toEqual({ id: fCaseID, str: 'f', num: 6 });
+      destroy(derived);
     });
 });
 
