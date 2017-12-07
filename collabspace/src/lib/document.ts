@@ -1,7 +1,7 @@
 import * as firebase from "firebase"
 import { FirebaseWindows } from "./window"
-import { PortalInfo, PortalActivity, PortalUser, PortalUserConnectionStatusMap } from "./auth"
-import { getUserTemplatePath, getActivityRef, getDocumentPath } from "./refs"
+import { PortalInfo, PortalOffering, PortalUser, PortalUserConnectionStatusMap } from "./auth"
+import { getUserTemplatePath, getOfferingRef, getDocumentPath } from "./refs"
 
 export interface FirebaseDocumentData {
   windows: FirebaseWindows
@@ -19,19 +19,19 @@ export interface FirebaseDocument {
   data?: FirebaseDocumentData
 }
 
-export interface FirebaseActivity {
+export interface FirebaseOffering {
   template: {
     userId: string,
     templateId: string
   }
   name: string
-  groups: FirebaseActivityGroupMap
+  groups: FirebaseOfferingGroupMap
 }
 
-export interface FirebaseActivityGroupMap {
-  [key: number]: FirebaseActivityGroup
+export interface FirebaseOfferingGroupMap {
+  [key: number]: FirebaseOfferingGroup
 }
-export interface FirebaseActivityGroup {
+export interface FirebaseOfferingGroup {
   documentId: string
   portalUsers: PortalUserConnectionStatusMap
 }
@@ -41,7 +41,7 @@ export interface FirebaseArtifactMap {
 }
 
 export interface FirebasePublication {
-  activityId: number
+  offeringId: number
   creator: string
   group: number
   groupMembers: PortalUserConnectionStatusMap
@@ -149,20 +149,20 @@ export class Document {
     return this.dataRef.child(`windows/${child}`)
   }
 
-  getFirebaseActivity(activity:PortalActivity) {
-    return new Promise<[FirebaseActivity, firebase.database.Reference]>((resolve, reject) => {
-      const activityRef = getActivityRef(activity)
+  getFirebaseOffering(offering:PortalOffering) {
+    return new Promise<[FirebaseOffering, firebase.database.Reference]>((resolve, reject) => {
+      const offeringRef = getOfferingRef(offering)
 
-      activityRef.once("value")
+      offeringRef.once("value")
         .then((snapshot) => {
-          const existingFirebaseActivity:FirebaseActivity|null = snapshot.val()
-          if (existingFirebaseActivity) {
-            resolve([existingFirebaseActivity, activityRef])
+          const existingFirebaseOffering:FirebaseOffering|null = snapshot.val()
+          if (existingFirebaseOffering) {
+            resolve([existingFirebaseOffering, offeringRef])
           }
           else {
             this.infoRef.once("value", (snapshot) => {
               const info:FirebaseDocumentInfo = snapshot.val()
-              const firebaseActivity:FirebaseActivity = {
+              const firebaseOffering:FirebaseOffering = {
                 template: {
                   userId: info.ownerId,
                   templateId: this.id
@@ -170,10 +170,10 @@ export class Document {
                 name: info.name,
                 groups: {}
               }
-              activityRef
-                .set(firebaseActivity)
+              offeringRef
+                .set(firebaseOffering)
                 .then(() => {
-                  resolve([firebaseActivity, activityRef])
+                  resolve([firebaseOffering, offeringRef])
                 })
                 .catch(reject)
             })
@@ -183,26 +183,26 @@ export class Document {
       })
   }
 
-  getGroupActivityDocument(activity:PortalActivity, group:number) {
+  getGroupOfferingDocument(offering:PortalOffering, group:number) {
     return new Promise<[Document, firebase.database.Reference]>((resolve, reject) => {
 
-      this.getFirebaseActivity(activity)
-        .then(([firebaseActivity, activityRef]) => {
+      this.getFirebaseOffering(offering)
+        .then(([firebaseOffering, offeringRef]) => {
 
-          const groupRef = activityRef.child("groups").child(`${group}`)
+          const groupRef = offeringRef.child("groups").child(`${group}`)
           groupRef.once("value")
             .then((snapshot) => {
-              const existingFirebaseGroup:FirebaseActivityGroup|null = snapshot.val()
+              const existingFirebaseGroup:FirebaseOfferingGroup|null = snapshot.val()
               if (existingFirebaseGroup) {
-                const documentPath = getDocumentPath(activity, existingFirebaseGroup.documentId)
+                const documentPath = getDocumentPath(offering, existingFirebaseGroup.documentId)
                 Document.LoadDocumentFromFirebase(existingFirebaseGroup.documentId, documentPath)
                   .then((document) => resolve([document, groupRef]))
                   .catch(reject)
               }
               else {
-                this.copy(getDocumentPath(activity))
+                this.copy(getDocumentPath(offering))
                   .then((document) => {
-                    const firebaseGroup:FirebaseActivityGroup = {
+                    const firebaseGroup:FirebaseOfferingGroup = {
                       documentId: document.id,
                       portalUsers: {}
                     }
