@@ -16,7 +16,7 @@ import { IFramePhoneLib,
  const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
 
 import * as firebase from "firebase"
-import { PortalActivity } from "./auth";
+import { PortalOffering } from "./auth";
 import { getDocumentRef } from "./refs"
 
 export enum DragType { GrowLeft, GrowRight, GrowUp, GrowDown, GrowDownRight, GrowDownLeft, Position, None }
@@ -455,10 +455,10 @@ export class WindowManager {
     })
   }
 
-  copyWindowFromPublication(portalActivity:PortalActivity, publication:FirebasePublication, windowId: string, title:string) {
+  copyWindowFromPublication(portalOffering:PortalOffering, publication:FirebasePublication, windowId: string, title:string) {
     return new Promise<void>((resolve, reject) => {
       // open the publication document
-      const documentWindowsRef = getDocumentRef(portalActivity, publication.documentId).child("data").child("windows")
+      const documentWindowsRef = getDocumentRef(portalOffering, publication.documentId).child("data").child("windows")
       documentWindowsRef.once("value")
         .then((snapshot) => {
           const windows:FirebaseWindows|null = snapshot.val()

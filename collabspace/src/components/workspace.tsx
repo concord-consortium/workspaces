@@ -10,7 +10,7 @@ import { InlineEditorComponent } from "./inline-editor"
 import { SidebarComponent } from "./sidebar"
 import { WindowManager, WindowManagerState, DragType } from "../lib/window-manager"
 import { v4 as uuidV4} from "uuid"
-import { PortalUser, PortalUserMap, PortalActivity, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected } from "../lib/auth"
+import { PortalUser, PortalUserMap, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
@@ -22,7 +22,8 @@ const timeagoInstance = timeago()
 export interface WorkspaceComponentProps {
   portalUser: PortalUser|null
   firebaseUser: firebase.User
-  portalActivity: PortalActivity|null
+  portalOffering: PortalOffering|null
+  portalTokens: PortalTokens|null
   document: Document
   setTitle: ((documentName?:string|null) => void)|null
   isTemplate: boolean
@@ -51,11 +52,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   constructor (props:WorkspaceComponentProps) {
     super(props)
 
-    const {portalActivity} = props
+    const {portalOffering} = props
 
     const classUserLookup:PortalUserMap = {}
-    if (portalActivity) {
-      portalActivity.classInfo.students.forEach((student) => {
+    if (portalOffering) {
+      portalOffering.classInfo.students.forEach((student) => {
         classUserLookup[escapeFirebaseKey(student.id)] = student
       })
     }
@@ -65,8 +66,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       allOrderedWindows: [],
       minimizedWindows: [],
       topWindow: null,
-      workspaceName: this.getWorkspaceName(portalActivity),
-      debugInfo: portalActivity ? `Class ID: ${portalActivity.classInfo.classHash}` : "",
+      workspaceName: this.getWorkspaceName(portalOffering),
+      debugInfo: portalOffering ? `Class ID: ${portalOffering.classInfo.classHash}` : "",
       groupUsers: null,
       classUserLookup: classUserLookup,
       viewArtifact: null,
@@ -74,13 +75,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  getWorkspaceName(portalActivity:PortalActivity|null) {
-    if (!portalActivity) {
+  getWorkspaceName(portalOffering:PortalOffering|null) {
+    if (!portalOffering) {
       return "Template"
     }
-    const {classInfo, isDemo} = portalActivity
+    const {classInfo, isDemo} = portalOffering
     const teacherNames = classInfo.teachers.map((teacher) => isDemo ? teacher.fullName : teacher.lastName)
-    const domain = isDemo ? "" : `: ${portalActivity.domain}`
+    const domain = isDemo ? "" : `: ${portalOffering.domain}`
     return `${classInfo.name}: ${teacherNames.join(" & ")}${domain}`
   }
 
@@ -318,8 +319,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   handlePublishButton = () => {
     const {groupUsers} = this.state
-    const {portalActivity, portalUser, groupRef, group} = this.props
-    if (!groupUsers || !portalActivity || !portalUser || (portalUser.type === "teacher") || !groupRef || !group) {
+    const {portalOffering, portalUser, groupRef, group} = this.props
+    if (!groupUsers || !portalOffering || !portalUser || (portalUser.type === "teacher") || !groupRef || !group) {
       return
     }
 
@@ -333,7 +334,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     this.setState({publishing: true})
 
     // copy the doc with local window state
-    this.props.document.copy(getDocumentPath(portalActivity), this.handleSyncLocalWindowState)
+    this.props.document.copy(getDocumentPath(portalOffering), this.handleSyncLocalWindowState)
       .then((document) => {
 
         // open the doc to get the windows
@@ -353,7 +354,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
             // then create the publication
             const publication:FirebasePublication = {
-              activityId: portalActivity.id,
+              offeringId: portalOffering.id,
               group: group,
               creator: portalUser.id,
               groupMembers: groupUsers,
@@ -362,14 +363,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
               windows: windows
             }
 
-            const publicationRef = getPublicationsRef(portalActivity).push(publication)
+            const publicationRef = getPublicationsRef(portalOffering).push(publication)
             const publicationId = publicationRef.key
             if (publicationId) {
 
               // and finally tell all the child windows so they can generate artifacts
               const publishRequest:WorkspaceClientPublishRequest = {
-                publicationsPath: getPublicationsPath(portalActivity, publicationId),
-                artifactStoragePath: getArtifactsStoragePath(portalActivity, publicationId)
+                publicationsPath: getPublicationsPath(portalOffering, publicationId),
+                artifactStoragePath: getArtifactsStoragePath(portalOffering, publicationId)
               }
               this.windowManager.postToAllWindows(
                 WorkspaceClientPublishRequestMessage,
@@ -406,9 +407,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderGroupInfo() {
-    const {portalActivity} = this.props
+    const {portalOffering} = this.props
     const {groupUsers} = this.state
-    if (!groupUsers || !portalActivity) {
+    if (!groupUsers || !portalOffering) {
       return null
     }
     const users:JSX.Element[] = []
@@ -528,13 +529,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderSidebarComponent() {
-    const {portalActivity, portalUser, group} = this.props
-    if (!portalActivity || !portalUser || !group) {
+    const {portalOffering, portalUser, portalTokens, group} = this.props
+    if (!portalOffering || !portalUser || !portalTokens || !group) {
       return null
     }
     return <SidebarComponent
-             portalActivity={portalActivity}
+             portalOffering={portalOffering}
              portalUser={portalUser}
+             portalTokens={portalTokens}
              group={group}
              toggleViewArtifact={this.handleToggleViewArtifact}
              publishing={this.state.publishing}

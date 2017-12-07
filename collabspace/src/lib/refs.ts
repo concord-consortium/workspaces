@@ -1,5 +1,5 @@
 import * as firebase from "firebase"
-import { PortalActivity } from "./auth"
+import { PortalOffering } from "./auth"
 
 export const getUserTemplateListPath = (userId:string) => {
   return `users/${userId}/templates`
@@ -17,49 +17,49 @@ export const getUserTemplateRef = (userId:string, templateId:string) => {
   return firebase.database().ref(getUserTemplatePath(userId, templateId))
 }
 
-export const getPortalPath = (activity:PortalActivity) => {
-  return activity.domain === "demo" ? "demo" : `portals/${activity.domain}`
+export const getPortalPath = (offering:PortalOffering) => {
+  return offering.domain === "demo" ? "demo" : `portals/${offering.domain}`
 }
 
-export const getClassPath = (activity:PortalActivity) => {
-  return `${getPortalPath(activity)}/classes/${activity.classInfo.classHash}`
+export const getClassPath = (offering:PortalOffering) => {
+  return `${getPortalPath(offering)}/classes/${offering.classInfo.classHash}`
 }
 
-export const getActivityPath = (activity:PortalActivity) => {
-  return `${getClassPath(activity)}/activities/${activity.id}`
+export const getOfferingPath = (offering:PortalOffering) => {
+  return `${getClassPath(offering)}/offerings/${offering.id}`
 }
 
-export const getActivityRef = (activity:PortalActivity) => {
-  return firebase.database().ref(getActivityPath(activity))
+export const getOfferingRef = (offering:PortalOffering) => {
+  return firebase.database().ref(getOfferingPath(offering))
 }
 
-export const getDocumentPath = (activity:PortalActivity, documentId?:string) => {
-  const prefix = `${getClassPath(activity)}/documents`
+export const getDocumentPath = (offering:PortalOffering, documentId?:string) => {
+  const prefix = `${getClassPath(offering)}/documents`
   return documentId ? `${prefix}/${documentId}` : prefix
 }
 
-export const getDocumentRef = (activity:PortalActivity, documentId?:string) => {
-  return firebase.database().ref(getDocumentPath(activity, documentId))
+export const getDocumentRef = (offering:PortalOffering, documentId?:string) => {
+  return firebase.database().ref(getDocumentPath(offering, documentId))
 }
 
-export const getPublicationsPath = (activity:PortalActivity, publicationId?:string) => {
-  const prefix = `${getClassPath(activity)}/publications`
+export const getPublicationsPath = (offering:PortalOffering, publicationId?:string) => {
+  const prefix = `${getClassPath(offering)}/publications`
   return publicationId ? `${prefix}/${publicationId}` : prefix
 }
 
-export const getPublicationsRef = (activity:PortalActivity, publicationId?:string) => {
-  return firebase.database().ref(getPublicationsPath(activity, publicationId))
+export const getPublicationsRef = (offering:PortalOffering, publicationId?:string) => {
+  return firebase.database().ref(getPublicationsPath(offering, publicationId))
 }
 
-export const getArtifactsPath = (activity:PortalActivity, artifactId?:string) => {
-  const prefix = `${getClassPath(activity)}/artifacts`
+export const getArtifactsPath = (offering:PortalOffering, artifactId?:string) => {
+  const prefix = `${getClassPath(offering)}/artifacts`
   return artifactId ? `${prefix}/${artifactId}` : prefix
 }
 
-export const getArtifactsRef = (activity:PortalActivity, artifactId?:string) => {
-  return firebase.database().ref(getArtifactsPath(activity, artifactId))
+export const getArtifactsRef = (offering:PortalOffering, artifactId?:string) => {
+  return firebase.database().ref(getArtifactsPath(offering, artifactId))
 }
 
-export const getArtifactsStoragePath = (activity:PortalActivity, publicationId:string) => {
-  return `artifacts/${getActivityPath(activity)}/publications/${publicationId}`
+export const getArtifactsStoragePath = (offering:PortalOffering, publicationId:string) => {
+  return `artifacts/${getOfferingPath(offering)}/publications/${publicationId}`
 }
