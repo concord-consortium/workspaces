@@ -18,7 +18,8 @@
     "start": "react-scripts-ts start",
     "build": "react-scripts-ts build",
     "test": "react-scripts-ts test --env=jsdom",
-    "test:coverage": "react-scripts-ts test --env=jsdom --coverage --verbose",
+    "test:ci": "CI=true npm run test",
+    "test:coverage": "npm run test -- --coverage --verbose",
     "eject": "react-scripts-ts eject"
   },
   "devDependencies": {

@@ -16,7 +16,11 @@
     "cs:start": "npm-run-all --parallel cs:build:watch cs:browse",
     "cs:start:secure": "npm-run-all --parallel cs:build:watch cs:browse",
     "cs:dev:start": "npm-run-all --parallel cs:dev:build:watch cs:browse",
-    "cs:dev:start:secure": "npm-run-all --parallel cs:dev:build:watch cs:browse:secure"
+    "cs:dev:start:secure": "npm-run-all --parallel cs:dev:build:watch cs:browse:secure",
+    "nc:build": "cd neo-codap && npm run build",
+    "nc:start": "cd neo-codap && npm run start",
+    "nc:test": "cd neo-codap && npm run test:ci",
+    "test": "npm-run-all --parallel nc:test"
   },
   "repository": {
     "type": "git",
