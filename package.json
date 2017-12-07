@@ -4,7 +4,6 @@
   "description": "Concord Consortium Workspaces",
   "scripts": {
     "build": "npm-run-all --parallel cs:build",
-
     "cs:build": "cd collabspace && cross-env NODE_ENV=production webpack",
     "cs:build:watch": "cd collabspace && cross-env NODE_ENV=production webpack -w",
     "cs:dev:build": "cd collabspace && cross-env NODE_ENV=development webpack",
@@ -29,9 +28,11 @@
   "dependencies": {
     "ag-grid": "^14.2.0",
     "ag-grid-react": "^14.2.0",
+    "d3": "^4.12.0",
     "mobx": "^3.4.0",
     "mobx-state-tree": "^1.2.1",
     "react-dom-factories": "^1.0.2",
+    "react-faux-dom": "^4.1.0",
     "react-scripts-ts": "2.8.0",
     "uuid": "^3.1.0"
   },

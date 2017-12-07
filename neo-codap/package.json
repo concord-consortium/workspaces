@@ -5,12 +5,14 @@
   "dependencies": {
     "ag-grid": "^14.2.0",
     "ag-grid-react": "^14.2.0",
+    "d3": "^4.12.0",
     "mobx": "^3.4.0",
     "mobx-state-tree": "^1.2.1",
     "query-string": "^5.0.1",
     "react": "^16.1.1",
     "react-dom": "^16.1.1",
     "react-dom-factories": "^1.0.2",
+    "react-faux-dom": "^4.1.0",
     "react-scripts-ts": "2.8.0",
     "uuid": "^3.1.0"
   },
@@ -23,11 +25,13 @@
   },
   "devDependencies": {
     "@types/ag-grid": "^3.2.0",
+    "@types/d3": "^4.12.0",
     "@types/jest": "^21.1.6",
     "@types/node": "^8.0.51",
     "@types/react": "^16.0.22",
     "@types/react-dom": "^16.0.3",
     "@types/react-dom-factories": "^1.0.0",
+    "@types/react-faux-dom": "^3.2.0",
     "@types/uuid": "^3.4.3"
   }
 }
