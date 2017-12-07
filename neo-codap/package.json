@@ -24,10 +24,10 @@
     "eject": "react-scripts-ts eject"
   },
   "devDependencies": {
-    "@types/ag-grid": "^3.2.0",
     "@types/d3": "^4.12.0",
     "@types/jest": "^21.1.6",
     "@types/node": "^8.0.51",
+    "@types/query-string": "^5.0.1",
     "@types/react": "^16.0.22",
     "@types/react-dom": "^16.0.3",
     "@types/react-dom-factories": "^1.0.0",
