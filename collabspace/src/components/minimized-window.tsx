@@ -16,10 +16,9 @@ export class MinimizedWindowComponent extends React.Component<MinimizedWindowCom
   constructor (props:MinimizedWindowComponentProps) {
     super(props)
     this.state = {}
-    this.handleClick = this.handleClick.bind(this)
   }
 
-  handleClick() {
+  handleClick = () => {
     this.props.windowManager.restoreMinimized(this.props.window)
   }
 

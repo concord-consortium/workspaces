@@ -2,7 +2,7 @@ import * as React from "react"
 import * as firebase from "firebase"
 import * as queryString from "query-string"
 
-import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap } from "../lib/document"
+import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap, FirebaseDocument } from "../lib/document"
 import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap } from "../lib/window"
 import { WindowComponent } from "./window"
 import { MinimizedWindowComponent } from "./minimized-window"
@@ -10,7 +10,7 @@ import { InlineEditorComponent } from "./inline-editor"
 import { SidebarComponent } from "./sidebar"
 import { WindowManager, WindowManagerState, DragType } from "../lib/window-manager"
 import { v4 as uuidV4} from "uuid"
-import { PortalUser, PortalUserMap, PortalActivity, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected } from "../lib/auth"
+import { PortalUser, PortalUserMap, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
@@ -22,7 +22,8 @@ const timeagoInstance = timeago()
 export interface WorkspaceComponentProps {
   portalUser: PortalUser|null
   firebaseUser: firebase.User
-  portalActivity: PortalActivity|null
+  portalOffering: PortalOffering|null
+  portalTokens: PortalTokens|null
   document: Document
   setTitle: ((documentName?:string|null) => void)|null
   isTemplate: boolean
@@ -51,11 +52,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   constructor (props:WorkspaceComponentProps) {
     super(props)
 
-    const {portalActivity} = props
+    const {portalOffering} = props
 
     const classUserLookup:PortalUserMap = {}
-    if (portalActivity) {
-      portalActivity.classInfo.students.forEach((student) => {
+    if (portalOffering) {
+      portalOffering.classInfo.students.forEach((student) => {
         classUserLookup[escapeFirebaseKey(student.id)] = student
       })
     }
@@ -65,39 +66,22 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       allOrderedWindows: [],
       minimizedWindows: [],
       topWindow: null,
-      workspaceName: this.getWorkspaceName(portalActivity),
-      debugInfo: portalActivity ? `Class ID: ${portalActivity.classInfo.classHash}` : "",
+      workspaceName: this.getWorkspaceName(portalOffering),
+      debugInfo: portalOffering ? `Class ID: ${portalOffering.classInfo.classHash}` : "",
       groupUsers: null,
       classUserLookup: classUserLookup,
       viewArtifact: null,
       publishing: false
     }
-
-    this.changeDocumentName = this.changeDocumentName.bind(this)
-    this.toggleViewArtifact = this.toggleViewArtifact.bind(this)
-    this.clearViewArtifact = this.clearViewArtifact.bind(this)
-    this.promptToChangeGroup = this.promptToChangeGroup.bind(this)
-
-    this.handleDrop = this.handleDrop.bind(this)
-    this.handleDragOver = this.handleDragOver.bind(this)
-    this.handleAddDrawingButton = this.handleAddDrawingButton.bind(this)
-    this.handleCreateDemoButton = this.handleCreateDemoButton.bind(this)
-    this.handleInfoChange = this.handleInfoChange.bind(this)
-    this.handleConnected = this.handleConnected.bind(this)
-    this.handleGroupUsersChange = this.handleGroupUsersChange.bind(this)
-    this.handleWindowMouseDown = this.handleWindowMouseDown.bind(this)
-    this.handleWindowMouseMove = this.handleWindowMouseMove.bind(this)
-    this.handleWindowMouseUp = this.handleWindowMouseUp.bind(this)
-    this.handlePublishButton = this.handlePublishButton.bind(this)
   }
 
-  getWorkspaceName(portalActivity:PortalActivity|null) {
-    if (!portalActivity) {
+  getWorkspaceName(portalOffering:PortalOffering|null) {
+    if (!portalOffering) {
       return "Template"
     }
-    const {classInfo, isDemo} = portalActivity
+    const {classInfo, isDemo} = portalOffering
     const teacherNames = classInfo.teachers.map((teacher) => isDemo ? teacher.fullName : teacher.lastName)
-    const domain = isDemo ? "" : `: ${portalActivity.domain}`
+    const domain = isDemo ? "" : `: ${portalOffering.domain}`
     return `${classInfo.name}: ${teacherNames.join(" & ")}${domain}`
   }
 
@@ -149,15 +133,15 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.removeEventListener("mouseup", this.handleWindowMouseUp, true)
   }
 
-  toggleViewArtifact(artifact: FirebaseArtifact) {
+  handleToggleViewArtifact = (artifact: FirebaseArtifact) => {
     this.setState({viewArtifact: artifact === this.state.viewArtifact ? null : artifact})
   }
 
-  clearViewArtifact() {
+  handleClearViewArtifact = () => {
     this.setState({viewArtifact: null})
   }
 
-  handleConnected(snapshot:firebase.database.DataSnapshot|null) {
+  handleConnected = (snapshot:firebase.database.DataSnapshot|null) => {
     if (snapshot && snapshot.val() && this.userRef) {
       const connected:PortalUserConnected = {
         connected: true,
@@ -173,14 +157,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleGroupUsersChange(snapshot:firebase.database.DataSnapshot|null) {
+  handleGroupUsersChange = (snapshot:firebase.database.DataSnapshot|null) => {
     if (snapshot && this.groupUsersRef) {
       const groupUsers:PortalUserConnectionStatusMap|null = snapshot.val()
       this.setState({groupUsers})
     }
   }
 
-  handleInfoChange(snapshot:firebase.database.DataSnapshot|null) {
+  handleInfoChange = (snapshot:firebase.database.DataSnapshot|null) => {
     if (snapshot) {
       const documentInfo:FirebaseDocumentInfo|null = snapshot.val()
       this.setState({documentInfo})
@@ -190,7 +174,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleWindowMouseDown(e:MouseEvent) {
+  handleWindowMouseDown = (e:MouseEvent) => {
     const {dragInfo} = this.windowManager
     const windowProps = dragInfo.window && dragInfo.window.attrs
     if (windowProps) {
@@ -205,7 +189,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleWindowMouseMove(e:MouseEvent) {
+  handleWindowMouseMove = (e:MouseEvent) => {
     const {dragInfo} = this.windowManager
     if (dragInfo.type !== DragType.None) {
       e.preventDefault()
@@ -248,7 +232,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleWindowMouseUp(e:MouseEvent) {
+  handleWindowMouseUp = (e:MouseEvent) => {
     const {dragInfo} = this.windowManager
     if (dragInfo.type !== DragType.None) {
       e.preventDefault()
@@ -257,18 +241,18 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  changeDocumentName(newName: string) {
+  handleChangeDocumentName = (newName: string) => {
     if (this.state.documentInfo) {
       this.state.documentInfo.name = newName
       this.infoRef.set(this.state.documentInfo)
     }
   }
 
-  handleDragOver(e:React.DragEvent<HTMLDivElement>) {
+  handleDragOver = (e:React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
   }
 
-  handleDrop(e:React.DragEvent<HTMLDivElement>) {
+  handleDrop = (e:React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     const [url, ...rest] = e.dataTransfer.getData("text/uri-list").split("\n")
     if (url) {
@@ -276,14 +260,40 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleAddDrawingButton() {
+  constructRelativeUrl(filename:string) {
+    const {location} = window
+    return `${location.origin}${location.pathname}${filename}`
+  }
+
+  handleAddDrawingButton = () => {
     const title = (prompt("Enter the title of the drawing", "Untitled Drawing") || "").trim()
     if (title.length > 0) {
-      this.windowManager.add(`${window.location.origin}/drawing-tool.html`, title)
+      this.windowManager.add(this.constructRelativeUrl("drawing-tool.html"), title)
     }
   }
 
-  handleCreateDemoButton() {
+  handleAddCaseTable = () => {
+    const title = (prompt("Enter the title of the table", "Untitled Table") || "").trim()
+    if (title.length > 0) {
+      this.windowManager.add(this.constructRelativeUrl("neo-codap.html?mode=table"), title)
+    }
+  }
+
+  handleAddGraph = () => {
+    const title = (prompt("Enter the title of the graph", "Untitled Graph") || "").trim()
+    if (title.length > 0) {
+      this.windowManager.add(this.constructRelativeUrl("neo-codap.html?mode=graph"), title)
+    }
+  }
+
+  handleAddCaseTableAndGraph = () => {
+    const title = (prompt("Enter the title of the table and graph", "Untitled Table/Graph") || "").trim()
+    if (title.length > 0) {
+      this.windowManager.add(this.constructRelativeUrl("neo-codap.html"), title)
+    }
+  }
+
+  handleCreateDemoButton = () => {
     const hashParams:AppHashParams = {
       template: this.props.document.getTemplateHashParam(),
       demo: uuidV4()
@@ -291,10 +301,26 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.open(`${window.location.origin}/#${queryString.stringify(hashParams)}`)
   }
 
-  handlePublishButton() {
+  handleSyncLocalWindowState = (firebaseDocument:FirebaseDocument) => {
+    if (firebaseDocument.data && firebaseDocument.data.windows) {
+      const {windows} = firebaseDocument.data
+      if (windows.attrs) {
+        Object.keys(windows.attrs).forEach((windowId) => {
+          const localWindow = this.windowManager.windows[windowId]
+          if (localWindow) {
+            windows.attrs[windowId] = localWindow.attrs
+          }
+        })
+      }
+      windows.order = this.windowManager.windowOrder
+      windows.minimizedOrder = this.windowManager.minimizedWindowOrder
+    }
+  }
+
+  handlePublishButton = () => {
     const {groupUsers} = this.state
-    const {portalActivity, portalUser, groupRef, group} = this.props
-    if (!groupUsers || !portalActivity || !portalUser || (portalUser.type === "teacher") || !groupRef || !group) {
+    const {portalOffering, portalUser, groupRef, group} = this.props
+    if (!groupUsers || !portalOffering || !portalUser || (portalUser.type === "teacher") || !groupRef || !group) {
       return
     }
 
@@ -307,8 +333,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
     this.setState({publishing: true})
 
-    // copy the doc
-    this.props.document.copy(getDocumentPath(portalActivity))
+    // copy the doc with local window state
+    this.props.document.copy(getDocumentPath(portalOffering), this.handleSyncLocalWindowState)
       .then((document) => {
 
         // open the doc to get the windows
@@ -328,7 +354,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
             // then create the publication
             const publication:FirebasePublication = {
-              activityId: portalActivity.id,
+              offeringId: portalOffering.id,
               group: group,
               creator: portalUser.id,
               groupMembers: groupUsers,
@@ -337,14 +363,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
               windows: windows
             }
 
-            const publicationRef = getPublicationsRef(portalActivity).push(publication)
+            const publicationRef = getPublicationsRef(portalOffering).push(publication)
             const publicationId = publicationRef.key
             if (publicationId) {
 
               // and finally tell all the child windows so they can generate artifacts
               const publishRequest:WorkspaceClientPublishRequest = {
-                publicationsPath: getPublicationsPath(portalActivity, publicationId),
-                artifactStoragePath: getArtifactsStoragePath(portalActivity, publicationId)
+                publicationsPath: getPublicationsPath(portalOffering, publicationId),
+                artifactStoragePath: getArtifactsStoragePath(portalOffering, publicationId)
               }
               this.windowManager.postToAllWindows(
                 WorkspaceClientPublishRequestMessage,
@@ -359,7 +385,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       .catch(donePublishing)
   }
 
-  promptToChangeGroup() {
+  handlePromptToChangeGroup = () => {
     if (this.props.leaveGroup && confirm("Do you want to change your group?")) {
       this.props.leaveGroup()
     }
@@ -373,7 +399,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return (
       <div className="document-info">
         <div className="document-name">
-          {this.props.setTitle ? <InlineEditorComponent text={documentInfo.name} changeText={this.changeDocumentName} /> : documentInfo.name}
+          {this.props.setTitle ? <InlineEditorComponent text={documentInfo.name} changeText={this.handleChangeDocumentName} /> : documentInfo.name}
         </div>
         <div className="instance-info" title={this.state.debugInfo}>{this.state.workspaceName}</div>
       </div>
@@ -381,9 +407,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderGroupInfo() {
-    const {portalActivity} = this.props
+    const {portalOffering} = this.props
     const {groupUsers} = this.state
-    if (!groupUsers || !portalActivity) {
+    if (!groupUsers || !portalOffering) {
       return null
     }
     const users:JSX.Element[] = []
@@ -398,7 +424,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       }
     })
     return (
-      <div className="group-info"><div className="group-name clickable" onClick={this.promptToChangeGroup} title="Click to leave group">Group {this.props.group}</div>{users}</div>
+      <div className="group-info"><div className="group-name clickable" onClick={this.handlePromptToChangeGroup} title="Click to leave group">Group {this.props.group}</div>{users}</div>
     )
   }
 
@@ -433,7 +459,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="buttons">
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
-        </div>
+          <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
+          <button type="button" onClick={this.handleAddGraph}>Add Graph</button>
+          <button type="button" onClick={this.handleAddCaseTableAndGraph}>Add Table &amp; Graph</button>
+          </div>
         <div className="right-buttons">
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}>Publish</button> : null}
@@ -500,15 +529,16 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderSidebarComponent() {
-    const {portalActivity, portalUser, group} = this.props
-    if (!portalActivity || !portalUser || !group) {
+    const {portalOffering, portalUser, portalTokens, group} = this.props
+    if (!portalOffering || !portalUser || !portalTokens || !group) {
       return null
     }
     return <SidebarComponent
-             portalActivity={portalActivity}
+             portalOffering={portalOffering}
              portalUser={portalUser}
+             portalTokens={portalTokens}
              group={group}
-             toggleViewArtifact={this.toggleViewArtifact}
+             toggleViewArtifact={this.handleToggleViewArtifact}
              publishing={this.state.publishing}
              windowManager={this.windowManager}
            />
@@ -519,7 +549,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       return null
     }
     return (
-      <div className="image-lightbox" onClick={this.clearViewArtifact}>
+      <div className="image-lightbox" onClick={this.handleClearViewArtifact}>
         <div className="image-lightbox-background" />
         <div className="image-lightbox-image">
           <div>

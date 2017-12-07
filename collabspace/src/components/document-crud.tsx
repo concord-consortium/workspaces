@@ -39,10 +39,9 @@ export class DocumentCrudItemComponent extends React.Component<DocumentCrudItemC
     super(props)
     this.state = {
     }
-    this.handleChange = this.handleChange.bind(this)
   }
 
-  handleChange(e:React.ChangeEvent<HTMLInputElement>) {
+  handleChange = (e:React.ChangeEvent<HTMLInputElement>) => {
     this.props.checkItem(this.props.item.id, e.target.checked)
   }
 
@@ -83,12 +82,6 @@ export class DocumentCrudComponent extends React.Component<DocumentCrudComponent
       haveItems: false,
       loadedItems: false
     }
-
-    this.handleDocumentList = this.handleDocumentList.bind(this)
-    this.handleCreateDocument = this.handleCreateDocument.bind(this)
-    this.handleDeleteDocuments = this.handleDeleteDocuments.bind(this)
-    this.handleToggleAllListItems = this.handleToggleAllListItems.bind(this)
-    this.handleCheckListItem = this.handleCheckListItem.bind(this)
   }
 
   componentWillMount() {
@@ -100,7 +93,7 @@ export class DocumentCrudComponent extends React.Component<DocumentCrudComponent
     this.listRef.off("value", this.handleDocumentList)
   }
 
-  handleDocumentList(snapshot:firebase.database.DataSnapshot|null) {
+  handleDocumentList = (snapshot:firebase.database.DataSnapshot|null) => {
     if (snapshot) {
       const items:DocumentInfoItemMap = {}
       const allDocuments:DocumentMap|null = snapshot.val()
@@ -119,7 +112,7 @@ export class DocumentCrudComponent extends React.Component<DocumentCrudComponent
     }
   }
 
-  handleCreateDocument() {
+  handleCreateDocument = () => {
     const {uid} = this.props.firebaseUser
     const documentId = uuidV4()
     Document.CreateTemplateInFirebase(uid, documentId)
@@ -127,7 +120,7 @@ export class DocumentCrudComponent extends React.Component<DocumentCrudComponent
       .catch((error) => this.setState({error}))
   }
 
-  handleDeleteDocuments(e:React.MouseEvent<HTMLButtonElement>) {
+  handleDeleteDocuments = (e:React.MouseEvent<HTMLButtonElement>) => {
     const {items} = this.state
     const updates:any = {}
     let haveUpdates = false
@@ -142,7 +135,7 @@ export class DocumentCrudComponent extends React.Component<DocumentCrudComponent
     }
   }
 
-  handleToggleAllListItems(e:React.ChangeEvent<HTMLInputElement>) {
+  handleToggleAllListItems = (e:React.ChangeEvent<HTMLInputElement>) => {
     const {checked} = e.target
     const {items} = this.state
     Object.keys(items).forEach((key) => {
@@ -151,7 +144,7 @@ export class DocumentCrudComponent extends React.Component<DocumentCrudComponent
     this.setState({items: items})
   }
 
-  handleCheckListItem(id:string, checked:boolean) {
+  handleCheckListItem = (id:string, checked:boolean) => {
     const item = this.state.items[id]
     if (item) {
       item.checked = checked

@@ -27,60 +27,66 @@ interface ICaseTableState {
 }
 
 function getColumnDefs(dataSet: IDataSet): ColDef[] {
-  let cols: ColDef[] = dataSet.attributes.map((attr) => {
-                          const widths = {
-                                  animal_id: 75,
-                                  species: 100,
-                                  day: 50,
-                                  month: 70,
-                                  longitude: 75,
-                                  temperature: 90,
-                                  chlorophyll: 80,
-                                  curviness: 75
-                                },
-                                defaultWidth = 70;
-                          return {
-                            key: attr.name,
-                            headerName: attr.name,
-                            field: attr.name,
-                            tooltipField: attr.name,
-                            colId: attr.id,
-                            editable: true,
-                            width: widths[attr.name] || defaultWidth,
-                            valueGetter: (params: ValueGetterParams) => {
-                              const caseID = params.node.id,
-                                    attrID = params.colDef.colId;
-                              return attrID ? dataSet.getValue(caseID, attrID) : undefined;
-                            },
-                            valueFormatter: (params: ValueFormatterParams) => {
-                              const colName = params.colDef.field || params.colDef.headerName || '',
-                                    colPlaces = {
-                                      day: 0,
-                                      distance: 1,
-                                      speed: 2
-                                    },
-                                    places = colPlaces[colName];
-                              return (places != null) && (typeof params.value === 'number')
-                                        ? params.value.toFixed(places)
-                                        : params.value;
-                            },
-                            valueSetter: (params: ValueSetterParams) => {
-                              if (params.newValue === params.oldValue) { return false; }
-                              const str = params.newValue && (typeof params.newValue === 'string')
-                                            ? params.newValue.trim() : undefined,
-                                    num = str ? Number(str) : undefined,
-                                    attrName = params.colDef.field || attr.name,
-                                    caseID = dataSet.cases[params.node.rowIndex].id,
-                                    caseValues = {
-                                      id: caseID,
-                                      [attrName]: (num != null) && isFinite(num) ? num : str
-                                    };
-                              if (caseValues[attrName] === params.oldValue) { return false; }
-                              dataSet.setCaseValues([caseValues]);
-                              return true;
-                            }
-                          };
-                        });
+  let cols: ColDef[];
+  cols = dataSet.attributes.map((attr) => {
+          const widths: { [key: string]: number } = {
+                  animal_id: 75,
+                  species: 100,
+                  day: 50,
+                  month: 70,
+                  longitude: 75,
+                  temperature: 90,
+                  chlorophyll: 80,
+                  curviness: 75,
+
+                  Mammal: 180,
+                  Order: 140,
+                  LifeSpan: 100,
+                  Habitat: 100
+                },
+                defaultWidth = 80;
+          return {
+            key: attr.name,
+            headerName: attr.name,
+            field: attr.name,
+            tooltipField: attr.name,
+            colId: attr.id,
+            editable: true,
+            width: widths[attr.name] || defaultWidth,
+            valueGetter: (params: ValueGetterParams) => {
+              const caseID = params.node.id,
+                    attrID = params.colDef.colId;
+              return attrID ? dataSet.getValue(caseID, attrID) : undefined;
+            },
+            valueFormatter: (params: ValueFormatterParams) => {
+              const colName = params.colDef.field || params.colDef.headerName || '',
+                    colPlaces: { [key: string]: number } = {
+                      day: 0,
+                      distance: 1,
+                      speed: 2
+                    },
+                    places = colPlaces[colName];
+              return (places != null) && (typeof params.value === 'number')
+                        ? params.value.toFixed(places)
+                        : params.value;
+            },
+            valueSetter: (params: ValueSetterParams) => {
+              if (params.newValue === params.oldValue) { return false; }
+              const str = params.newValue && (typeof params.newValue === 'string')
+                            ? params.newValue.trim() : undefined,
+                    num = str ? Number(str) : undefined,
+                    attrName = params.colDef.field || attr.name,
+                    caseID = dataSet.cases[params.node.rowIndex].id,
+                    caseValues = {
+                      id: caseID,
+                      [attrName]: (num != null) && isFinite(num) ? num : str
+                    };
+              if (caseValues[attrName] === params.oldValue) { return false; }
+              dataSet.setCaseValues([caseValues]);
+              return true;
+            }
+          };
+        });
   cols.unshift({
     headerName: '#',
     headerClass: 'cdp-case-index-header',
@@ -127,42 +133,31 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   onGridReady = (gridReadyParams: GridReadyEvent) => {
     this.gridApi = gridReadyParams.api;
     this.gridColumnApi = gridReadyParams.columnApi;
-
-    this.gridApi.sizeColumnsToFit();
   }
 
   getRowNodeId = (data: { id: string }) => data.id;
 
   render() {
     return (
-      <div style={{ width: '100%', height: '100%' }}>
-        <div
-          style={{
-            boxSizing: 'border-box',
-            height: '100%',
-            width: '100%'
-          }}
-          className="ag-theme-fresh"
-        >
-          <AgGridReact
-            columnDefs={this.state.columnDefs}
-            enableColResize={true}
-            rowBuffer={this.state.rowBuffer}
-            getRowNodeId={this.getRowNodeId}
-            debug={false}
-            rowSelection={this.state.rowSelection}
-            rowDeselection={true}
-            rowModelType={this.state.rowModelType}
-            rowData={this.state.rowData}
-            deltaRowDataMode={true}
-            paginationPageSize={this.state.paginationPageSize}
-            cacheOverflowSize={this.state.cacheOverflowSize}
-            maxConcurrentDatasourceRequests={this.state.maxConcurrentDatasourceRequests}
-            infiniteInitialRowCount={this.state.infiniteInitialRowCount}
-            maxBlocksInCache={this.state.maxBlocksInCache}
-            onGridReady={this.onGridReady}
-          />
-        </div>
+      <div className="neo-codap-case-table ag-theme-fresh">
+        <AgGridReact
+          columnDefs={this.state.columnDefs}
+          enableColResize={true}
+          rowBuffer={this.state.rowBuffer}
+          getRowNodeId={this.getRowNodeId}
+          debug={false}
+          rowSelection={this.state.rowSelection}
+          rowDeselection={true}
+          rowModelType={this.state.rowModelType}
+          rowData={this.state.rowData}
+          deltaRowDataMode={true}
+          paginationPageSize={this.state.paginationPageSize}
+          cacheOverflowSize={this.state.cacheOverflowSize}
+          maxConcurrentDatasourceRequests={this.state.maxConcurrentDatasourceRequests}
+          infiniteInitialRowCount={this.state.infiniteInitialRowCount}
+          maxBlocksInCache={this.state.maxBlocksInCache}
+          onGridReady={this.onGridReady}
+        />
       </div>
     );
   }

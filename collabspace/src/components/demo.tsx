@@ -2,6 +2,7 @@ import * as React from "react"
 import { Document, FirebaseDocumentInfo } from "../lib/document"
 import * as firebase from "firebase"
 import { AppQueryParams, AppHashParams } from "./app"
+import { DashboardQueryParameters } from "./dashboard"
 import * as queryString from "query-string"
 
 const demoInfo = require("../../functions/demo-info").demoInfo;
@@ -24,7 +25,6 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
     this.state = {
       title: null
     }
-    this.handleInfoRef = this.handleInfoRef.bind(this)
   }
 
   componentWillMount() {
@@ -36,7 +36,7 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
     this.infoRef.off("value", this.handleInfoRef)
   }
 
-  handleInfoRef(snapshot:firebase.database.DataSnapshot) {
+  handleInfoRef = (snapshot:firebase.database.DataSnapshot) => {
     const info:FirebaseDocumentInfo|null = snapshot.val()
     if (info) {
       this.setState({title: info.name})
@@ -64,12 +64,31 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
     return links
   }
 
+  renderTeacherLinks() {
+    const links = []
+    const hash = window.location.hash
+    const templateParam = this.props.template.getTemplateHashParam()
+    for (let i=0; i < demoInfo.numTeachers; i++) {
+      const userId = i + 1001;
+      const queryParams:DashboardQueryParameters = {
+        demo: this.props.demoId,
+        token: userId,
+        offering: `${demoInfo.rootUrl}demoGetFakeOffering`
+      }
+      const url = `dashboard.html?${queryString.stringify(queryParams)}`
+      links.push(<div key={i}><a href={url} target="_blank">Teacher {userId - 1000}</a></div>)
+    }
+    return links
+  }
+
   render() {
     return (
       <div className="demo">
         {this.state.title ? <h1>{this.state.title}</h1> : null}
         <h2>Demo Links</h2>
         {this.renderStudentLinks()}
+        <br />
+        {this.renderTeacherLinks()}
       </div>
     )
   }
