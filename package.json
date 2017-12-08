@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Concord Consortium Workspaces",
   "scripts": {
-    "build": "npm-run-all --parallel copy-root cs:build",
+    "build": "npm-run-all --parallel cs:build nc:build",
 
     "copy-root": "copyfiles -f root/**/*.* dist/",
 
