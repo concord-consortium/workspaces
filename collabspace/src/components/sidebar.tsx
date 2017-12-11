@@ -216,11 +216,13 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
   }
 
   renderExpanded() {
-    const {publication} = this.props.publicationItem
+    const {publicationItem, portalTokens} = this.props
+    const {publication} = publicationItem
     const params:any = {
-      jwtToken: this.props.portalTokens.rawPortalJWT,
-      domain: this.props.portalTokens.domain,
-      document: this.props.publicationItem.publication.documentId
+      jwtToken: portalTokens.rawPortalJWT,
+      domain: portalTokens.domain,
+      document: publication.documentId,
+      publication: publicationItem.id
     }
     if (demoId) {
       params.demo = demoId

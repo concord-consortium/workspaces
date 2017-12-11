@@ -5,6 +5,6 @@ exports.demoInfo = {
   numTeachers: 2,
   numStudents: 20,
   isDemo: (domain) => {
-    return domain.indexOf("us-central1") !== -1;
+    return (domain.indexOf("us-central1") !== -1) || (domain.indexOf("demo") !== -1);
   }
 };

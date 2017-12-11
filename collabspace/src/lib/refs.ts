@@ -1,5 +1,8 @@
 import * as firebase from "firebase"
 import { PortalOffering } from "./auth"
+import escapeFirebaseKey from "./escape-firebase-key"
+
+const isDemo = require("../../functions/demo-info").demoInfo.isDemo
 
 export const getUserTemplateListPath = (userId:string) => {
   return `users/${userId}/templates`
@@ -18,7 +21,7 @@ export const getUserTemplateRef = (userId:string, templateId:string) => {
 }
 
 export const getPortalPath = (offering:PortalOffering) => {
-  return offering.domain === "demo" ? "demo" : `portals/${offering.domain}`
+  return isDemo(offering.domain) ? "demo" : `portals/${escapeFirebaseKey(offering.domain)}`
 }
 
 export const getClassPath = (offering:PortalOffering) => {

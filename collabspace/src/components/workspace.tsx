@@ -298,7 +298,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       template: this.props.document.getTemplateHashParam(),
       demo: uuidV4()
     }
-    window.open(`${window.location.origin}/#${queryString.stringify(hashParams)}`)
+    window.open(`#${queryString.stringify(hashParams)}`)
   }
 
   handleSyncLocalWindowState = (firebaseDocument:FirebaseDocument) => {

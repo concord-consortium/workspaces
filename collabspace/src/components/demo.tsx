@@ -59,7 +59,7 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
         template: templateParam
       }
       const url = `?${queryString.stringify(queryParams)}#${queryString.stringify(hashParams)}`
-      links.push(<div key={i}><a href={url} target="_blank">Student {userId}</a></div>)
+      links.push(<div key={i}><a href={url} className="clickable" target="_blank">Student {userId}</a></div>)
     }
     return links
   }
@@ -76,7 +76,7 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
         offering: `${demoInfo.rootUrl}demoGetFakeOffering`
       }
       const url = `dashboard.html?${queryString.stringify(queryParams)}`
-      links.push(<div key={i}><a href={url} target="_blank">Teacher {userId - 1000}</a></div>)
+      links.push(<div key={i}><a href={url} className="clickable" target="_blank">Teacher {userId - 1000}</a></div>)
     }
     return links
   }
