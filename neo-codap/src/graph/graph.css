@@ -6,3 +6,33 @@
 .nc-graph-message {
   padding: 30px;
 }
+
+.nc-point {
+    r: 6px;
+    fill: #e6805b;
+    stroke: white;
+    fill-opacity: 0.7;
+    stroke-opacity: 0.8;
+    shape-rendering: geometricPrecision;
+}
+
+.nc-point:active {
+    fill: steelblue;
+}
+
+.nc-point:hover {
+    r: 8px;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: gray;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+    fill: black;
+}

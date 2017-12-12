@@ -50,7 +50,8 @@ class App extends React.Component<IAppProps, IAppState> {
   }
 
   renderGraph() {
-    return showGraph
+
+      return showGraph
             ? (
                 <div className="neo-codap-app-item">
                   <Graph dataSet={this.state.dataSet} />
