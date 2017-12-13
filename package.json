@@ -34,6 +34,7 @@
     "react-dom-factories": "^1.0.2",
     "react-faux-dom": "^4.1.0",
     "react-scripts-ts": "2.8.0",
+    "react-sizeme": "^2.3.6",
     "uuid": "^3.1.0"
   },
   "devDependencies": {

@@ -838,6 +838,10 @@ basic-auth@~2.0.0:
   dependencies:
     safe-buffer "5.1.1"
 
+batch-processor@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/batch-processor/-/batch-processor-1.0.0.tgz#75c95c32b748e0850d10c2b168f6bdbe9891ace8"
+
 batch@0.6.1:
   version "0.6.1"
   resolved "https://registry.yarnpkg.com/batch/-/batch-0.6.1.tgz#dc34314f4e679318093fc760272525f94bf25c16"
@@ -2224,6 +2228,12 @@ electron-to-chromium@^1.2.7:
 electron-to-chromium@^1.3.27:
   version "1.3.28"
   resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.28.tgz#8dd4e6458086644e9f9f0a1cf32e2a1f9dffd9ee"
+
+element-resize-detector@^1.1.12:
+  version "1.1.12"
+  resolved "https://registry.yarnpkg.com/element-resize-detector/-/element-resize-detector-1.1.12.tgz#8b3fd6eedda17f9c00b360a0ea2df9927ae80ba2"
+  dependencies:
+    batch-processor "^1.0.0"
 
 elliptic@^6.0.0:
   version "6.4.0"
@@ -5854,6 +5864,14 @@ react-scripts-ts@2.8.0:
     whatwg-fetch "2.0.3"
   optionalDependencies:
     fsevents "1.1.2"
+
+react-sizeme@^2.3.6:
+  version "2.3.6"
+  resolved "https://registry.yarnpkg.com/react-sizeme/-/react-sizeme-2.3.6.tgz#d60ea2634acc3fd827a3c7738d41eea0992fa678"
+  dependencies:
+    element-resize-detector "^1.1.12"
+    invariant "^2.2.2"
+    lodash "^4.17.4"
 
 react@^16.1.0:
   version "16.1.0"
