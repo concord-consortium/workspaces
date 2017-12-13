@@ -37,72 +37,62 @@ yAEf/ljJXS2eGEBJKr/JXkqQQcs4oiVgiRavtoDiny7Xw81A8bPWkMS10cRruPdh
 nX7TyKDAe/w5dpJPqwIDAQAB
 -----END PUBLIC KEY-----`;
 
-const getAuthorizationToken = (request, tokenType, callback) => {
-  if (request.headers && request.headers.authorization) {
-    const headerParts = request.headers.authorization.split(" ");
-    if ((headerParts.length === 2) && (headerParts[0] === tokenType)) {
-      callback(null, headerParts[1]);
-    }
-    else {
-      callback(`Invalid authorization header: ${request.headers.authorization} (expected ${tokenType})`);
-    }
-  }
-  else {
-    callback("Missing authorization header");
-  }
-};
+const fakeHMACKey = "ajgljafadhflsdjkhfasljkfh";
 
-const getDemoUserFromAuthToken = (request, response, callback) => {
-  getAuthorizationToken(request, "Bearer", (err, token) => {
-    if (err) {
-      callback(err);
-    }
-    else {
+const getDemoUserFromBearerToken = (request, response, callback) => {
+  if (!request.headers || !request.headers.authorization) {
+    return callback("Missing authorization header");
+  }
+
+  const [type, token, ...rest] = request.headers.authorization.split(" ");
+  if (!type || !token) {
+    return callback(`Invalid authorization header: ${request.headers.authorization}`);
+  }
+
+  switch (type) {
+    case "Bearer":
       const userId = parseInt(token);
-      if (!isNaN(userId)) {
-        callback(null, createDemoUser(userId));
+      if (isNaN(userId)) {
+        return callback(`Invalid bearer token: ${token} (must be simple integer for demo)`);
       }
-      else {
-        callback(`Invalid bearer token: ${token} (must be simple integer for demo)`);
-      }
-    }
-  });
-};
+      return callback(null, createDemoUser(userId));
 
-const getDemoUserFromJWTToken = (request, response, callback) => {
-  getAuthorizationToken(request, "Bearer/JWT", (err, token) => {
-    if (err) {
-      callback(err);
-    }
-    else {
-      jwt.verify(token, fakePublicKey, function(err, decoded) {
+    case "Bearer/JWT":
+      jwt.verify(token, fakeHMACKey, function(err, decoded) {
         if (err) {
-          callback(err);
+          return callback(err);
         }
-        else if (!decoded.uid) {
-          callback("Missing uid in JWT bearer token!");
+        if (!decoded.uid) {
+          return callback("Missing uid in JWT bearer token!");
         }
-        else {
-          callback(null, createDemoUser(decoded.uid));
-        }
+        callback(null, createDemoUser(decoded.uid));
       });
-    }
-  });
+      break;
+
+    default:
+      callback(`Invalid authorization header type: ${request.headers.authorization}`);
+  }
 };
 
 const createDemoUser = (userId, useExtendedId) => {
   const id = useExtendedId ? `http://example.com/users/${userId}` : userId;
   if (userId < 1000) {
     return {
-      id: id,
-      first_name: "Student",
-      last_name: `${userId}`
+      type: "learner",
+      info: {
+        id: id,
+        first_name: "Student",
+        last_name: `${userId}`
+      }
     };
   }
   return {
-    id: id,
-    first_name: "Teacher",
-    last_name: `${userId - 999}`
+    type: "teacher",
+    info: {
+      id: id,
+      first_name: "Teacher",
+      last_name: `${userId - 999}`
+    }
   };
 };
 
@@ -113,7 +103,7 @@ const sendError = (response, message, code) => {
 
 exports.demoGetFakeFirebaseJWT = functions.https.onRequest((request, response) => {
   cors(request, response, () => {
-    getDemoUserFromAuthToken(request, response, (err, user) => {
+    getDemoUserFromBearerToken(request, response, (err, user) => {
       if (err) {
         sendError(response, err, 403);
         return;
@@ -121,26 +111,53 @@ exports.demoGetFakeFirebaseJWT = functions.https.onRequest((request, response) =
 
       const now = Math.floor(Date.now() / 1000);
       const oneHourFromNow = now + (60 * 60);
-      const claims = {
-        "alg": "RS256",
-        "iss": "firebase-adminsdk-gy3ts@collabspace-920f6.iam.gserviceaccount.com",
-        "sub": "firebase-adminsdk-gy3ts@collabspace-920f6.iam.gserviceaccount.com",
-        "aud": "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
-        "iat": now,
-        "exp": oneHourFromNow,
-        "uid": user.id,
-        "claims": {
-          "user_type": "learner",
-          "user_id": `http://example.com/users/${user.id}`,
-          "domain": demoInfo.rootUrl,
-          "externalId": 1,
-          "returnUrl": `${demoInfo.rootUrl}dataservice/external_activity_data/debc99c7-daa2-4758-86f7-2ca4f3726c66`,
-          "logging": false,
-          "domain_uid": user.id,
-          "class_info_url": `${demoInfo.rootUrl}demoGetFakeClassInfo`,
-          "class_hash": "demo"
-        }
-      };
+
+      let claims;
+      if (user.type === "learner") {
+        claims = {
+          alg: "RS256",
+          iss: "firebase-adminsdk-gy3ts@collabspace-920f6.iam.gserviceaccount.com",
+          sub: "firebase-adminsdk-gy3ts@collabspace-920f6.iam.gserviceaccount.com",
+          aud: "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
+          iat: now,
+          exp: oneHourFromNow,
+          uid: user.info.id,
+          domain: demoInfo.rootUrl,
+          domain_uid: user.info.id,
+          externalId: 1,
+          returnUrl: `${demoInfo.rootUrl}dataservice/external_activity_data/debc99c7-daa2-4758-86f7-2ca4f3726c66`,
+          logging: false,
+          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo`,
+          claims: {
+            user_type: "learner",
+            user_id: `http://example.com/users/${user.info.id}`,
+            class_hash: "demo",
+            offering_id: 1
+          }
+        };
+      }
+      else {
+        claims = {
+          alg: "RS256",
+          iss: "firebase-adminsdk-gy3ts@collabspace-920f6.iam.gserviceaccount.com",
+          sub: "firebase-adminsdk-gy3ts@collabspace-920f6.iam.gserviceaccount.com",
+          aud: "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
+          iat: now,
+          exp: oneHourFromNow,
+          uid: user.info.id,
+          domain: demoInfo.rootUrl,
+          domain_uid: user.info.id,
+          externalId: 1,
+          returnUrl: `${demoInfo.rootUrl}dataservice/external_activity_data/debc99c7-daa2-4758-86f7-2ca4f3726c66`,
+          logging: false,
+          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo`,
+          claims: {
+            user_type: "teacher",
+            user_id: `http://example.com/users/${user.info.id}`,
+            class_hash: "demo"
+          }
+        };
+      }
 
       jwt.sign(claims, fakePrivateKey, {algorithm: "RS256"}, function(err, token) {
         if (err) {
@@ -154,9 +171,60 @@ exports.demoGetFakeFirebaseJWT = functions.https.onRequest((request, response) =
   });
 });
 
+exports.demoGetFakePortalJWT = functions.https.onRequest((request, response) => {
+  cors(request, response, () => {
+    getDemoUserFromBearerToken(request, response, (err, user) => {
+      if (err) {
+        sendError(response, err, 403);
+        return;
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const oneHourFromNow = now + (60 * 60);
+
+      let claims;
+      if (user.type === "learner") {
+        claims = {
+          alg: "HS256",
+          iat: now,
+          exp: oneHourFromNow,
+          uid: user.info.id,
+          domain: demoInfo.rootUrl,
+          user_type: "learner",
+          user_id: `http://example.com/users/${user.info.id}`,
+          learner_id: user.info.id,
+          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo`,
+          offering_id: 1
+        };
+      }
+      else {
+        claims = {
+          alg: "HS256",
+          iat: now,
+          exp: oneHourFromNow,
+          uid: user.info.id,
+          domain: demoInfo.rootUrl,
+          user_type: "teacher",
+          user_id: `http://example.com/users/${user.info.id}`,
+          teacher_id: user.info.id
+        };
+      }
+
+      jwt.sign(claims, fakeHMACKey, {algorithm: "HS256"}, function(err, token) {
+        if (err) {
+          sendError(response, err, 403);
+        }
+        else {
+          response.json({token: token});
+        }
+      });
+    });
+  });
+});
+
 exports.demoGetFakeClassInfo = functions.https.onRequest((request, response) => {
   cors(request, response, () => {
-    getDemoUserFromAuthToken(request, response, (err, user) => {
+    getDemoUserFromBearerToken(request, response, (err, user) => {
       if (err) {
         sendError(response, err, 403);
         return;
@@ -172,10 +240,10 @@ exports.demoGetFakeClassInfo = functions.https.onRequest((request, response) => 
       };
 
       for (let i = 0; i < demoInfo.numTeachers; i++) {
-        classInfo.teachers.push(createDemoUser(1000 + i, true));
+        classInfo.teachers.push(createDemoUser(1000 + i, true).info);
       }
       for (let i = 0; i < demoInfo.numStudents; i++) {
-        classInfo.students.push(createDemoUser(1 + i, true));
+        classInfo.students.push(createDemoUser(1 + i, true).info);
       }
 
       response.json(classInfo);

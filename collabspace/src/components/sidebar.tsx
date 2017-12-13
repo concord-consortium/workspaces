@@ -2,14 +2,17 @@ import * as React from "react"
 import * as firebase from "firebase"
 import { Window } from "../lib/window"
 import { WindowManager } from "../lib/window-manager"
-import { PortalActivity, PortalUser, PortalUserMap } from "../lib/auth"
+import { PortalInfo, PortalOffering, PortalUser, PortalUserMap, getPortalJWTWithBearerToken, PortalTokens } from "../lib/auth"
 import { getPublicationsRef, getArtifactsRef } from "../lib/refs"
 import { FirebasePublication, FirebasePublicationWindow, FirebaseArtifact } from "../lib/document"
 import { WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
+import * as queryString from "query-string"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
+
+const demoId = queryString.parse(window.location.search).demo
 
 export interface FirebasePublicationItem {
   id: string
@@ -58,7 +61,7 @@ export interface SidebarPublicationWindowComponentProps {
   publication: FirebasePublication
   window: FirebasePublicationWindow
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
-  portalActivity: PortalActivity
+  portalOffering: PortalOffering
   windowManager: WindowManager
   creatorName: string
 }
@@ -74,7 +77,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
     this.state = {
       artifactItems: []
     }
-    this.artifactsRef = getPublicationsRef(this.props.portalActivity, this.props.publicationId).child("windows").child(this.props.windowId).child("artifacts")
+    this.artifactsRef = getPublicationsRef(this.props.portalOffering, this.props.publicationId).child("windows").child(this.props.windowId).child("artifacts")
   }
 
   componentWillMount() {
@@ -96,7 +99,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
 
   handleCopyIntoDocument = () => {
     const title = `${this.props.window.title} by ${this.props.creatorName} in group ${this.props.publication.group}`
-    this.props.windowManager.copyWindowFromPublication(this.props.portalActivity, this.props.publication, this.props.windowId, title)
+    this.props.windowManager.copyWindowFromPublication(this.props.portalOffering, this.props.publication, this.props.windowId, title)
       .catch((err:any) => alert(err.toString()))
   }
 
@@ -135,7 +138,8 @@ export interface SidebarPublicationComponentProps {
   publicationItem: FirebasePublicationItem
   userMap: PortalUserMap
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
-  portalActivity: PortalActivity
+  portalOffering: PortalOffering
+  portalTokens: PortalTokens
   windowManager: WindowManager
 }
 export interface SidebarPublicationComponentState {
@@ -184,7 +188,7 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
                    window={window}
                    creatorName={this.state.creatorName}
                    toggleViewArtifact={this.props.toggleViewArtifact}
-                   portalActivity={this.props.portalActivity}
+                   portalOffering={this.props.portalOffering}
                    windowManager={this.props.windowManager}
                  />
         })}
@@ -213,11 +217,22 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
 
   renderExpanded() {
     const {publication} = this.props.publicationItem
+    const params:any = {
+      jwtToken: this.props.portalTokens.rawPortalJWT,
+      domain: this.props.portalTokens.domain,
+      document: this.props.publicationItem.publication.documentId
+    }
+    if (demoId) {
+      params.demo = demoId
+    }
+    const {location} = window
+    const url = `${location.origin}${location.pathname}dashboard.html?${queryString.stringify(params)}`
+
     return (
       <div className="expanded-info">
         <div className="user-name">{this.state.creatorName}</div>
         {this.renderGroupUsers()}
-        <div className="clickable">Open In Dashboard <strong>(TBD)</strong></div>
+        <a className="clickable" href={url} target="_blank">Open In Dashboard</a>
         {this.renderWindows()}
       </div>
     )
@@ -242,7 +257,8 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
 }
 
 export interface SidebarComponentProps {
-  portalActivity: PortalActivity
+  portalTokens: PortalTokens
+  portalOffering: PortalOffering
   portalUser: PortalUser
   group: number
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
@@ -251,7 +267,7 @@ export interface SidebarComponentProps {
 }
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
-  filter: "activity" | "group" | "mine"
+  filter: "offering" | "group" | "mine"
 }
 
 export class SidebarComponent extends React.Component<SidebarComponentProps, SidebarComponentState> {
@@ -262,12 +278,12 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     super(props)
     this.state = {
       publicationItems: [],
-      filter: "activity"
+      filter: "offering"
     }
-    this.publicationsRef = getPublicationsRef(this.props.portalActivity)
+    this.publicationsRef = getPublicationsRef(this.props.portalOffering)
 
     this.userMap = {}
-    this.props.portalActivity.classInfo.students.forEach((student) => {
+    this.props.portalOffering.classInfo.students.forEach((student) => {
       this.userMap[student.id] = student
       this.userMap[escapeFirebaseKey(student.id)] = student
     })
@@ -284,7 +300,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   handlePublicationAdded = (snapshot:firebase.database.DataSnapshot) => {
     const {publicationItems} = this.state
     const publication:FirebasePublication = snapshot.val()
-    if (publication.activityId === this.props.portalActivity.id) {
+    if (publication.offeringId === this.props.portalOffering.id) {
       const publicationItem:FirebasePublicationItem = {
         index: publicationItems.length + 1,
         id: snapshot.key as string,
@@ -297,7 +313,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
 
   getFilteredPublicationItems() {
     const {publicationItems, filter} = this.state
-    const {portalActivity, portalUser, group} = this.props
+    const {portalOffering, portalUser, group} = this.props
     return publicationItems.filter((publicationItem) => {
       const {publication} = publicationItem
       switch (filter) {
@@ -317,7 +333,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     }
     return (
       <div className="filter-selector">
-        <span className={className("activity")} onClick={() => this.setState({filter: "activity"})}>Activity</span>
+        <span className={className("offering")} onClick={() => this.setState({filter: "offering"})}>All</span>
         <span className={className("group")} onClick={() => this.setState({filter: "group"})}>Group</span>
         <span className={className("mine")} onClick={() => this.setState({filter: "mine"})}>Mine</span>
       </div>
@@ -349,7 +365,8 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
                    publicationItem={publicationItem}
                    userMap={this.userMap}
                    toggleViewArtifact={this.props.toggleViewArtifact}
-                   portalActivity={this.props.portalActivity}
+                   portalOffering={this.props.portalOffering}
+                   portalTokens={this.props.portalTokens}
                    windowManager={this.props.windowManager}
                  />
         })}

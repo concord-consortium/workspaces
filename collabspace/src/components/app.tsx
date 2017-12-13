@@ -7,7 +7,7 @@ import { DocumentCrudComponent } from "./document-crud"
 import { WorkspaceComponent } from "./workspace"
 import { FirebaseConfig } from "../lib/firebase-config"
 import { DemoComponent } from "./demo"
-import { PortalUser, PortalActivity, portalAuth, firebaseAuth } from "../lib/auth"
+import { PortalUser, PortalOffering, collabSpaceAuth, firebaseAuth, PortalTokens } from "../lib/auth"
 import { getUserTemplatePath } from "../lib/refs"
 
 export interface AppComponentProps {}
@@ -21,8 +21,9 @@ export interface AppComponentState {
   templateId: string|null
   template: Document|null
   demoId: string|null
+  portalTokens: PortalTokens|null,
   portalUser: PortalUser|null,
-  portalActivity: PortalActivity|null,
+  portalOffering: PortalOffering|null,
   groupChosen: boolean
   group: number
   groupRef: firebase.database.Reference|null
@@ -52,8 +53,9 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       documentId: null,
       document: null,
       demoId: null,
+      portalTokens: null,
       portalUser: null,
-      portalActivity: null,
+      portalOffering: null,
       groupChosen: false,
       group: 0,
       groupRef: null,
@@ -70,8 +72,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   componentWillMount() {
     firebase.initializeApp(FirebaseConfig)
 
-    portalAuth().then((portalInfo) => {
-      this.setState({portalUser: portalInfo.user, portalActivity: portalInfo.activity})
+    collabSpaceAuth().then((portalInfo) => {
+      this.setState({portalUser: portalInfo.user, portalOffering: portalInfo.offering, portalTokens: portalInfo.tokens})
 
       return firebaseAuth().then((firebaseUser) => {
         this.setState({firebaseUser})
@@ -113,7 +115,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
           .then((template) => {
             const {firebaseUser} = this.state
             template.isReadonly = firebaseUser ? firebaseUser.uid !== template.ownerId : true
-            this.setState({template, document: this.state.portalActivity ? null : template})
+            this.setState({template, document: this.state.portalOffering ? null : template})
           })
           .catch((documentError) => this.setState({documentError}))
       }
@@ -129,8 +131,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       const group = parseInt(this.refs.group.value)
       if (group > 0) {
         this.setState({groupChosen: true, group})
-        if (this.state.template && this.state.portalActivity) {
-          this.state.template.getGroupActivityDocument(this.state.portalActivity, group)
+        if (this.state.template && this.state.portalOffering) {
+          this.state.template.getGroupOfferingDocument(this.state.portalOffering, group)
             .then(([document, groupRef]) => {
               this.setState({document, groupRef})
             })
@@ -180,13 +182,14 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
     if (this.state.firebaseUser) {
       if (this.state.templateId) {
         if (this.state.template) {
-          if (this.state.portalUser && this.state.portalActivity) {
+          if (this.state.portalUser && this.state.portalOffering && this.state.portalTokens) {
             if (this.state.groupChosen) {
               if (this.state.document) {
                 return <WorkspaceComponent
                   isTemplate={false}
                   portalUser={this.state.portalUser}
-                  portalActivity={this.state.portalActivity}
+                  portalOffering={this.state.portalOffering}
+                  portalTokens={this.state.portalTokens}
                   firebaseUser={this.state.firebaseUser}
                   document={this.state.document}
                   setTitle={null}
@@ -211,7 +214,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
           return <WorkspaceComponent
                     isTemplate={true}
                     portalUser={null}
-                    portalActivity={null}
+                    portalOffering={null}
+                    portalTokens={null}
                     group={null}
                     groupRef={null}
                     firebaseUser={this.state.firebaseUser}
