@@ -2,7 +2,7 @@ import * as React from 'react';
 import * as ReactFauxDOM from 'react-faux-dom';
 import * as d3 from 'd3';
 import sizeMe from 'react-sizeme';
-import {ICase, IDataSet, IDerivationSpec} from '../data-manager/data-manager';
+import { ICase, IDataSet, IDerivationSpec } from '../data-manager/data-manager';
 import './graph.css';
 
 interface ISizeMeSize {
@@ -71,7 +71,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     }
 
     render() {
-        const kPointRadius:number = 6;
+        const kPointRadius: number = 6;
 
         const /*{dataSet} = this.props,*/
             {graphData} = this.state/*,
@@ -97,8 +97,8 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 */
 
         let margin = {top: 20, right: 20, bottom: 30, left: 50},
-            width:number = this.props.size.width - margin.left - margin.right,
-            height:number = this.props.size.height - margin.top - margin.bottom,
+            width: number = this.props.size.width - margin.left - margin.right,
+            height: number = this.props.size.height - margin.top - margin.bottom,
             x = d3.scaleLinear()
                 .range([0, width])
                 .domain([0, xMax || 1]).nice(),
