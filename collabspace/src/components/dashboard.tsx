@@ -2,11 +2,11 @@ import * as React from "react"
 import * as firebase from "firebase"
 import * as queryString from "query-string"
 import * as jwt from "jsonwebtoken"
-import { PortalJWT, getClassInfo, PortalClassInfo, PortalOffering } from "../lib/auth";
+import { PortalJWT, getClassInfo, PortalClassInfo, PortalOffering, dashboardAuth, PortalUser, firebaseAuth } from "../lib/auth";
 import { Document, FirebasePublication } from "../lib/document"
 import { getDocumentPath, getPublicationsRef } from "../lib/refs"
 import { FirebaseConfig } from "../lib/firebase-config"
-import { DashboardDocumentComponent } from "./dashboard-document"
+import { WorkspaceComponent } from "./workspace"
 
 const isDemo = require("../../functions/demo-info").demoInfo.isDemo
 
@@ -23,12 +23,11 @@ export interface DashboardComponentProps {
 }
 
 export interface DashboardComponentState {
+  firebaseUser: firebase.User|null
   error: any|null
   progress: string|null
-  params: DashboardQueryParameters
-  portalJWT: PortalJWT|null
-  classInfo: PortalClassInfo|null
   portalOffering: PortalOffering|null
+  portalUser: PortalUser|null
   document: Document|null
   firebasePublication: FirebasePublication|null
 }
@@ -38,12 +37,11 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
   constructor (props:DashboardComponentProps) {
     super(props);
     this.state = {
+      firebaseUser: null,
       error: null,
       progress: "Loading...",
-      params: {},
-      portalJWT: null,
-      classInfo: null,
       portalOffering: null,
+      portalUser: null,
       document: null,
       firebasePublication: null
     }
@@ -52,90 +50,70 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
   componentWillMount() {
     firebase.initializeApp(FirebaseConfig)
 
-    const params:DashboardQueryParameters = queryString.parse(window.location.search)
-    const portalJWT:PortalJWT|null = params.jwtToken ? jwt.decode(params.jwtToken) as PortalJWT : null
-    this.setState({
-      params,
-      portalJWT
+    firebaseAuth().then((firebaseUser) => {
+
+      this.setState({firebaseUser})
+
+      const params:DashboardQueryParameters = queryString.parse(window.location.search)
+      const {publication, jwtToken, demo} = params
+
+      if (publication && jwtToken) {
+        dashboardAuth(jwtToken, demo)
+          .then(([portalOffering, portalUser]) => {
+
+            this.setState({progress: "Loading publication...", portalOffering, portalUser})
+
+            return getPublicationsRef(portalOffering, publication).once("value")
+              .then((snapshot) => {
+                const firebasePublication:FirebasePublication = snapshot.val()
+                this.setState({firebasePublication})
+
+                this.setState({progress: "Loading document..."})
+
+                const {documentId} = firebasePublication
+                Document.LoadDocumentFromFirebase(documentId, getDocumentPath(portalOffering, documentId))
+                  .then((document) => {
+                    document.isReadonly = true
+                    this.setState({document, progress: null})
+                  })
+                  .catch((error) => this.setState({error}))
+              })
+
+          })
+          .catch((error) => this.setState({error}))
+      }
     })
-
-    const {publication, jwtToken, demo} = params
-
-    if (publication && jwtToken && portalJWT && portalJWT.user_type === "learner") {
-      this.setState({progress: "Loading class info..."})
-
-      const classInfoUrl = `${portalJWT.class_info_url}${isDemo(portalJWT.class_info_url) && demo ? `?demo=${demo}` : ""}`
-      getClassInfo(classInfoUrl, jwtToken)
-        .then((classInfo) => {
-
-          const portalOffering:PortalOffering = {
-            id: portalJWT.offering_id,
-            domain: portalJWT.domain,
-            classInfo,
-            isDemo
-          }
-
-          this.setState({classInfo, portalOffering})
-
-          this.setState({progress: "Loading publication..."})
-
-          return getPublicationsRef(portalOffering, publication).once("value")
-            .then((snapshot) => {
-              const firebasePublication:FirebasePublication = snapshot.val()
-              this.setState({firebasePublication})
-
-              this.setState({progress: "Loading document..."})
-
-              const {documentId} = firebasePublication
-              Document.LoadDocumentFromFirebase(documentId, getDocumentPath(portalOffering, documentId))
-                .then((document) => this.setState({document, progress: null}))
-                .catch((error) => this.setState({error}))
-            })
-        })
-        .catch((error) => this.setState({error}))
-    }
-  }
-
-  renderDocument() {
-    const {portalOffering, document, firebasePublication} = this.state
-    if (!portalOffering || !document || !firebasePublication) {
-      return null
-    }
-  }
-
-  renderDebugInfo() {
-    const {params} = this.state
-    if (params.token) {
-      return <div>Showing dashboard for teacher</div>
-    }
-    return <div>Unknown parameters!</div>
   }
 
   renderError() {
-    return <div className="error">{this.state.error}</div>
+    return <div className="error">{this.state.error.toString()}</div>
   }
 
-  renderProgress() {
-    return <div className="progress">{this.state.progress}</div>
+  renderProgress(progress?:string) {
+    return <div className="progress">{progress || this.state.progress}</div>
   }
 
   render() {
-    const {error, progress, portalOffering, document, firebasePublication} = this.state
+    const {error, progress, portalOffering, portalUser, firebaseUser, document, firebasePublication} = this.state
 
     if (error) {
       return this.renderError()
     }
-    if (progress) {
-      return this.renderProgress()
+    if (portalUser && firebaseUser && portalOffering && document && firebasePublication) {
+      return <WorkspaceComponent
+              isTemplate={false}
+              portalUser={portalUser}
+              portalOffering={portalOffering}
+              portalTokens={null}
+              firebaseUser={firebaseUser}
+              document={document}
+              setTitle={null}
+              group={null}
+              groupRef={null}
+              publication={firebasePublication}
+            />
     }
-    if (portalOffering && document && firebasePublication) {
-      return <DashboardDocumentComponent
-                portalOffering={portalOffering}
-                document={document}
-                firebasePublication={firebasePublication}
-             />
-    }
-    return null
+    return this.renderProgress("Authenticating...")
   }
 }
 

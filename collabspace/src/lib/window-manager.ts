@@ -52,10 +52,10 @@ export interface WindowManagerSettings {
   syncChanges: boolean
 }
 
-interface FirebaseOrderMap {
+export interface FirebaseOrderMap {
   [key: string]: number|null
 }
-interface InvertedFirebaseOrderMap {
+export interface InvertedFirebaseOrderMap {
   [key: string]: string
 }
 

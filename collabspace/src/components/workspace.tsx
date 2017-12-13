@@ -30,6 +30,7 @@ export interface WorkspaceComponentProps {
   groupRef: firebase.database.Reference|null
   group: number|null
   leaveGroup?: () => void
+  publication: FirebasePublication|null
 }
 export interface WorkspaceComponentState extends WindowManagerState {
   documentInfo: FirebaseDocumentInfo|null
@@ -57,6 +58,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const classUserLookup:PortalUserMap = {}
     if (portalOffering) {
       portalOffering.classInfo.students.forEach((student) => {
+        classUserLookup[student.id] = student
         classUserLookup[escapeFirebaseKey(student.id)] = student
       })
     }
@@ -88,7 +90,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   componentWillMount() {
     this.windowManager = new WindowManager({
       document: this.props.document,
-      onStateChanged: (newState) => this.setState(newState),
+      onStateChanged: (newState) => {
+        this.setState(newState)
+      },
       syncChanges: this.props.isTemplate
     })
 
@@ -312,8 +316,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           }
         })
       }
-      windows.order = this.windowManager.windowOrder
-      windows.minimizedOrder = this.windowManager.minimizedWindowOrder
+      windows.order = this.windowManager.arrayToFirebaseOrderMap(this.windowManager.windowOrder)
+      windows.minimizedOrder = this.windowManager.arrayToFirebaseOrderMap(this.windowManager.minimizedWindowOrder)
     }
   }
 
@@ -436,19 +440,35 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className={className}>
         {this.renderDocumentInfo()}
         <div className="user-info">
-          <div className="user-name">{userName}</div>
+          <div className="user-name" title={firebaseUser.uid}>{userName}</div>
         </div>
         {this.renderGroupInfo()}
       </div>
     )
   }
 
-  renderReadonlyToolbar() {
+  renderPublicationToolbar() {
+    const { publication } = this.props
+    if (!publication) {
+      return null
+    }
+    const {creator, createdAt} = publication
+    const user = this.state.classUserLookup[creator]
+    const name = user ? user.fullName : "Unknown User"
+    const message = `Published ${timeagoInstance.format(createdAt)} by ${name} in group ${publication.group}`
     return (
-      <div className="readonly-message">
-        View only.  You do not have edit access to this template.
-      </div>
+      <div className="readonly-message">{message}</div>
     )
+  }
+
+  renderReadonlyTemplateToolbar() {
+    return (
+      <div className="readonly-message">View only.  You do not have edit access to this template.</div>
+    )
+  }
+
+  renderReadonlyToolbar() {
+    return this.props.isTemplate ? this.renderReadonlyTemplateToolbar() : this.renderPublicationToolbar()
   }
 
   renderToolbarButtons() {
@@ -510,7 +530,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   renderWindowArea() {
     const hasMinmizedWindows = this.state.minimizedWindows.length > 0
     const nonMinimizedClassName = `non-minimized${hasMinmizedWindows ? " with-minimized" : ""}`
-    const className = `window-area${!this.props.isTemplate ? " with-sidebar" : ""}`
+    const className = `window-area${!this.props.isTemplate && !this.props.document.isReadonly ? " with-sidebar" : ""}`
     return (
       <div className={className}>
         <div className={nonMinimizedClassName}>
@@ -522,7 +542,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderReadonlyBlocker() {
-    if (this.props.document.isReadonly) {
+    if (this.props.isTemplate && this.props.document.isReadonly) {
       return <div className="readonly-blocker" />
     }
     return null

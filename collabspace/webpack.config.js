@@ -108,7 +108,7 @@ module.exports = [
     {
         entry: {
             "dashboard": "./src/dashboard.tsx",
-            "dashboard-styles": "./src/styles/dashboard.scss",
+            "dashboard-styles": "./src/styles/app.scss",
             "dashboard-globals": globalsList
         },
 

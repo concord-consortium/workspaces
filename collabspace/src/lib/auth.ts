@@ -352,3 +352,39 @@ export const firebaseAuth = () => {
     firebase.auth().signInAnonymously().catch(reject)
   })
 }
+
+export const dashboardAuth = (jwtToken:string, demo?:string) => {
+  return new Promise<[PortalOffering, PortalUser]>((resolve, reject) => {
+    const portalJWT:PortalJWT = jwt.decode(jwtToken) as PortalJWT
+
+    if (portalJWT && portalJWT.user_type === "learner") {
+
+      const classInfoUrl = `${portalJWT.class_info_url}${isDemo(portalJWT.class_info_url) && demo ? `?demo=${demo}` : ""}`
+      getClassInfo(classInfoUrl, jwtToken)
+        .then((classInfo) => {
+          let user:PortalUser|null = null
+          classInfo.students.forEach((student) => {
+            if (student.id === portalJWT.user_id) {
+              user = student
+            }
+          })
+          if (!user) {
+            return reject("Current user not found in class roster")
+          }
+
+          const portalOffering:PortalOffering = {
+            id: portalJWT.offering_id,
+            domain: portalJWT.domain,
+            classInfo,
+            isDemo
+          }
+
+          resolve([portalOffering, user])
+        })
+        .catch(reject)
+    }
+    else {
+      reject("Teaching login not yet enabled")
+    }
+  })
+}
