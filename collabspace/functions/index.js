@@ -250,3 +250,19 @@ exports.demoGetFakeClassInfo = functions.https.onRequest((request, response) => 
     });
   });
 });
+
+
+exports.demoGetFakeOffering = functions.https.onRequest((request, response) => {
+  cors(request, response, () => {
+    getDemoUserFromBearerToken(request, response, (err, user) => {
+      if (err) {
+        sendError(response, err, 403);
+        return;
+      }
+
+      response.json({
+        clazz_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo`
+      });
+    });
+  });
+});

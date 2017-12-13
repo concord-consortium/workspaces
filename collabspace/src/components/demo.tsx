@@ -2,7 +2,7 @@ import * as React from "react"
 import { Document, FirebaseDocumentInfo } from "../lib/document"
 import * as firebase from "firebase"
 import { AppQueryParams, AppHashParams } from "./app"
-import { DashboardQueryParameters } from "./dashboard"
+import { DashboardQueryParams } from "./dashboard"
 import * as queryString from "query-string"
 
 const demoInfo = require("../../functions/demo-info").demoInfo;
@@ -70,10 +70,11 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
     const templateParam = this.props.template.getTemplateHashParam()
     for (let i=0; i < demoInfo.numTeachers; i++) {
       const userId = i + 1001;
-      const queryParams:DashboardQueryParameters = {
+      const queryParams:DashboardQueryParams = {
         demo: this.props.demoId,
-        token: userId,
-        offering: `${demoInfo.rootUrl}demoGetFakeOffering`
+        token: String(userId),
+        offering: `${demoInfo.rootUrl}demoGetFakeOffering`,
+        domain: demoInfo.rootUrl
       }
       const url = `dashboard.html?${queryString.stringify(queryParams)}`
       links.push(<div key={i}><a href={url} className="clickable" target="_blank">Teacher {userId - 1000}</a></div>)
