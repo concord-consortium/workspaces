@@ -47,6 +47,7 @@ export interface WindowComponentProps {
   isTopWindow: boolean
   zIndex: number
   isTemplate: boolean
+  isReadonly: boolean
 }
 export interface WindowComponentState {
   editingTitle: boolean
@@ -162,6 +163,13 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     )
   }
 
+  renderReadonlyBlocker() {
+    if (this.props.isReadonly) {
+      return <div className="readonly-iframe-blocker" />
+    }
+    return null
+  }
+
   render() {
     const {window, isTopWindow} = this.props
     const {attrs} = window
@@ -186,6 +194,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         </div>
         <div className="iframe">
           <WindowIframeComponent key={window.id} src={url} loaded={this.handleIframeLoaded} />
+          {this.renderReadonlyBlocker()}
         </div>
         {this.renderIframeOverlay()}
         {!maximized ? <div className="left-drag" onMouseDown={this.handleDragLeft} /> : null}

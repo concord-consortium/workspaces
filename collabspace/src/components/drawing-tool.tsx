@@ -143,18 +143,10 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
     }
   }
 
-  renderReadonlyBlocker() {
-    if (this.state.readonly) {
-      return <div className="readonly-blocker" />
-    }
-    return null
-  }
-
   render() {
     return (
       <div className="drawing-tool-wrapper">
         <div ref="container" id="drawing-tool-container" />
-        {this.renderReadonlyBlocker()}
       </div>
     )
   }

@@ -510,6 +510,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                zIndex={orderedWindow.order}
                windowManager={this.windowManager}
                isTemplate={this.props.isTemplate}
+               isReadonly={this.props.document.isReadonly}
              />
     })
   }
