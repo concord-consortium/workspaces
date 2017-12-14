@@ -6,10 +6,10 @@ import { ICase, IDataSet, IDerivationSpec } from '../data-manager/data-manager';
 import './graph.css';
 
 interface ISizeMeSize {
-    width: number;
-    height: number;
+    width: number|null;
+    height: number|null;
 }
-
+  
 interface IGraphProps {
     size: ISizeMeSize;
     dataSet: IDataSet;
@@ -27,10 +27,17 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     constructor(props: IGraphProps) {
         super(props);
 
+        this.state = {
+            graphData: props.dataSet &&
+                        this.createGraphData(props.dataSet, this.xAttributeName, this.yAttributeName)
+        };
+    }
+
+    createGraphData(srcDataSet: IDataSet, xName: string, yName: string) {
         const
-            xAttr = props.dataSet && props.dataSet.attrFromName(this.xAttributeName),
+            xAttr = srcDataSet && srcDataSet.attrFromName(xName),
             xAttrID = xAttr && xAttr.id,
-            yAttr = props.dataSet && props.dataSet.attrFromName(this.yAttributeName),
+            yAttr = srcDataSet && srcDataSet.attrFromName(yName),
             yAttrID = yAttr && yAttr.id,
             attrIDs: string[] = [];
         if (xAttrID) {
@@ -39,12 +46,12 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         if (yAttrID) {
             attrIDs.push(yAttrID);
         }
-
+    
         const derivationSpec: IDerivationSpec = {
                 attributeIDs: attrIDs,
                 filter: (aCase: ICase) => {
-                    let x = aCase[this.xAttributeName],
-                        y = aCase[this.yAttributeName];
+                    let x = aCase[xName],
+                        y = aCase[yName];
                     // exclude missing values
                     if ((x == null) || (x === '') || (y == null) || (y === '')) {
                         return undefined;
@@ -57,32 +64,47 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                         return undefined;
                     }
                     // return the filtered case
-                    aCase[this.xAttributeName] = x;
-                    aCase[this.yAttributeName] = y;
+                    aCase[xName] = x;
+                    aCase[yName] = y;
                     return aCase;
                 },
                 synchronize: true
             },
-            graphData = props.dataSet && props.dataSet.derive('graphData', derivationSpec);
-
-        this.state = {
-            graphData: graphData
-        };
+            graphData = srcDataSet && srcDataSet.derive('graphData', derivationSpec);
+        if (graphData) {
+            graphData.addActionListener('graph', (action) => {
+                this.forceUpdate();
+            });
+        }
+        return graphData;
+    }
+    
+    componentWillReceiveProps(nextProps: IGraphProps) {
+        const { dataSet } = nextProps;
+        if (dataSet !== this.props.dataSet) {
+            if (this.state.graphData) {
+                this.state.graphData.removeActionListener('graph');
+            }
+            const graphData = dataSet &&
+                                this.createGraphData(dataSet, this.xAttributeName, this.yAttributeName);
+            this.setState({ graphData });
+        }
     }
 
     render() {
+        if (!this.props.size.width || !this.props.size.height) { return null; }
+
         const kPointRadius: number = 6;
 
-        const /*{dataSet} = this.props,*/
-            {graphData} = this.state/*,
-            totalCaseCount = dataSet && dataSet.cases.length,
-            graphCaseCount = graphData && graphData.cases.length*/;
+        const
+            {graphData} = this.state,
+            graphCaseCount = graphData && graphData.cases.length;
         let xAttr = graphData.attrFromName(this.xAttributeName),
             yAttr = graphData.attrFromName(this.yAttributeName);
         let xValues: number[] = xAttr ? xAttr.values as number[] : [],
             yValues: number[] = yAttr ? yAttr.values as number[] : [];
-        let xMax = d3.max(xValues),
-            yMax = d3.max(yValues);
+        let xMax = graphCaseCount ? d3.max(xValues) : 10,
+            yMax = graphCaseCount ? d3.max(yValues) : 10;
 
         // Just for fun plot a _lot_ of random points instead of the ones from dataset
 /*
@@ -169,8 +191,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
 const sizeMeConfig = {
     monitorWidth: true,
-    monitorHeight: true,
-    noPlaceholder: true
+    monitorHeight: true
 };
 
 export const Graph = sizeMe(sizeMeConfig)(GraphComponent);
