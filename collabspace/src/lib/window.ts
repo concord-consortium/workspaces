@@ -1,5 +1,6 @@
 import { Document } from "./document"
 import { IFramePhoneParent } from "../../../shared/workspace-client"
+import { FirebaseOrderMap } from "./window-manager"
 import * as firebase from "firebase"
 
 export interface FirebaseWindowAttrs {
@@ -25,8 +26,8 @@ export interface FirebaseIFrameDataMap {
 
 export interface FirebaseWindows {
   attrs: FirebaseWindowAttrsMap
-  order: string[]
-  minimizedOrder: string[]
+  order: FirebaseOrderMap
+  minimizedOrder: FirebaseOrderMap
   iframeData: FirebaseIFrameDataMap
 }
 

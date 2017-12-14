@@ -9,21 +9,12 @@ import './case-table.css';
 // import { ICellRendererParams } from 'ag-grid';
 
 interface ICaseTableProps {
-  dataSet: IDataSet;
+  dataSet?: IDataSet;
 }
 
 interface ICaseTableState {
-  columnDefs: ColDef[];
-  rowBuffer: number;
   rowSelection: string;
-  rowModelType?: string;
-  rowData?: (ICase | undefined)[];
-  paginationPageSize: number;
-  cacheOverflowSize?: number;
-  maxConcurrentDatasourceRequests?: number;
-  infiniteInitialRowCount?: number;
-  cacheBlockSize?: number;
-  maxBlocksInCache?: number;
+  rowModelType: string;
 }
 
 function getColumnDefs(dataSet: IDataSet): ColDef[] {
@@ -76,9 +67,9 @@ function getColumnDefs(dataSet: IDataSet): ColDef[] {
                             ? params.newValue.trim() : undefined,
                     num = str ? Number(str) : undefined,
                     attrName = params.colDef.field || attr.name,
-                    caseID = dataSet.cases[params.node.rowIndex].id,
+                    caseID = dataSet.cases[params.node.rowIndex].__id__,
                     caseValues = {
-                      id: caseID,
+                      __id__: caseID,
                       [attrName]: (num != null) && isFinite(num) ? num : str
                     };
               if (caseValues[attrName] === params.oldValue) { return false; }
@@ -105,9 +96,8 @@ function getColumnDefs(dataSet: IDataSet): ColDef[] {
 function getRowData(dataSet: IDataSet) {
   const rows = [];
   for (let i = 0; i < dataSet.cases.length; ++i) {
-    // rows.push(dataSet.getCaseAtIndex(i));
     // just need the ID; everything else comes from valueGetter
-    rows.push({ id: dataSet.cases[i].id });
+    rows.push({ id: dataSet.cases[i].__id__ });
   }
   return rows;
 }
@@ -117,17 +107,20 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   gridApi: GridApi;
   gridColumnApi: ColumnApi;
 
+  gridColumnDefs: ColDef[];
+  gridRowData: (ICase | undefined)[];
+
   constructor(props: ICaseTableProps) {
     super(props);
 
+    const { dataSet } = this.props;
+
     this.state = {
-      columnDefs: getColumnDefs(props.dataSet),
-      rowBuffer: 0,
       rowSelection: 'multiple',
-      // rowModelType: 'infinite',
-      rowData: getRowData(props.dataSet),
-      paginationPageSize: 100
+      rowModelType: 'inMemory',
     };
+
+    this.updateGridState(dataSet);
   }
 
   onGridReady = (gridReadyParams: GridReadyEvent) => {
@@ -137,25 +130,47 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
 
   getRowNodeId = (data: { id: string }) => data.id;
 
+  updateGridState(dataSet?: IDataSet) {
+    this.gridColumnDefs = dataSet ? getColumnDefs(dataSet) : [];
+    this.gridRowData = dataSet ? getRowData(dataSet) : [];
+    if (this.gridApi) {
+      this.gridApi.setRowData(this.gridRowData);
+    }
+  }
+
+  componentWillReceiveProps(nextProps: ICaseTableProps) {
+    const { dataSet } = nextProps;
+    if (dataSet !== this.props.dataSet) {
+      if (this.props.dataSet) {
+        this.props.dataSet.removeActionListener('case-table');
+      }
+      if (dataSet) {
+        dataSet.addActionListener('case-table', (action) => {
+          this.updateGridState(dataSet);
+          this.forceUpdate();
+        });
+      }
+      this.updateGridState(dataSet);
+    }
+  }
+
+  componentWillReact() {
+    this.updateGridState(this.props.dataSet);
+  }
+
   render() {
     return (
       <div className="neo-codap-case-table ag-theme-fresh">
         <AgGridReact
-          columnDefs={this.state.columnDefs}
+          columnDefs={this.gridColumnDefs}
           enableColResize={true}
-          rowBuffer={this.state.rowBuffer}
           getRowNodeId={this.getRowNodeId}
           debug={false}
           rowSelection={this.state.rowSelection}
           rowDeselection={true}
           rowModelType={this.state.rowModelType}
-          rowData={this.state.rowData}
-          deltaRowDataMode={true}
-          paginationPageSize={this.state.paginationPageSize}
-          cacheOverflowSize={this.state.cacheOverflowSize}
-          maxConcurrentDatasourceRequests={this.state.maxConcurrentDatasourceRequests}
-          infiniteInitialRowCount={this.state.infiniteInitialRowCount}
-          maxBlocksInCache={this.state.maxBlocksInCache}
+          rowData={this.gridRowData}
+          deltaRowDataMode={false}
           onGridReady={this.onGridReady}
         />
       </div>

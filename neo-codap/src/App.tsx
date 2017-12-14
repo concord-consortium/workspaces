@@ -13,11 +13,12 @@ const urlParams = queryString.parse(location.search),
       showTable = (mode === 'all') || (mode === 'table'),
       showGraph = (mode === 'all') || (mode === 'graph');
 
-export interface IAppProps {
-
+interface IAppProps {
+  dataSet?: IDataSet;
+  onDOMNodeRef?: (ref: HTMLElement) => void;
 }
 
-export interface IAppState {
+interface IAppState {
   dataSet: IDataSet;
 }
 
@@ -26,12 +27,22 @@ class App extends React.Component<IAppProps, IAppState> {
   constructor(props: IAppProps) {
     super(props);
 
-    const dataSet = DataSet.create({ name: chosenDataSetName });
+    const dataSet = this.props.dataSet || DataSet.create({ name: chosenDataSetName });
+    this.initializeDataSetIfEmpty(dataSet);
 
     this.state = {
       dataSet
     };
+  }
 
+  initializeDataSetIfEmpty(dataSet?: IDataSet) {
+    if (dataSet && !dataSet.attributes.length && !dataSet.cases.length) {
+      this.loadDataSetFromDefaultData(dataSet);
+    }
+  }
+
+  loadDataSetFromDefaultData(dataSet: IDataSet) {
+    dataSet.setName(chosenDataSetName);
     const firstCase = rawData && rawData[0];
     for (let name in firstCase) {
       addAttributeToDataSet(dataSet, { name });
@@ -39,10 +50,20 @@ class App extends React.Component<IAppProps, IAppState> {
     addCasesToDataSet(dataSet, rawData as {} as ICase[]);
   }
 
+  componentWillReceiveProps(nextProps: IAppProps) {
+    const { dataSet } = nextProps;
+    if (dataSet && (dataSet !== this.props.dataSet)) {
+      this.initializeDataSetIfEmpty(dataSet);
+      this.setState({ dataSet });
+    }
+  }
+
   renderTable() {
+    const widthClass = showTable && showGraph ? 'half-width' : 'full-width',
+          classes = `neo-codap-app-item ${widthClass}`;
     return showTable
             ? (
-                <div className="neo-codap-app-item">
+                <div className={classes}>
                   <CaseTable dataSet={this.state.dataSet} />
                 </div>
               )
@@ -50,9 +71,11 @@ class App extends React.Component<IAppProps, IAppState> {
   }
 
   renderGraph() {
-    return showGraph
+    const widthClass = showTable && showGraph ? 'half-width' : 'full-width',
+          classes = `neo-codap-app-item ${widthClass}`;
+    return showGraph && this.props.dataSet
             ? (
-                <div className="neo-codap-app-item">
+              <div className={classes}>
                   <Graph dataSet={this.state.dataSet} />
                 </div>
               )

@@ -27,6 +27,9 @@ export interface FirebaseOffering {
   name: string
   groups: FirebaseOfferingGroupMap
 }
+export interface FirebaseOfferingMap {
+  [key: number]: FirebaseOffering
+}
 
 export interface FirebaseOfferingGroupMap {
   [key: number]: FirebaseOfferingGroup
@@ -48,6 +51,9 @@ export interface FirebasePublication {
   createdAt: number|object
   documentId: string
   windows: FirebasePublicationWindowMap
+}
+export interface FirebasePublicationMap {
+  [key: string]: FirebasePublication
 }
 
 export interface FirebaseArtifact {

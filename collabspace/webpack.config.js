@@ -9,7 +9,8 @@ const jsFilename = isDev ? "[name].js" : "[name].[chunkhash].js";
 
 const distPath = __dirname + "/../dist/collabspace";
 
-const globalsList = ["react", "react-dom", "firebase", "lodash", "query-string", "uuid"];
+const globalsList = ["react", "react-dom", "firebase", "lodash",
+                    "mobx", "mobx-state-tree", "query-string", "uuid"];
 
 const extractSass = new ExtractTextPlugin({
    filename: cssFilename,
@@ -108,7 +109,7 @@ module.exports = [
     {
         entry: {
             "dashboard": "./src/dashboard.tsx",
-            "dashboard-styles": "./src/styles/dashboard.scss",
+            "dashboard-styles": "./src/styles/app.scss",
             "dashboard-globals": globalsList
         },
 
@@ -156,7 +157,7 @@ module.exports = [
     },
     {
         entry: {
-            "neo-codap": "../neo-codap/src/index.tsx",
+            "neo-codap": "./src/neo-codap.tsx",
             "neo-codap-globals": ["react", "react-dom", "firebase"]
         },
 
@@ -186,7 +187,7 @@ module.exports = [
             }),
             new HtmlWebpackPlugin({
                 filename: '../neo-codap.html',
-                template: '../neo-codap/public/index.html'
+                template: 'src/neo-codap.template.html'
             })
         ]
     }

@@ -1,33 +1,46 @@
 {
-  "name": "codap-components",
+  "name": "neo-codap",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
     "ag-grid": "^14.2.0",
     "ag-grid-react": "^14.2.0",
+    "d3": "^4.12.0",
+    "dom-to-image": "^2.6.0",
+    "html2canvas": "^1.0.0-alpha.4",
+    "lodash": "^4.17.4",
     "mobx": "^3.4.0",
+    "mobx-react": "^4.3.5",
     "mobx-state-tree": "^1.2.1",
+    "prop-types": "^15.6.0",
     "query-string": "^5.0.1",
     "react": "^16.1.1",
     "react-dom": "^16.1.1",
     "react-dom-factories": "^1.0.2",
+    "react-faux-dom": "^4.1.0",
     "react-scripts-ts": "2.8.0",
+    "react-sizeme": "^2.3.6",
     "uuid": "^3.1.0"
   },
   "scripts": {
     "start": "react-scripts-ts start",
     "build": "react-scripts-ts build",
     "test": "react-scripts-ts test --env=jsdom",
-    "test:coverage": "react-scripts-ts test --env=jsdom --coverage --verbose",
+    "test:ci": "CI=true npm run test",
+    "test:coverage": "npm run test -- --coverage --verbose",
     "eject": "react-scripts-ts eject"
   },
   "devDependencies": {
-    "@types/ag-grid": "^3.2.0",
+    "@types/d3": "^4.12.0",
+    "@types/html2canvas": "^0.5.35",
     "@types/jest": "^21.1.6",
+    "@types/lodash": "^4.14.88",
     "@types/node": "^8.0.51",
+    "@types/query-string": "^5.0.1",
     "@types/react": "^16.0.22",
     "@types/react-dom": "^16.0.3",
     "@types/react-dom-factories": "^1.0.0",
+    "@types/react-faux-dom": "^3.2.0",
     "@types/uuid": "^3.4.3"
   }
 }

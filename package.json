@@ -3,10 +3,8 @@
   "version": "1.0.0",
   "description": "Concord Consortium Workspaces",
   "scripts": {
-    "build": "npm-run-all --parallel copy-root cs:build",
-
+    "build": "npm-run-all --parallel cs:build nc:build",
     "copy-root": "copyfiles -f root/**/*.* dist/",
-
     "cs:build": "cd collabspace && cross-env NODE_ENV=production webpack",
     "cs:build:watch": "cd collabspace && cross-env NODE_ENV=production webpack -w",
     "cs:dev:build": "cd collabspace && cross-env NODE_ENV=development webpack",
@@ -16,7 +14,11 @@
     "cs:start": "npm-run-all --parallel cs:build:watch cs:browse",
     "cs:start:secure": "npm-run-all --parallel cs:build:watch cs:browse",
     "cs:dev:start": "npm-run-all --parallel cs:dev:build:watch cs:browse",
-    "cs:dev:start:secure": "npm-run-all --parallel cs:dev:build:watch cs:browse:secure"
+    "cs:dev:start:secure": "npm-run-all --parallel cs:dev:build:watch cs:browse:secure",
+    "nc:build": "cd neo-codap && npm run build",
+    "nc:start": "cd neo-codap && npm run start",
+    "nc:test": "cd neo-codap && npm run test:ci",
+    "test": "npm-run-all --parallel nc:test"
   },
   "repository": {
     "type": "git",
@@ -31,19 +33,29 @@
   "dependencies": {
     "ag-grid": "^14.2.0",
     "ag-grid-react": "^14.2.0",
+    "d3": "^4.12.0",
+    "dom-to-image": "^2.6.0",
+    "html2canvas": "^1.0.0-alpha.4",
     "mobx": "^3.4.0",
+    "mobx-react": "^4.3.5",
     "mobx-state-tree": "^1.2.1",
+    "prop-types": "^15.6.0",
     "react-dom-factories": "^1.0.2",
+    "react-faux-dom": "^4.1.0",
     "react-scripts-ts": "2.8.0",
+    "react-sizeme": "^2.3.6",
     "uuid": "^3.1.0"
   },
   "devDependencies": {
+    "@types/d3": "^4.12.0",
+    "@types/html2canvas": "^0.5.35",
     "@types/jsonwebtoken": "^7.2.3",
     "@types/lodash": "^4.14.85",
     "@types/node": "^8.0.51",
     "@types/query-string": "^5.0.1",
     "@types/react": "^16.0.22",
     "@types/react-dom": "^16.0.3",
+    "@types/react-faux-dom": "^3.2.0",
     "@types/superagent": "^3.5.6",
     "@types/uuid": "^3.4.3",
     "awesome-typescript-loader": "^3.3.0",

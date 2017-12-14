@@ -2,12 +2,13 @@ import * as React from "react"
 import * as firebase from "firebase"
 import { Window } from "../lib/window"
 import { WindowManager } from "../lib/window-manager"
-import { PortalInfo, PortalOffering, PortalUser, PortalUserMap, getPortalJWTWithBearerToken, PortalTokens } from "../lib/auth"
+import { PortalInfo, PortalOffering, PortalUser, getPortalJWTWithBearerToken, PortalTokens } from "../lib/auth"
 import { getPublicationsRef, getArtifactsRef } from "../lib/refs"
 import { FirebasePublication, FirebasePublicationWindow, FirebaseArtifact } from "../lib/document"
 import { WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import * as queryString from "query-string"
+import { UserLookup } from "../lib/user-lookup"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
@@ -136,7 +137,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
 
 export interface SidebarPublicationComponentProps {
   publicationItem: FirebasePublicationItem
-  userMap: PortalUserMap
+  userLookup: UserLookup
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
   portalOffering: PortalOffering
   portalTokens: PortalTokens
@@ -163,7 +164,7 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
   }
 
   getUserName(id:string) {
-    const user = this.props.userMap[escapeFirebaseKey(id)]
+    const user = this.props.userLookup.lookup(id)
     return user ? user.fullName : "Unknown Student"
   }
 
@@ -216,11 +217,13 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
   }
 
   renderExpanded() {
-    const {publication} = this.props.publicationItem
+    const {publicationItem, portalTokens} = this.props
+    const {publication} = publicationItem
     const params:any = {
-      jwtToken: this.props.portalTokens.rawPortalJWT,
-      domain: this.props.portalTokens.domain,
-      document: this.props.publicationItem.publication.documentId
+      jwtToken: portalTokens.rawPortalJWT,
+      domain: portalTokens.domain,
+      document: publication.documentId,
+      publication: publicationItem.id
     }
     if (demoId) {
       params.demo = demoId
@@ -242,7 +245,7 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
     const {publicationItem} = this.props
     const {publication, index} = publicationItem
     const {group, createdAt} = publication
-    const user = this.props.userMap[publication.creator]
+    const user = this.props.userLookup.lookup(publication.creator)
     const name = user ? user.fullName : "Unknown Student"
     const initials = user ? user.initials : "?"
     return (
@@ -272,7 +275,7 @@ export interface SidebarComponentState {
 
 export class SidebarComponent extends React.Component<SidebarComponentProps, SidebarComponentState> {
   publicationsRef: firebase.database.Reference
-  userMap: PortalUserMap
+  userLookup: UserLookup
 
   constructor (props:SidebarComponentProps) {
     super(props)
@@ -282,11 +285,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     }
     this.publicationsRef = getPublicationsRef(this.props.portalOffering)
 
-    this.userMap = {}
-    this.props.portalOffering.classInfo.students.forEach((student) => {
-      this.userMap[student.id] = student
-      this.userMap[escapeFirebaseKey(student.id)] = student
-    })
+    this.userLookup = new UserLookup(this.props.portalOffering.classInfo)
   }
 
   componentWillMount() {
@@ -363,7 +362,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
           return <SidebarPublicationComponent
                    key={publicationItem.id}
                    publicationItem={publicationItem}
-                   userMap={this.userMap}
+                   userLookup={this.userLookup}
                    toggleViewArtifact={this.props.toggleViewArtifact}
                    portalOffering={this.props.portalOffering}
                    portalTokens={this.props.portalTokens}

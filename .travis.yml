@@ -4,7 +4,8 @@ node_js: node
 install:
 - travis_retry gem install s3_website -v 3.4.0
 - travis_retry pip install awscli --upgrade --user
-- travis_retry yarn
+- travis_retry yarn install --frozen-lockfile
+- travis_retry cd neo-codap && yarn install --frozen-lockfile && cd ..
 before_script: npm run build
 script: ./s3_deploy.sh
 cache:
@@ -12,3 +13,4 @@ cache:
   yarn: true
   directories:
     - node_modules
+    - neo-codap/node_modules
