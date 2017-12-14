@@ -277,13 +277,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleAddGraph = () => {
-    const title = (prompt("Enter the title of the graph", "Untitled Graph") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add(this.constructRelativeUrl("neo-codap.html?mode=graph"), title)
-    }
-  }
-
   handleAddCaseTableAndGraph = () => {
     const title = (prompt("Enter the title of the table and graph", "Untitled Table/Graph") || "").trim()
     if (title.length > 0) {
@@ -516,7 +509,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
           <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
-          <button type="button" onClick={this.handleAddGraph}>Add Graph</button>
           <button type="button" onClick={this.handleAddCaseTableAndGraph}>Add Table &amp; Graph</button>
           </div>
         <div className="right-buttons">

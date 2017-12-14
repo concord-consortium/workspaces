@@ -182,9 +182,23 @@
   version "7946.0.0"
   resolved "https://registry.yarnpkg.com/@types/geojson/-/geojson-7946.0.0.tgz#e8bc74e8183d966455f82023f0c72e1072a952d0"
 
+"@types/html2canvas@^0.5.35":
+  version "0.5.35"
+  resolved "https://registry.yarnpkg.com/@types/html2canvas/-/html2canvas-0.5.35.tgz#62ef0b59918bf87553593342fa2b040a7477a587"
+  dependencies:
+    "@types/jquery" "*"
+
 "@types/jest@^21.1.6":
   version "21.1.6"
   resolved "https://registry.yarnpkg.com/@types/jest/-/jest-21.1.6.tgz#9467945ce33261e4fdd14276576951aa130515aa"
+
+"@types/jquery@*":
+  version "3.2.17"
+  resolved "https://registry.yarnpkg.com/@types/jquery/-/jquery-3.2.17.tgz#01df9805dd5cf83a14cf5bfd81adced7d4fbd970"
+
+"@types/lodash@^4.14.88":
+  version "4.14.88"
+  resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.88.tgz#97eaf2dc668f33ed8e511a5b627035f4ea20b0f5"
 
 "@types/node@*", "@types/node@^8.0.51":
   version "8.0.51"
@@ -1795,6 +1809,10 @@ dom-serializer@0:
     domelementtype "~1.1.1"
     entities "~1.1.1"
 
+dom-to-image@^2.6.0:
+  version "2.6.0"
+  resolved "https://registry.yarnpkg.com/dom-to-image/-/dom-to-image-2.6.0.tgz#8a503608088c87b1c22f9034ae032e1898955867"
+
 dom-urls@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/dom-urls/-/dom-urls-1.1.0.tgz#001ddf81628cd1e706125c7176f53ccec55d918e"
@@ -2643,6 +2661,10 @@ hoek@4.x.x:
   version "4.2.0"
   resolved "https://registry.yarnpkg.com/hoek/-/hoek-4.2.0.tgz#72d9d0754f7fe25ca2d01ad8f8f9a9449a89526d"
 
+hoist-non-react-statics@^2.3.1:
+  version "2.3.1"
+  resolved "https://registry.yarnpkg.com/hoist-non-react-statics/-/hoist-non-react-statics-2.3.1.tgz#343db84c6018c650778898240135a1420ee22ce0"
+
 home-or-tmp@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/home-or-tmp/-/home-or-tmp-2.0.0.tgz#e36c3f2d2cae7d746a857e38d18d5f32a7882db8"
@@ -2706,6 +2728,12 @@ html-webpack-plugin@2.29.0:
     lodash "^4.17.3"
     pretty-error "^2.0.2"
     toposort "^1.0.0"
+
+html2canvas@^1.0.0-alpha.4:
+  version "1.0.0-alpha.4"
+  resolved "https://registry.yarnpkg.com/html2canvas/-/html2canvas-1.0.0-alpha.4.tgz#b7543eea45240078ad1847ac939081a575180a1a"
+  dependencies:
+    punycode "2.1.0"
 
 htmlparser2@~3.3.0:
   version "3.3.0"
@@ -3798,6 +3826,12 @@ mkdirp@0.5.x, "mkdirp@>=0.5 0", mkdirp@^0.5.0, mkdirp@^0.5.1, mkdirp@~0.5.0, mkd
   dependencies:
     minimist "0.0.8"
 
+mobx-react@^4.3.5:
+  version "4.3.5"
+  resolved "https://registry.yarnpkg.com/mobx-react/-/mobx-react-4.3.5.tgz#76853f2f2ef4a6f960c374bcd9f01e875929c04c"
+  dependencies:
+    hoist-non-react-statics "^2.3.1"
+
 mobx-state-tree@^1.2.1:
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/mobx-state-tree/-/mobx-state-tree-1.2.1.tgz#ce15ed5d2d7e82bb83d66de12a22fb56400f45d1"
@@ -4652,6 +4686,10 @@ public-encrypt@^4.0.0:
 punycode@1.3.2:
   version "1.3.2"
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-1.3.2.tgz#9653a036fb7c1ee42342f2325cceefea3926c48d"
+
+punycode@2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/punycode/-/punycode-2.1.0.tgz#5f863edc89b96db09074bad7947bf09056ca4e7d"
 
 punycode@^1.2.4, punycode@^1.4.1:
   version "1.4.1"

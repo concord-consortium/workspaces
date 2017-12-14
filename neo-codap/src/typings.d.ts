@@ -4,4 +4,5 @@ declare module "*.json" {
   const value: any;
   export default value;
 }
-declare module 'react-sizeme';
+declare module "dom-to-image";
+declare module "react-sizeme";
