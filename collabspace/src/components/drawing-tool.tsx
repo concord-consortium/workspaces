@@ -37,6 +37,7 @@ export interface DrawingToolComponentProps {
 }
 
 export interface DrawingToolComponentState {
+  readonly: boolean
 }
 
 export class DrawingToolComponent extends React.Component<DrawingToolComponentProps, DrawingToolComponentState> {
@@ -46,7 +47,9 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
 
   constructor (props:DrawingToolComponentProps) {
     super(props)
-    this.state = {}
+    this.state = {
+      readonly: false
+    }
   }
 
   refs: {
@@ -66,6 +69,7 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
 
     this.WorkspaceClient = new WorkspaceClient({
       init: (req) => {
+        this.setState({readonly: req.readonly})
         const firebaseStorage = new FirebaseStorage(this.WorkspaceClient.dataRef, req.readonly)
         this.drawingTool.addStore(firebaseStorage)
         return {}
@@ -120,10 +124,6 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
 
   componentWillUnmount() {
     window.removeEventListener("resize", this.handleDebounceResize, false)
-  }
-
-  shouldComponentUpdate() {
-    return false
   }
 
   handleDebounceResize = () => {

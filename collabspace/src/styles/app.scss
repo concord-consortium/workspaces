@@ -22,7 +22,7 @@ a {
   text-decoration: none;
 }
 
-#app {
+#app, #dashboard {
   position: fixed;
   top: 0;
   right: 0;
@@ -158,7 +158,7 @@ a {
     }
   }
 
-  .workspace {
+  .workspace, .dashboard {
     .readonly-blocker {
       position: fixed;
       top: 0;
@@ -279,6 +279,9 @@ a {
 
         .left-buttons {
           float: left;
+          .readonly-message {
+            margin: 5px;
+          }
         }
         .right-buttons {
           float: right;
@@ -421,6 +424,16 @@ a {
             border: 0;
             width: 100%;
             height: 100%;
+          }
+
+          .readonly-iframe-blocker {
+            position: absolute;
+            top: 0;
+            right: 0;
+            left: 0;
+            bottom: 0;
+            cursor: not-allowed;
+            opacity: 0;
           }
         }
 
@@ -639,6 +652,33 @@ a {
         }
       }
     }
+
+    .dashboard-table {
+      position: fixed;
+      top: $header-height;
+      right: 0;
+      left: 0;
+      bottom: 0;
+      overflow: auto;
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px;
+
+        th {
+          padding-bottom: 5px;
+          text-align: left;
+        }
+
+        tbody {
+          tr:hover {
+            background-color: #ddd;
+            color: #fff;
+          }
+        }
+      }
+    }
   }
 
   .demo {
@@ -649,4 +689,7 @@ a {
     }
   }
 }
+
+
+
 

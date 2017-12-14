@@ -196,6 +196,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                   group={this.state.group}
                   groupRef={this.state.groupRef}
                   leaveGroup={this.handleLeaveGroup}
+                  publication={null}
                 />
               }
               return this.renderProgress("Loading collaborative space group document...")
@@ -221,7 +222,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                     firebaseUser={this.state.firebaseUser}
                     document={this.state.template}
                     setTitle={this.handleSetTitle}
-                 />
+                    publication={null}
+                  />
         }
         return this.renderProgress("Loading collaborative space template...")
       }

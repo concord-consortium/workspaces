@@ -2,6 +2,7 @@ import * as firebase from "firebase"
 import * as queryString from "query-string"
 import * as superagent from "superagent"
 import * as jwt from "jsonwebtoken"
+import { UserLookup } from "./user-lookup";
 
 const isDemo = require("../../functions/demo-info").demoInfo.isDemo
 
@@ -12,6 +13,12 @@ export interface AuthQueryParams {
   token?: string
   domain?: string
   domain_uid?: string
+  jwtToken?: string
+  document?: string
+  publication?: string
+  offering?: string
+  classInfoUrl?: string
+  offeringId?: number
 }
 
 export interface PortalAPIClassUser {
@@ -27,6 +34,23 @@ export interface PortalAPIClassInfo {
   class_hash: string
   teachers: PortalAPIClassUser[]
   students: PortalAPIClassUser[]
+}
+
+export interface PortalAPIOfferingInfo {
+  clazz_info_url: string
+}
+
+export interface OfferingInfo {
+  id: number
+  classInfoUrl: string
+}
+
+export interface PortalAPIOfferingStudent {
+  endpoint_url: string
+  name: string
+  started_activity: boolean
+  user_id: number
+  username: string
 }
 
 export interface PortalClassInfo {
@@ -81,6 +105,7 @@ export interface PortalOffering {
   domain: string
   classInfo: PortalClassInfo
   isDemo: boolean
+  classInfoUrl: string
 }
 
 export interface PortalTokens {
@@ -167,9 +192,9 @@ export const getErrorMessage = (err: any, res:superagent.Response) => {
   return (res.body ? res.body.message : null) || err
 }
 
-export const getPortalJWTWithBearerToken = (domain:string, type:string, token:string) => {
+export const getPortalJWTWithBearerToken = (domain:string, type:string, token:string, demo?:string) => {
   return new Promise<[string, PortalJWT]>((resolve, reject) => {
-    const url = `${domain}${isDemo(domain) ? "demoGetFakePortalJWT" : "api/v1/jwt/portal"}`
+    const url = `${domain}${isDemo(domain) ? `demoGetFakePortalJWT?demo=${demo}` : "api/v1/jwt/portal"}`
     superagent
       .get(url)
       .set("Authorization", `${type} ${token}`)
@@ -194,9 +219,9 @@ export const getPortalJWTWithBearerToken = (domain:string, type:string, token:st
   })
 }
 
-export const getFirebaseJWTWithBearerToken = (domain: string, type: string, token:string) => {
+export const getFirebaseJWTWithBearerToken = (domain: string, type: string, token:string, demo?:string) => {
   return new Promise<[string, PortalFirebaseJWT]>((resolve, reject) => {
-    const url = `${domain}${isDemo(domain) ? "demoGetFakeFirebaseJWT" : "api/v1/jwt/firebase?firebase_app=collabspace"}`
+    const url = `${domain}${isDemo(domain) ? `demoGetFakeFirebaseJWT?demo=${demo}` : "api/v1/jwt/firebase?firebase_app=collabspace"}`
     superagent
       .get(url)
       .set("Authorization", `${type} ${token}`)
@@ -293,16 +318,16 @@ export const collabSpaceAuth = () => {
       return reject("Missing domain query parameter (required when token parameter is present)")
     }
 
-    return getPortalJWTWithBearerToken(domain, "Bearer", token)
+    return getPortalJWTWithBearerToken(domain, "Bearer", token, params.demo)
       .then(([rawPortalJWT, portalJWT]) => {
         if (portalJWT.user_type !== "learner") {
           return reject("Non-student login to the CollabSpace is not allowed")
         }
         const portalStudentJWT:PortalStudentJWT = portalJWT
 
-        return getFirebaseJWTWithBearerToken(domain, "Bearer", token)
+        return getFirebaseJWTWithBearerToken(domain, "Bearer", token, params.demo)
           .then(([rawFirebaseJWT, firebaseJWT]) => {
-            const classInfoUrl = `${portalStudentJWT.class_info_url}${isDemo(domain) && params.demo ? `?demo=${params.demo}` : ""}`
+            const classInfoUrl = portalStudentJWT.class_info_url
 
             return getClassInfo(classInfoUrl, rawPortalJWT)
               .then((classInfo) => {
@@ -325,7 +350,8 @@ export const collabSpaceAuth = () => {
                     id: portalStudentJWT.offering_id,
                     domain: isDemo(domain) ? "demo" : domainParser.host,
                     classInfo: classInfo,
-                    isDemo: isDemo(domain)
+                    isDemo: isDemo(domain),
+                    classInfoUrl
                   },
                   tokens: {
                     domain,
@@ -350,5 +376,165 @@ export const firebaseAuth = () => {
       }
     })
     firebase.auth().signInAnonymously().catch(reject)
+  })
+}
+
+export const getOfferingInfo = (offeringUrl:string, token:string) => {
+  return new Promise<OfferingInfo>((resolve, reject) => {
+    superagent
+      .get(offeringUrl)
+      .set("Authorization", `Bearer ${token}`)
+      .end((err, res) => {
+        if (err) {
+          return reject(getErrorMessage(err, res))
+        }
+
+        let offeringId:number|null = 0
+        if (isDemo(offeringUrl)) {
+          offeringId = 1
+        }
+        else {
+          const matches = offeringUrl.match(/\/offerings\/(\d+)/)
+          if (matches) {
+            offeringId = parseInt(matches[1])
+          }
+        }
+
+        if (!offeringId) {
+          return reject("Unable to find offering id in url")
+        }
+
+        const portalOfferingInfo:PortalAPIOfferingInfo = res.body
+        resolve({
+          id: offeringId,
+          classInfoUrl: portalOfferingInfo.clazz_info_url
+        })
+      })
+  })
+}
+
+
+export const dashboardAuth = () => {
+  return new Promise<PortalInfo>((resolve, reject) => {
+
+    const params:AuthQueryParams = queryString.parse(window.location.search)
+    const {jwtToken, offering, token, domain, demo, classInfoUrl} = params
+
+    if (jwtToken) {
+      const portalJWT:PortalJWT = jwt.decode(jwtToken) as PortalJWT
+      if (!portalJWT) {
+        return reject("Invalid portalJWT param")
+      }
+
+      let classInfoUrl:string|null = null
+      let offeringId:number = 0
+
+      if (portalJWT.user_type === "learner") {
+        classInfoUrl = portalJWT.class_info_url
+        offeringId = portalJWT.offering_id
+      }
+      else if (params.classInfoUrl && params.offeringId) {
+        classInfoUrl = params.classInfoUrl
+        offeringId = params.offeringId
+      }
+
+      if (!classInfoUrl || !offeringId) {
+        return reject("Unable to compute class info url or offering id")
+      }
+
+      // needed to do this to keep typescript from complaining about classInfoUrl usage below
+      const finalClassInfoUrl = classInfoUrl
+
+      return getFirebaseJWTWithBearerToken(portalJWT.domain, "Bearer/JWT", jwtToken, params.demo)
+        .then(([rawFirebaseJWT, firebaseJWT]) => {
+
+          getClassInfo(finalClassInfoUrl, jwtToken)
+            .then((classInfo) => {
+              const userLookup = new UserLookup(classInfo)
+              const user = userLookup.lookup(portalJWT.user_id)
+              if (!user) {
+                return reject("Current user not found in class roster")
+              }
+
+              const domainParser = document.createElement("a")
+              domainParser.href = portalJWT.domain
+
+              resolve({
+                user: user,
+                offering: {
+                  id: offeringId,
+                  domain: isDemo(portalJWT.domain) ? "demo" : domainParser.host,
+                  classInfo: classInfo,
+                  isDemo: isDemo(portalJWT.domain),
+                  classInfoUrl: finalClassInfoUrl
+                },
+                tokens: {
+                  domain: portalJWT.domain,
+                  rawPortalJWT: jwtToken,
+                  portalJWT,
+                  rawFirebaseJWT,
+                  firebaseJWT
+                }
+              })
+            })
+            .catch(reject)
+        })
+    }
+    else if (offering && token) {
+      const offeringParser = document.createElement("a")
+      offeringParser.href = offering
+      const domain = `${offeringParser.protocol}//${offeringParser.host}/`
+
+      return getPortalJWTWithBearerToken(domain, "Bearer", token, params.demo)
+        .then(([rawPortalJWT, portalJWT]) => {
+          if (portalJWT.user_type !== "teacher") {
+            return reject("Non-teacher login to the CollabSpace is not allowed via the offering param")
+          }
+          const portalTeacherJWT:PortalTeacherJWT = portalJWT
+
+          return getFirebaseJWTWithBearerToken(domain, "Bearer", token, params.demo)
+            .then(([rawFirebaseJWT, firebaseJWT]) => {
+
+              return getOfferingInfo(offering, token)
+                .then((offeringInfo) => {
+                  const classInfoUrl = offeringInfo.classInfoUrl
+                  getClassInfo(classInfoUrl, rawPortalJWT)
+                    .then((classInfo) => {
+                      const userLookup = new UserLookup(classInfo)
+                      const user = userLookup.lookup(portalJWT.user_id)
+                      if (!user) {
+                        return reject("Current user not found in class roster")
+                      }
+
+                      const domainParser = document.createElement("a")
+                      domainParser.href = portalJWT.domain
+
+                      resolve({
+                        user: user,
+                        offering: {
+                          id: offeringInfo.id,
+                          domain: isDemo(portalJWT.domain) ? "demo" : domainParser.host,
+                          classInfo: classInfo,
+                          isDemo: isDemo(portalJWT.domain),
+                          classInfoUrl
+                        },
+                        tokens: {
+                          domain: portalJWT.domain,
+                          rawPortalJWT,
+                          portalJWT,
+                          rawFirebaseJWT,
+                          firebaseJWT
+                        }
+                      })
+                    })
+                    .catch(reject)
+                })
+            })
+          })
+    }
+    else {
+      reject("Missing valid auth query parameter combination")
+    }
+
   })
 }

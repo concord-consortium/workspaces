@@ -10,11 +10,12 @@ import { InlineEditorComponent } from "./inline-editor"
 import { SidebarComponent } from "./sidebar"
 import { WindowManager, WindowManagerState, DragType } from "../lib/window-manager"
 import { v4 as uuidV4} from "uuid"
-import { PortalUser, PortalUserMap, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens } from "../lib/auth"
+import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
+import { UserLookup } from "../lib/user-lookup"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
@@ -30,13 +31,13 @@ export interface WorkspaceComponentProps {
   groupRef: firebase.database.Reference|null
   group: number|null
   leaveGroup?: () => void
+  publication: FirebasePublication|null
 }
 export interface WorkspaceComponentState extends WindowManagerState {
   documentInfo: FirebaseDocumentInfo|null
   workspaceName: string
   debugInfo: string
   groupUsers: PortalUserConnectionStatusMap|null
-  classUserLookup: PortalUserMap
   viewArtifact: FirebaseArtifact|null
   publishing: boolean
 }
@@ -48,18 +49,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   groupUsersRef: firebase.database.Reference|null
   windowManager: WindowManager
   userOnDisconnect: firebase.database.OnDisconnect|null
+  userLookup: UserLookup
 
   constructor (props:WorkspaceComponentProps) {
     super(props)
 
     const {portalOffering} = props
 
-    const classUserLookup:PortalUserMap = {}
-    if (portalOffering) {
-      portalOffering.classInfo.students.forEach((student) => {
-        classUserLookup[escapeFirebaseKey(student.id)] = student
-      })
-    }
+    this.userLookup = new UserLookup(portalOffering ? portalOffering.classInfo : undefined)
 
     this.state = {
       documentInfo: null,
@@ -69,7 +66,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       workspaceName: this.getWorkspaceName(portalOffering),
       debugInfo: portalOffering ? `Class ID: ${portalOffering.classInfo.classHash}` : "",
       groupUsers: null,
-      classUserLookup: classUserLookup,
       viewArtifact: null,
       publishing: false
     }
@@ -88,7 +84,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   componentWillMount() {
     this.windowManager = new WindowManager({
       document: this.props.document,
-      onStateChanged: (newState) => this.setState(newState),
+      onStateChanged: (newState) => {
+        this.setState(newState)
+      },
       syncChanges: this.props.isTemplate
     })
 
@@ -298,7 +296,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       template: this.props.document.getTemplateHashParam(),
       demo: uuidV4()
     }
-    window.open(`${window.location.origin}/#${queryString.stringify(hashParams)}`)
+    window.open(`#${queryString.stringify(hashParams)}`)
   }
 
   handleSyncLocalWindowState = (firebaseDocument:FirebaseDocument) => {
@@ -312,8 +310,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           }
         })
       }
-      windows.order = this.windowManager.windowOrder
-      windows.minimizedOrder = this.windowManager.minimizedWindowOrder
+      windows.order = this.windowManager.arrayToFirebaseOrderMap(this.windowManager.windowOrder)
+      windows.minimizedOrder = this.windowManager.arrayToFirebaseOrderMap(this.windowManager.minimizedWindowOrder)
     }
   }
 
@@ -391,6 +389,41 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleViewAllPublications = () => {
+    const {portalTokens} = this.props
+    if (!portalTokens) {
+      return
+    }
+    const {portalJWT, rawPortalJWT} = portalTokens
+
+    const params:AuthQueryParams = queryString.parse(window.location.search)
+
+    let newParams:AuthQueryParams = {}
+    if (portalJWT.user_type === "learner") {
+      newParams = {
+        jwtToken: rawPortalJWT
+      }
+    }
+    else {
+      const {classInfoUrl, offeringId} = params
+      if (!classInfoUrl || !offeringId) {
+        alert("Missing classInfoUrl or offeringId in params!")
+        return
+      }
+      newParams = {
+        jwtToken: rawPortalJWT,
+        classInfoUrl,
+        offeringId
+      }
+    }
+
+    if (params.demo) {
+      newParams.demo = params.demo
+    }
+
+    window.location.href = `?${queryString.stringify(newParams)}`
+  }
+
   renderDocumentInfo() {
     const {documentInfo} = this.state
     if (!documentInfo) {
@@ -415,7 +448,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const users:JSX.Element[] = []
     Object.keys(groupUsers).forEach((id) => {
       const groupUser = groupUsers[id]
-      const portalUser = this.state.classUserLookup[escapeFirebaseKey(id)]
+      const portalUser = this.userLookup.lookup(id)
       if (portalUser) {
         const {connected} = groupUser
         const className = `group-user ${groupUser.connected ? "connected" : "disconnected"}`
@@ -436,19 +469,42 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className={className}>
         {this.renderDocumentInfo()}
         <div className="user-info">
-          <div className="user-name">{userName}</div>
+          <div className="user-name" title={firebaseUser.uid}>{userName}</div>
         </div>
         {this.renderGroupInfo()}
       </div>
     )
   }
 
-  renderReadonlyToolbar() {
+  renderPublicationToolbar() {
+    const { publication } = this.props
+    if (!publication) {
+      return null
+    }
+    const {creator, createdAt} = publication
+    const user = this.userLookup.lookup(creator)
+    const name = user ? user.fullName : "Unknown User"
+    const message = `Published ${timeagoInstance.format(createdAt)} by ${name} in group ${publication.group}`
     return (
-      <div className="readonly-message">
-        View only.  You do not have edit access to this template.
+      <div className="buttons">
+        <div className="left-buttons">
+          <div className="readonly-message">{message}</div>
+        </div>
+        <div className="right-buttons">
+          <button type="button" onClick={this.handleViewAllPublications}>View All Publications</button>
+        </div>
       </div>
     )
+  }
+
+  renderReadonlyTemplateToolbar() {
+    return (
+      <div className="readonly-message">View only.  You do not have edit access to this template.</div>
+    )
+  }
+
+  renderReadonlyToolbar() {
+    return this.props.isTemplate ? this.renderReadonlyTemplateToolbar() : this.renderPublicationToolbar()
   }
 
   renderToolbarButtons() {
@@ -490,6 +546,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                zIndex={orderedWindow.order}
                windowManager={this.windowManager}
                isTemplate={this.props.isTemplate}
+               isReadonly={this.props.document.isReadonly}
              />
     })
   }
@@ -510,7 +567,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   renderWindowArea() {
     const hasMinmizedWindows = this.state.minimizedWindows.length > 0
     const nonMinimizedClassName = `non-minimized${hasMinmizedWindows ? " with-minimized" : ""}`
-    const className = `window-area${!this.props.isTemplate ? " with-sidebar" : ""}`
+    const className = `window-area${!this.props.isTemplate && !this.props.document.isReadonly ? " with-sidebar" : ""}`
     return (
       <div className={className}>
         <div className={nonMinimizedClassName}>
@@ -522,7 +579,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderReadonlyBlocker() {
-    if (this.props.document.isReadonly) {
+    if (this.props.isTemplate && this.props.document.isReadonly) {
       return <div className="readonly-blocker" />
     }
     return null

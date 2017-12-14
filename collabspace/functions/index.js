@@ -111,6 +111,7 @@ exports.demoGetFakeFirebaseJWT = functions.https.onRequest((request, response) =
 
       const now = Math.floor(Date.now() / 1000);
       const oneHourFromNow = now + (60 * 60);
+      const classHash = request.query.demo || "demo";
 
       let claims;
       if (user.type === "learner") {
@@ -127,11 +128,11 @@ exports.demoGetFakeFirebaseJWT = functions.https.onRequest((request, response) =
           externalId: 1,
           returnUrl: `${demoInfo.rootUrl}dataservice/external_activity_data/debc99c7-daa2-4758-86f7-2ca4f3726c66`,
           logging: false,
-          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo`,
+          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo?demo=${classHash}`,
           claims: {
             user_type: "learner",
             user_id: `http://example.com/users/${user.info.id}`,
-            class_hash: "demo",
+            class_hash: classHash,
             offering_id: 1
           }
         };
@@ -150,11 +151,11 @@ exports.demoGetFakeFirebaseJWT = functions.https.onRequest((request, response) =
           externalId: 1,
           returnUrl: `${demoInfo.rootUrl}dataservice/external_activity_data/debc99c7-daa2-4758-86f7-2ca4f3726c66`,
           logging: false,
-          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo`,
+          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo?demo=${classHash}`,
           claims: {
             user_type: "teacher",
             user_id: `http://example.com/users/${user.info.id}`,
-            class_hash: "demo"
+            class_hash: classHash
           }
         };
       }
@@ -182,6 +183,8 @@ exports.demoGetFakePortalJWT = functions.https.onRequest((request, response) => 
       const now = Math.floor(Date.now() / 1000);
       const oneHourFromNow = now + (60 * 60);
 
+      const classHash = request.query.demo || "demo";
+
       let claims;
       if (user.type === "learner") {
         claims = {
@@ -193,7 +196,7 @@ exports.demoGetFakePortalJWT = functions.https.onRequest((request, response) => 
           user_type: "learner",
           user_id: `http://example.com/users/${user.info.id}`,
           learner_id: user.info.id,
-          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo`,
+          class_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo?demo=${classHash}`,
           offering_id: 1
         };
       }
@@ -230,11 +233,13 @@ exports.demoGetFakeClassInfo = functions.https.onRequest((request, response) => 
         return;
       }
 
+      const classHash = request.query.demo || "demo";
+
       const classInfo = {
-        uri: `${demoInfo.rootUrl}portal/classes/1`,
+        uri: `${demoInfo.rootUrl}demoGetFakeClassInfo?demo=${classHash}`,
         name: "Demo Class",
         state: "MA",
-        class_hash: request.query.demo || "demo",
+        class_hash: classHash,
         teachers: [],
         students: []
       };
@@ -247,6 +252,24 @@ exports.demoGetFakeClassInfo = functions.https.onRequest((request, response) => 
       }
 
       response.json(classInfo);
+    });
+  });
+});
+
+
+exports.demoGetFakeOffering = functions.https.onRequest((request, response) => {
+  cors(request, response, () => {
+    getDemoUserFromBearerToken(request, response, (err, user) => {
+      if (err) {
+        sendError(response, err, 403);
+        return;
+      }
+
+      const classHash = request.query.demo || "demo";
+
+      response.json({
+        clazz_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo?demo=${classHash}`
+      });
     });
   });
 });
