@@ -658,5 +658,38 @@ a {
       margin: 10px 0;
     }
   }
+
+  .dashboard-table {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
+    .inner-table {
+      margin: 10px;
+
+      .table-header {
+        font-size: 22px;
+        font-weight: bold;
+        text-align: center;
+        margin: 10px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+
+        th {
+          text-align: left;
+        }
+
+        tr:hover {
+          background-color: #ccc;
+          color: #fff;
+        }
+      }
+    }
+  }
 }
 

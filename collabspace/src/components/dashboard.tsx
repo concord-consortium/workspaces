@@ -2,7 +2,7 @@ import * as React from "react"
 import * as firebase from "firebase"
 import * as queryString from "query-string"
 import * as jwt from "jsonwebtoken"
-import { PortalJWT, getClassInfo, PortalClassInfo, PortalOffering, dashboardAuth, PortalUser, firebaseAuth, AuthQueryParams } from "../lib/auth";
+import { PortalJWT, getClassInfo, PortalClassInfo, PortalOffering, dashboardAuth, PortalUser, firebaseAuth, AuthQueryParams, PortalTokens } from "../lib/auth";
 import { Document, FirebasePublication } from "../lib/document"
 import { getDocumentPath, getPublicationsRef } from "../lib/refs"
 import { FirebaseConfig } from "../lib/firebase-config"
@@ -26,6 +26,7 @@ export interface DashboardComponentState {
   progress: string|null
   portalOffering: PortalOffering|null
   portalUser: PortalUser|null
+  portalTokens: PortalTokens|null
   document: Document|null
   publication: FirebasePublication|null
 }
@@ -40,6 +41,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
       progress: "Loading...",
       portalOffering: null,
       portalUser: null,
+      portalTokens: null,
       document: null,
       publication: null
     }
@@ -51,12 +53,12 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
     dashboardAuth()
       .then((portalInfo) => {
 
-        const {offering, user} = portalInfo
+        const {offering, user, tokens} = portalInfo
         if (!offering || !user) {
           throw new Error("Cannot find offering or user")
         }
 
-        this.setState({portalOffering: offering, portalUser: user})
+        this.setState({portalOffering: offering, portalUser: user, portalTokens: tokens})
 
         return firebaseAuth().then((firebaseUser) => {
           this.setState({firebaseUser})
@@ -98,7 +100,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
   }
 
   render() {
-    const {error, progress, portalOffering, portalUser, firebaseUser, document, publication} = this.state
+    const {error, progress, portalOffering, portalUser, portalTokens, firebaseUser, document, publication} = this.state
 
     if (error) {
       return this.renderError()
@@ -106,7 +108,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
     if (this.state.progress) {
       return this.renderProgress()
     }
-    if (portalUser && firebaseUser && portalOffering) {
+    if (portalUser && firebaseUser && portalOffering && portalTokens) {
       if (document && publication) {
         return <WorkspaceComponent
           isTemplate={false}
@@ -125,6 +127,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
       return <DashboardTableComponent
           portalUser={portalUser}
           portalOffering={portalOffering}
+          portalTokens={portalTokens}
         />
     }
     return this.renderProgress("Authenticating...")

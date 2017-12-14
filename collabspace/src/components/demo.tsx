@@ -73,7 +73,7 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
       const queryParams:DashboardQueryParams = {
         demo: this.props.demoId,
         token: String(userId),
-        offering: `${demoInfo.rootUrl}demoGetFakeOffering`,
+        offering: `${demoInfo.rootUrl}demoGetFakeOffering?demo=${this.props.demoId}`,
         domain: demoInfo.rootUrl
       }
       const url = `dashboard.html?${queryString.stringify(queryParams)}`

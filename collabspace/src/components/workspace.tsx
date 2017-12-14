@@ -10,11 +10,12 @@ import { InlineEditorComponent } from "./inline-editor"
 import { SidebarComponent } from "./sidebar"
 import { WindowManager, WindowManagerState, DragType } from "../lib/window-manager"
 import { v4 as uuidV4} from "uuid"
-import { PortalUser, PortalUserMap, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens } from "../lib/auth"
+import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
+import { UserLookup } from "../lib/user-lookup"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
@@ -37,7 +38,6 @@ export interface WorkspaceComponentState extends WindowManagerState {
   workspaceName: string
   debugInfo: string
   groupUsers: PortalUserConnectionStatusMap|null
-  classUserLookup: PortalUserMap
   viewArtifact: FirebaseArtifact|null
   publishing: boolean
 }
@@ -49,19 +49,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   groupUsersRef: firebase.database.Reference|null
   windowManager: WindowManager
   userOnDisconnect: firebase.database.OnDisconnect|null
+  userLookup: UserLookup
 
   constructor (props:WorkspaceComponentProps) {
     super(props)
 
     const {portalOffering} = props
 
-    const classUserLookup:PortalUserMap = {}
-    if (portalOffering) {
-      portalOffering.classInfo.students.forEach((student) => {
-        classUserLookup[student.id] = student
-        classUserLookup[escapeFirebaseKey(student.id)] = student
-      })
-    }
+    this.userLookup = new UserLookup(portalOffering ? portalOffering.classInfo : undefined)
 
     this.state = {
       documentInfo: null,
@@ -71,7 +66,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       workspaceName: this.getWorkspaceName(portalOffering),
       debugInfo: portalOffering ? `Class ID: ${portalOffering.classInfo.classHash}` : "",
       groupUsers: null,
-      classUserLookup: classUserLookup,
       viewArtifact: null,
       publishing: false
     }
@@ -419,7 +413,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const users:JSX.Element[] = []
     Object.keys(groupUsers).forEach((id) => {
       const groupUser = groupUsers[id]
-      const portalUser = this.state.classUserLookup[escapeFirebaseKey(id)]
+      const portalUser = this.userLookup.lookup(id)
       if (portalUser) {
         const {connected} = groupUser
         const className = `group-user ${groupUser.connected ? "connected" : "disconnected"}`
@@ -453,7 +447,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       return null
     }
     const {creator, createdAt} = publication
-    const user = this.state.classUserLookup[creator]
+    const user = this.userLookup.lookup(creator)
     const name = user ? user.fullName : "Unknown User"
     const message = `Published ${timeagoInstance.format(createdAt)} by ${name} in group ${publication.group}`
     return (

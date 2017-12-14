@@ -29,12 +29,21 @@ export const getClassPath = (offering:PortalOffering) => {
 }
 
 export const getOfferingPath = (offering:PortalOffering) => {
-  return `${getClassPath(offering)}/offerings/${offering.id}`
+  return `${getClassOfferingsPath(offering)}/${offering.id}`
 }
 
 export const getOfferingRef = (offering:PortalOffering) => {
   return firebase.database().ref(getOfferingPath(offering))
 }
+
+export const getClassOfferingsPath = (offering:PortalOffering) => {
+  return `${getClassPath(offering)}/offerings`
+}
+
+export const getClassOfferingsRef = (offering:PortalOffering) => {
+  return firebase.database().ref(getClassOfferingsPath(offering))
+}
+
 
 export const getDocumentPath = (offering:PortalOffering, documentId?:string) => {
   const prefix = `${getClassPath(offering)}/documents`
