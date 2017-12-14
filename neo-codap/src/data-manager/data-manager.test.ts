@@ -6,7 +6,7 @@ import { addAttributeToDataSet, addCasesToDataSet, CaseID, ICaseID, ICase,
 import * as uuid from 'uuid/v4';
 
 test('Data Manager CaseID functionality', () => {
-  const caseID = CaseID.create({ __index__: 0 });
+  const caseID = CaseID.create({ __id__: 0 });
   expect(caseID.__id__).toBeDefined();
 
   let copy = clone(caseID);
@@ -77,8 +77,7 @@ test('Data Manager Attribute functionality', () => {
   expect(bar.length).toBe(3);
 
   let bazSnap: IAttributeSnapshot = bar.derive('baz');
-  expect(bazSnap.id).toBeUndefined();
-  expect(bazSnap.sourceID).toBe(bar.id);
+  expect(bazSnap.id).toBe(bar.id);
   expect(bazSnap.name).toBe('baz');
   expect(bazSnap.values.length).toBe(0);
 });
@@ -449,23 +448,23 @@ test('Data Manager derived DataSet synchronization (no filter)', () => {
   addCasesToDataSet(source, [{ str: 'g', num: 7 }]);
   expect(source.cases.length).toBe(6);
   let fCaseID: string;
-  const gCaseID = source.cases[5].id;
+  const gCaseID = source.cases[5].__id__;
   derived.onSynchronized()
     .then(() => {
       expect(derived.cases.length).toBe(6);
-      expect(derived.getCase(gCaseID)).toEqual({ id: gCaseID, str: 'g', num: 7 });
+      expect(derived.getCase(gCaseID)).toEqual({ __id__: gCaseID, str: 'g', num: 7 });
       addCasesToDataSet(source, [{ str: 'f', num: 7 }], gCaseID);
-      fCaseID = source.cases[5].id;
+      fCaseID = source.cases[5].__id__;
       return derived.onSynchronized();
     })
     .then(() => {
       expect(derived.cases.length).toBe(7);
-      expect(derived.getCaseAtIndex(5)).toEqual({ id: fCaseID, str: 'f', num: 7 });
-      source.setCaseValues([{ id: fCaseID, num: 6 }]);
+      expect(derived.getCaseAtIndex(5)).toEqual({ __id__: fCaseID, str: 'f', num: 7 });
+      source.setCaseValues([{ __id__: fCaseID, num: 6 }]);
       return derived.onSynchronized();
     })
     .then(() => {
-      expect(derived.getCase(fCaseID)).toEqual({ id: fCaseID, str: 'f', num: 6 });
+      expect(derived.getCase(fCaseID)).toEqual({ __id__: fCaseID, str: 'f', num: 6 });
       destroy(derived);
     });
 });

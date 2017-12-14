@@ -7,8 +7,8 @@ import { Attribute, IAttribute, IAttributeSnapshot, IValueType } from './attribu
 import * as _ from 'lodash';
 
 export const CaseID = types.model('CaseID', {
-  __id__: types.identifier(types.string),
-  __index__: types.number
+  __id__: types.identifier(types.string)
+  // __index__: types.number
 }).preProcessSnapshot((snapshot) => {
   const { __id__, ...others } = snapshot;
   return { __id__: __id__ || uuid(), ...others };
@@ -129,14 +129,15 @@ export const DataSet = types.model('DataSet', {
   }
 
   function insertCaseIDAtIndex(id: string, beforeIndex: number) {
-    const newCase = { __id__: id, __index__: beforeIndex };
+    // const newCase = { __id__: id, __index__: beforeIndex };
+    const newCase = { __id__: id };
     if ((beforeIndex != null) && (beforeIndex < self.cases.length)) {
       self.cases.splice(beforeIndex, 0, newCase );
       // increment indices of all subsequent cases
       for (let i = beforeIndex + 1; i < self.cases.length; ++i) {
         const aCase = self.cases[i];
         ++caseIDMap[aCase.__id__];
-        aCase.__index__ = i;
+        // aCase.__index__ = i;
       }
     }
     else {
