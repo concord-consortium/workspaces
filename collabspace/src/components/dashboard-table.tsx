@@ -16,6 +16,7 @@ export interface DashboardTableRowDocument {
 }
 
 export interface DashboardTableRow {
+  id: string
   document: DashboardTableRowDocument
   student: string
   group: number
@@ -29,6 +30,7 @@ export interface DashboardTableOfferingNamesMap {
 }
 
 export interface DashboardTableComponentProps {
+  firebaseUser: firebase.User
   portalUser: PortalUser
   portalOffering: PortalOffering
   portalTokens: PortalTokens
@@ -117,6 +119,7 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
           classInfoUrl: this.props.portalOffering.classInfo.uri
         }
         const row:DashboardTableRow = {
+          id: publicationId,
           document: {
             id: publication.documentId,
             name: offeringNames[publication.offeringId],
@@ -138,38 +141,62 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
   }
 
   renderHeader() {
-    const {classInfo} = this.props.portalOffering
-    return <div className="table-header">{classInfo.name} Publications</div>
+    const {firebaseUser, portalUser, portalOffering} = this.props
+    const {classInfo} = portalOffering
+    const userName = portalUser ? portalUser.fullName : (firebaseUser.isAnonymous ? "Anonymous User" : firebaseUser.displayName)
+    return (
+      <div className="header">
+        <div className="document-info">
+          <div className="document-name">
+            {classInfo.name}
+          </div>
+          <div className="instance-info" >Dashboard</div>
+        </div>
+        <div className="user-info">
+          <div className="user-name" title={firebaseUser.uid}>{userName}</div>
+        </div>
+      </div>
+    )
   }
 
   renderTable() {
+    if (this.state.rows.length === 0) {
+      return (
+        <div className="dashboard-table">
+          <div className="no-rows">No publications have been created yet for this class</div>
+        </div>
+      )
+    }
+
     return (
-      <table>
-        <thead>
-          <tr>
-            <th>Document</th>
-            <th>Student</th>
-            <th>Group</th>
-            <th>Group Members</th>
-            <th>Published</th>
-          </tr>
-        </thead>
-        <tbody>
-          {this.state.rows.map((row) => {
-            const href = `?${row.document.url}`
-            const link = (label:string|number) => <a href={href} className="clickable" target="_blank">{label}</a>
-            return (
-              <tr>
-                <td>{link(row.document.name)}</td>
-                <td>{link(row.student)}</td>
-                <td>{link(row.group)}</td>
-                <td>{link(row.groupMembers)}</td>
-                <td>{link(row.published)}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      <div className="dashboard-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Document</th>
+              <th>Student</th>
+              <th>Group</th>
+              <th>Group Members</th>
+              <th>Published</th>
+            </tr>
+          </thead>
+          <tbody>
+            {this.state.rows.map((row) => {
+              const href = `?${row.document.url}`
+              const link = (label:string|number) => <a href={href} className="clickable" target="_blank">{label}</a>
+              return (
+                <tr className="data-row" key={row.id}>
+                  <td>{link(row.document.name)}</td>
+                  <td>{link(row.student)}</td>
+                  <td>{link(row.group)}</td>
+                  <td>{link(row.groupMembers)}</td>
+                  <td>{link(row.published)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     )
   }
 
@@ -182,20 +209,10 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
       return this.renderProgress("Loading dashboard data...")
     }
 
-    if (this.state.rows.length === 0) {
-      return (
-        <div>
-          <div className="no-rows">No publications have been created yet for this class</div>
-        </div>
-      )
-    }
-
     return (
-      <div className="dashboard-table">
-        <div className="inner-table">
-          {this.renderHeader()}
-          {this.renderTable()}
-        </div>
+      <div className="dashboard">
+        {this.renderHeader()}
+        {this.renderTable()}
       </div>
     )
   }

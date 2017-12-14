@@ -9,8 +9,6 @@ import { FirebaseConfig } from "../lib/firebase-config"
 import { WorkspaceComponent } from "./workspace"
 import { DashboardTableComponent } from "./dashboard-table"
 
-const isDemo = require("../../functions/demo-info").demoInfo.isDemo
-
 export interface DashboardQueryParams extends AuthQueryParams {
   document?: string
   publication?: string
@@ -125,6 +123,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
       }
 
       return <DashboardTableComponent
+          firebaseUser={firebaseUser}
           portalUser={portalUser}
           portalOffering={portalOffering}
           portalTokens={portalTokens}

@@ -158,7 +158,7 @@ a {
     }
   }
 
-  .workspace {
+  .workspace, .dashboard {
     .readonly-blocker {
       position: fixed;
       top: 0;
@@ -652,6 +652,33 @@ a {
         }
       }
     }
+
+    .dashboard-table {
+      position: fixed;
+      top: $header-height;
+      right: 0;
+      left: 0;
+      bottom: 0;
+      overflow: auto;
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px;
+
+        th {
+          padding-bottom: 5px;
+          text-align: left;
+        }
+
+        tbody {
+          tr:hover {
+            background-color: #ddd;
+            color: #fff;
+          }
+        }
+      }
+    }
   }
 
   .demo {
@@ -661,38 +688,8 @@ a {
       margin: 10px 0;
     }
   }
-
-  .dashboard-table {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-
-    .inner-table {
-      margin: 10px;
-
-      .table-header {
-        font-size: 22px;
-        font-weight: bold;
-        text-align: center;
-        margin: 10px;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-
-        th {
-          text-align: left;
-        }
-
-        tr:hover {
-          background-color: #ccc;
-          color: #fff;
-        }
-      }
-    }
-  }
 }
+
+
+
 
