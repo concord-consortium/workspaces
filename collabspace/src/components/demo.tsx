@@ -69,7 +69,7 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
     const hash = window.location.hash
     const templateParam = this.props.template.getTemplateHashParam()
     for (let i=0; i < demoInfo.numTeachers; i++) {
-      const userId = i + 1001;
+      const userId = i + 1000;
       const queryParams:DashboardQueryParams = {
         demo: this.props.demoId,
         token: String(userId),
@@ -77,7 +77,7 @@ export class DemoComponent extends React.Component<DemoComponentProps, DemoCompo
         domain: demoInfo.rootUrl
       }
       const url = `dashboard.html?${queryString.stringify(queryParams)}`
-      links.push(<div key={i}><a href={url} className="clickable" target="_blank">Teacher {userId - 1000}</a></div>)
+      links.push(<div key={i}><a href={url} className="clickable" target="_blank">Teacher {userId - 999}</a></div>)
     }
     return links
   }

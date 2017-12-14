@@ -116,7 +116,7 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
           jwtToken: this.props.portalTokens.rawPortalJWT,
           publication: publicationId,
           offeringId: publication.offeringId,
-          classInfoUrl: this.props.portalOffering.classInfo.uri
+          classInfoUrl: this.props.portalOffering.classInfoUrl
         }
         const row:DashboardTableRow = {
           id: publicationId,

@@ -105,6 +105,7 @@ export interface PortalOffering {
   domain: string
   classInfo: PortalClassInfo
   isDemo: boolean
+  classInfoUrl: string
 }
 
 export interface PortalTokens {
@@ -349,7 +350,8 @@ export const collabSpaceAuth = () => {
                     id: portalStudentJWT.offering_id,
                     domain: isDemo(domain) ? "demo" : domainParser.host,
                     classInfo: classInfo,
-                    isDemo: isDemo(domain)
+                    isDemo: isDemo(domain),
+                    classInfoUrl
                   },
                   tokens: {
                     domain,
@@ -463,7 +465,8 @@ export const dashboardAuth = () => {
                   id: offeringId,
                   domain: isDemo(portalJWT.domain) ? "demo" : domainParser.host,
                   classInfo: classInfo,
-                  isDemo: isDemo(portalJWT.domain)
+                  isDemo: isDemo(portalJWT.domain),
+                  classInfoUrl: finalClassInfoUrl
                 },
                 tokens: {
                   domain: portalJWT.domain,
@@ -477,7 +480,11 @@ export const dashboardAuth = () => {
             .catch(reject)
         })
     }
-    else if (offering && token && domain) {
+    else if (offering && token) {
+      const offeringParser = document.createElement("a")
+      offeringParser.href = offering
+      const domain = `${offeringParser.protocol}//${offeringParser.host}/`
+
       return getPortalJWTWithBearerToken(domain, "Bearer", token, params.demo)
         .then(([rawPortalJWT, portalJWT]) => {
           if (portalJWT.user_type !== "teacher") {
@@ -508,7 +515,8 @@ export const dashboardAuth = () => {
                           id: offeringInfo.id,
                           domain: isDemo(portalJWT.domain) ? "demo" : domainParser.host,
                           classInfo: classInfo,
-                          isDemo: isDemo(portalJWT.domain)
+                          isDemo: isDemo(portalJWT.domain),
+                          classInfoUrl
                         },
                         tokens: {
                           domain: portalJWT.domain,
