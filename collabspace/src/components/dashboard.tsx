@@ -114,7 +114,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
           isTemplate={false}
           portalUser={portalUser}
           portalOffering={portalOffering}
-          portalTokens={null}
+          portalTokens={portalTokens}
           firebaseUser={firebaseUser}
           document={document}
           setTitle={null}

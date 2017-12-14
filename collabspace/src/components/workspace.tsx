@@ -10,7 +10,7 @@ import { InlineEditorComponent } from "./inline-editor"
 import { SidebarComponent } from "./sidebar"
 import { WindowManager, WindowManagerState, DragType } from "../lib/window-manager"
 import { v4 as uuidV4} from "uuid"
-import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens } from "../lib/auth"
+import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
@@ -389,6 +389,41 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleViewAllPublications = () => {
+    const {portalTokens} = this.props
+    if (!portalTokens) {
+      return
+    }
+    const {portalJWT, rawPortalJWT} = portalTokens
+
+    const params:AuthQueryParams = queryString.parse(window.location.search)
+
+    let newParams:AuthQueryParams = {}
+    if (portalJWT.user_type === "learner") {
+      newParams = {
+        jwtToken: rawPortalJWT
+      }
+    }
+    else {
+      const {classInfoUrl, offeringId} = params
+      if (!classInfoUrl || !offeringId) {
+        alert("Missing classInfoUrl or offeringId in params!")
+        return
+      }
+      newParams = {
+        jwtToken: rawPortalJWT,
+        classInfoUrl,
+        offeringId
+      }
+    }
+
+    if (params.demo) {
+      newParams.demo = params.demo
+    }
+
+    window.location.href = `?${queryString.stringify(newParams)}`
+  }
+
   renderDocumentInfo() {
     const {documentInfo} = this.state
     if (!documentInfo) {
@@ -451,7 +486,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const name = user ? user.fullName : "Unknown User"
     const message = `Published ${timeagoInstance.format(createdAt)} by ${name} in group ${publication.group}`
     return (
-      <div className="readonly-message">{message}</div>
+      <div className="buttons">
+        <div className="left-buttons">
+          <div className="readonly-message">{message}</div>
+        </div>
+        <div className="right-buttons">
+          <button type="button" onClick={this.handleViewAllPublications}>View All Publications</button>
+        </div>
+      </div>
     )
   }
 

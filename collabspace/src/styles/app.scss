@@ -279,6 +279,9 @@ a {
 
         .left-buttons {
           float: left;
+          .readonly-message {
+            margin: 5px;
+          }
         }
         .right-buttons {
           float: right;
