@@ -50,47 +50,31 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
       },
 
       publish: (publication) => {
-        const mimeType = "image/png"
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
-          const thumbnailBlobPromise = new Promise<Blob>((resolve, reject) => {
-            const thumbnailCanvas:HTMLCanvasElement = document.createElement("canvas"),
-                  aspectRatio = this.props.size.width && this.props.size.height
-                                  ? this.props.size.width / this.props.size.height
-                                  : 1;
-            thumbnailCanvas.width = WorkspaceClientThumbnailWidth;
-            thumbnailCanvas.height = WorkspaceClientThumbnailWidth / aspectRatio;
-
-            const options = {
-              canvas: thumbnailCanvas,
-              width: thumbnailCanvas.width,
-              height: thumbnailCanvas.height
-            };
+          const artifactBlobPromise = () => new Promise<Blob>((resolve, reject) => {
             // domtoimage.toBlob(this.appDOMNodeRef)
             // .then(function (blob: Blob) {
-            //   blob ? resolve(blob) : reject("Couldn't get thumbnail drawing from canvas!");
+            //   blob ? resolve(blob) : reject("Couldn't get artifact blob from canvas!");
             // });
-        
+
             // html2canvas(this.appDOMNodeRef, options).then((canvas: HTMLCanvasElement) => {
             //   const blobSaver = (blob:Blob) => {
-            //     blob ? resolve(blob) : reject("Couldn't get thumbnail drawing from canvas!");
+            //     blob ? resolve(blob) : reject("Couldn't get artifact blob from canvas!");
             //   }
             //   canvas.toBlob(blobSaver, "image/png");
             // });
-            reject("Couldn't get thumbnail drawing from canvas!");
+            reject("TODO: get artifact blob from neo-CODAP");
           })
 
-          Promise.all([thumbnailBlobPromise])
-            .then(([thumbnailPNGBlob]) => {
-              publication.saveArtifactBlob({
+          artifactBlobPromise()
+            .then((blob) => {
+              publication.saveArtifact({
                 title: "Table/Graph",
-                blob: thumbnailPNGBlob,
-                mimeType,
-                thumbnailPNGBlob
+                blob: blob
               })
               .then((artifact) => resolve({}))
               .catch(reject)
             })
-            .catch(reject)
         })
       }
     })
