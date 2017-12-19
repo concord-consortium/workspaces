@@ -6,10 +6,7 @@ import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishRespo
 import { loadDataSetFromFirebase } from "../../../shared/firebase-dataset";
 import * as firebase from "firebase";
 import sizeMe from "react-sizeme";
-// import html2canvas from "html2canvas";
-// var html2canvas = require("html2canvas");
-// import domtoimage from 'dom-to-image';
-// var domtoimage = require('dom-to-image');
+const html2canvas = require("html2canvas");
 
 
 interface ISizeMeSize {
@@ -28,7 +25,7 @@ interface NeoCodapState {
 class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   workspaceClient: WorkspaceClient;
   dataSetRef?: firebase.database.Reference;
-  appDOMNodeRef: HTMLElement;
+  appDOMNodeRef: HTMLElement | null;
 
   constructor (props:NeoCodapProps) {
     super(props)
@@ -57,13 +54,17 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
             //   blob ? resolve(blob) : reject("Couldn't get artifact blob from canvas!");
             // });
 
-            // html2canvas(this.appDOMNodeRef, options).then((canvas: HTMLCanvasElement) => {
-            //   const blobSaver = (blob:Blob) => {
-            //     blob ? resolve(blob) : reject("Couldn't get artifact blob from canvas!");
-            //   }
-            //   canvas.toBlob(blobSaver, "image/png");
-            // });
-            reject("TODO: get artifact blob from neo-CODAP");
+            if (this.appDOMNodeRef) {
+              html2canvas(this.appDOMNodeRef).then((canvas: HTMLCanvasElement) => {
+                const blobSaver = (blob:Blob) => {
+                  blob ? resolve(blob) : reject("Couldn't get artifact blob from canvas!");
+                }
+                canvas.toBlob(blobSaver, "image/png");
+              });
+            }
+            else {
+              reject("No DOM node to render!");
+            }
           })
 
           artifactBlobPromise()
@@ -86,7 +87,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
       <div className="neo-codap-wrapper">
         <NeoCodapApp
           dataSet={dataSet}
-          onDOMNodeRef={(ref: HTMLElement) => this.appDOMNodeRef = ref}
+          onDOMNodeRef={(ref: HTMLElement | null) => this.appDOMNodeRef = ref}
         />
       </div>
     )
