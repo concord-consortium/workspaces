@@ -15,7 +15,7 @@ const urlParams = queryString.parse(location.search),
 
 interface IAppProps {
   dataSet?: IDataSet;
-  onDOMNodeRef?: (ref: HTMLElement) => void;
+  onDOMNodeRef?: (ref: HTMLElement | null) => void;
 }
 
 interface IAppState {
@@ -84,7 +84,7 @@ class App extends React.Component<IAppProps, IAppState> {
 
   render() {
     return (
-      <div className="neo-codap-app">
+      <div className="neo-codap-app" ref={this.props.onDOMNodeRef}>
         {this.renderTable()}
         {this.renderGraph()}
       </div>
