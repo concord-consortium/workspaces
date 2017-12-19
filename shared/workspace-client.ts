@@ -113,10 +113,10 @@ export class WorkspaceClient {
   }
 }
 
-export interface SaveArtifactBlobOptions {
+export interface SaveArtifactOptions {
   title: string
   blob: Blob
-  mimeType: string
+  mimeType?: string
   extension?: string
   thumbnailPNGBlob?: Blob
 }
@@ -132,44 +132,75 @@ export class WorkspaceClientPublication {
     this.artifactsStoragePath = req.artifactStoragePath
   }
 
-  saveArtifactBlob(options: SaveArtifactBlobOptions) {
-    return new Promise<FirebaseArtifact>((resolve, reject) => {
-      const {title, blob, mimeType, thumbnailPNGBlob} = options
-      let {extension} = options
+  createThumbnail(imageBlob:Blob) {
+    return new Promise<Blob>((resolve, reject) => {
+      const blobImage = document.createElement("img")
+      blobImage.addEventListener("load", () => {
+        const thumbnailCanvas:HTMLCanvasElement = document.createElement("canvas")
+        thumbnailCanvas.width = WorkspaceClientThumbnailWidth
+        thumbnailCanvas.height = WorkspaceClientThumbnailWidth * (blobImage.height / blobImage.width)
 
+        const thumbnailContext = thumbnailCanvas.getContext("2d")
+        if (!thumbnailContext) {
+          return reject("Can't get thumbnail image context!")
+        }
+        thumbnailContext.drawImage(blobImage, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height)
+        thumbnailCanvas.toBlob((thumbnailBlob:Blob) => {
+          thumbnailBlob ? resolve(thumbnailBlob) : reject("Couldn't get thumbnail from canvas!")
+        }, "image/png")
+      })
+      blobImage.src = URL.createObjectURL(imageBlob)
+    })
+  }
+
+  saveThumbnail(thumbnailBlob:Blob, blobId:string) {
+    return new Promise<string|undefined>((resolve, reject) => {
+      const thumbnailStoragePath:string = `${this.artifactsStoragePath}/${blobId}-thumbnail.png`
+      const thumbnailStorageRef = firebase.storage().ref(thumbnailStoragePath)
+      thumbnailStorageRef
+        .put(thumbnailBlob, {contentType: "image/png"})
+        .then((snapshot) => thumbnailStorageRef.getDownloadURL())
+        .then(resolve)
+    })
+  }
+
+  saveArtifactBlob = (options: SaveArtifactOptions, blobId: string, thumbnailUrl?:string) => {
+    return new Promise<FirebaseArtifact>((resolve, reject) => {
+      let {extension} = options
+      const mimeType = options.mimeType || options.blob.type
       if (!extension) {
         const parts = mimeType.split("/")
         extension = parts[parts.length - 1]
       }
 
-      const blobId = uuidV4()
-
-      const saveBlob = (thumbnailUrl?:string) => {
-        const blobStoragePath:string = `${this.artifactsStoragePath}/${blobId}.${extension}`
-        const blobStorageRef = firebase.storage().ref(blobStoragePath)
-        blobStorageRef
-          .put(blob, {contentType: mimeType})
-          .then((snapshot) => blobStorageRef.getDownloadURL())
-          .then((url) => {
-            const artifact:FirebaseArtifact = {title, mimeType, url, thumbnailUrl}
-            const artifactRef = this.artifactsRef.push(artifact)
-            resolve(artifact)
-          })
-          .catch(reject)
-      }
-
-      if (thumbnailPNGBlob) {
-        const thumbnailStoragePath:string = `${this.artifactsStoragePath}/${blobId}-thumbnail.png`
-        const thumbnailStorageRef = firebase.storage().ref(thumbnailStoragePath)
-        thumbnailStorageRef
-          .put(thumbnailPNGBlob, {contentType: "image/png"})
-          .then((snapshot) => thumbnailStorageRef.getDownloadURL())
-          .then(saveBlob)
-          .catch(reject)
-      }
-      else {
-        saveBlob()
-      }
+      const blobStoragePath:string = `${this.artifactsStoragePath}/${blobId}.${extension}`
+      const blobStorageRef = firebase.storage().ref(blobStoragePath)
+      blobStorageRef
+        .put(options.blob, {contentType: mimeType})
+        .then((snapshot) => blobStorageRef.getDownloadURL())
+        .then((url) => {
+          const artifact:FirebaseArtifact = {title: options.title, mimeType, url, thumbnailUrl}
+          const artifactRef = this.artifactsRef.push(artifact)
+          resolve(artifact)
+        })
+        .catch(reject)
     })
+  }
+
+  saveArtifact(options: SaveArtifactOptions) {
+    const blobId = uuidV4()
+
+    if (options.thumbnailPNGBlob) {
+      return this.saveThumbnail(options.thumbnailPNGBlob, blobId)
+        .then((thumbnailUrl) => this.saveArtifactBlob(options, blobId, thumbnailUrl))
+    }
+
+    if (options.blob.type.startsWith("image/")) {
+      return this.createThumbnail(options.blob)
+        .then((thumbnailBlob) => this.saveThumbnail(thumbnailBlob, blobId))
+        .then((thumbnailUrl) => this.saveArtifactBlob(options, blobId, thumbnailUrl))
+    }
+
+    return this.saveArtifactBlob(options, blobId)
   }
 }
