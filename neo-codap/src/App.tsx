@@ -73,7 +73,7 @@ class App extends React.Component<IAppProps, IAppState> {
   renderGraph() {
     const widthClass = showTable && showGraph ? 'half-width' : 'full-width',
           classes = `neo-codap-app-item ${widthClass}`;
-    return showGraph && this.props.dataSet
+    return showGraph && this.state.dataSet
             ? (
               <div className={classes}>
                   <Graph dataSet={this.state.dataSet} />
