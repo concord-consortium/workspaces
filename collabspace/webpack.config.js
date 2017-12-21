@@ -158,12 +158,15 @@ module.exports = [
     {
         entry: {
             "neo-codap": "./src/neo-codap.tsx",
-            "neo-codap-globals": ["react", "react-dom", "firebase"]
+            "neo-codap-globals": globalsList
         },
 
         output: {
             filename: jsFilename,
-            path: distPath + "/assets"
+            path: distPath + "/assets",
+            // cf. https://stackoverflow.com/a/45376588
+            // cf. https://github.com/webpack/webpack/issues/597#issuecomment-297721105
+            publicPath: "assets/"
         },
 
         devtool: isDev ? "source-map" : "",
@@ -176,7 +179,27 @@ module.exports = [
             rules: [
                 { enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
                 { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
-                { test: /\.css$/, use: [ 'style-loader', 'css-loader' ] }
+                { test: /\.css$/, use: [ 'style-loader', 'css-loader' ] },
+                {
+                    test: /\.(woff|woff2)$/,
+                    use: {
+                        loader: 'url-loader',
+                        options: {
+                        name: 'fonts/[hash].[ext]',
+                        limit: 5000,
+                        mimetype: 'application/font-woff'
+                        }
+                    }
+                },
+                {
+                    test: /\.(ttf|eot|svg)$/,
+                    use: {
+                        loader: 'file-loader',
+                        options: {
+                        name: 'fonts/[hash].[ext]'
+                        }
+                    }
+                }
             ]
         },
 

@@ -4,6 +4,7 @@
   "description": "Concord Consortium Workspaces",
   "scripts": {
     "build": "npm-run-all --parallel cs:build nc:build copy-root",
+    "clean": "rm -rf dist",
     "copy-root": "copyfiles -f root/**/*.* dist/",
     "cs:build": "cd collabspace && cross-env NODE_ENV=production webpack",
     "cs:build:watch": "cd collabspace && cross-env NODE_ENV=production webpack -w",
@@ -31,6 +32,7 @@
   },
   "homepage": "https://github.com/concord-consortium/workspaces#readme",
   "dependencies": {
+    "@blueprintjs/core": "^1.35.0",
     "ag-grid": "^14.2.0",
     "ag-grid-react": "^14.2.0",
     "d3": "^4.12.0",
@@ -39,6 +41,7 @@
     "mobx-react": "^4.3.5",
     "mobx-state-tree": "^1.2.1",
     "prop-types": "^15.6.0",
+    "react-addons-css-transition-group": "^15.6.2",
     "react-dom-factories": "^1.0.2",
     "react-faux-dom": "^4.1.0",
     "react-scripts-ts": "2.8.0",
@@ -62,6 +65,7 @@
     "cross-env": "^5.1.1",
     "css-loader": "^0.28.7",
     "extract-text-webpack-plugin": "^3.0.2",
+    "file-loader": "^1.1.6",
     "firebase": "^4.6.2",
     "firebase-functions": "latest",
     "html-webpack-plugin": "^2.30.1",
@@ -84,6 +88,7 @@
     "superagent": "^3.8.1",
     "timeago.js": "^3.0.2",
     "typescript": "^2.6.1",
+    "url-loader": "^0.6.2",
     "uuid": "^3.1.0",
     "webpack": "^3.8.1"
   }
