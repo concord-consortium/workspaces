@@ -3,6 +3,7 @@ import './App.css';
 import { addAttributeToDataSet, addCasesToDataSet, ICase, DataSet, IDataSet } from './data-manager/data-manager';
 import { CaseTable } from './case-table/case-table';
 import { Graph } from './graph/graph';
+import { FocusStyleManager } from '@blueprintjs/core';
 import * as queryString from 'query-string';
 const isLocalHost = (window.location.hostname.indexOf('localhost') >= 0) ||
                     (window.location.hostname.indexOf('127.0.0.1') >= 0),
@@ -33,6 +34,9 @@ class App extends React.Component<IAppProps, IAppState> {
     this.state = {
       dataSet
     };
+
+    // cf. http://blueprintjs.com/docs/#core/accessibility.focus-management
+    FocusStyleManager.onlyShowFocusOnTabs();
   }
 
   handleSampleData = (sampleName: string) => {
