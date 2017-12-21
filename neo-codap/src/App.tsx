@@ -37,6 +37,7 @@ class App extends React.Component<IAppProps, IAppState> {
 
   handleSampleData = (sampleName: string) => {
     const { dataSet } = this.state;
+    dataSet.beginTransaction();
     dataSet.setName(sampleName);
     const sampleData = samples[sampleName],
           firstCase = sampleData && sampleData[0];
@@ -44,6 +45,7 @@ class App extends React.Component<IAppProps, IAppState> {
       addAttributeToDataSet(dataSet, { name });
     }
     addCasesToDataSet(dataSet, sampleData);
+    dataSet.endTransaction();
   }
 
   componentWillReceiveProps(nextProps: IAppProps) {

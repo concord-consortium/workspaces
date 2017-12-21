@@ -2,7 +2,9 @@ import * as React from 'react';
 import * as ReactFauxDOM from 'react-faux-dom';
 import * as d3 from 'd3';
 import sizeMe from 'react-sizeme';
+import { IAttribute } from '../data-manager/attribute';
 import { ICase, IDataSet, IDerivationSpec } from '../data-manager/data-manager';
+import { find } from 'lodash';
 import './graph.css';
 
 interface ISizeMeSize {
@@ -16,43 +18,69 @@ interface IGraphProps {
 }
 
 interface IGraphState {
-    graphData: IDataSet;
+    graphData?: IDataSet;
+    xAttrID?: string;
+    yAttrID?: string;
 }
 
 export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
-    xAttributeName: string = 'Sleep';
-    yAttributeName: string = 'Speed';
+    srcAttributesChanged: boolean = false;
+    srcValuesChanged: boolean = false;
 
     constructor(props: IGraphProps) {
         super(props);
 
-        this.state = {
-            graphData: props.dataSet &&
-                        this.createGraphData(props.dataSet, this.xAttributeName, this.yAttributeName)
-        };
+        this.state = this.createGraphData(props.dataSet);
+
         this.attachHandlers(this.props.dataSet);
     }
 
-    createGraphData(srcDataSet: IDataSet, xName: string, yName: string) {
-        const
-            xAttr = srcDataSet && srcDataSet.attrFromName(xName),
-            xAttrID = xAttr && xAttr.id,
-            yAttr = srcDataSet && srcDataSet.attrFromName(yName),
-            yAttrID = yAttr && yAttr.id,
+    findPlottableAttribute(srcDataSet: IDataSet, afterAttrID?: string) {
+        const afterAttrIndex = afterAttrID ? srcDataSet.attrIndexFromID(afterAttrID) : undefined,
+              found = find(srcDataSet.attributes, (attr) => {
+                let numericCount = 0,
+                    nonEmptyCount = 0;
+                attr.values.forEach((value) => {
+                    if ((value != null) && (value !== '')) {
+                        ++nonEmptyCount;
+                        if (isFinite(Number(value))) {
+                            ++numericCount;
+                        }
+                    }
+                });
+                // attribute is plottable if at least half of its non-empty values are numeric
+                return ((nonEmptyCount > 0) && (numericCount / nonEmptyCount >= 0.5));
+              }, afterAttrIndex != null ? afterAttrIndex + 1 : undefined);
+        return found ? (found as {} as IAttribute).id : undefined;
+    }
+
+    createGraphData(srcDataSet?: IDataSet): IGraphState {
+        if (!srcDataSet) { return {}; }
+
+        let { xAttrID, yAttrID } = this.state ? this.state : {} as IGraphState,
+            xAttr: IAttribute, yAttr: IAttribute,
             attrIDs: string[] = [];
+        if (!xAttrID) {
+            xAttrID = this.findPlottableAttribute(srcDataSet);
+        }
         if (xAttrID) {
             attrIDs.push(xAttrID);
+            xAttr = srcDataSet.attrFromID(xAttrID);
+        }
+        if (!yAttrID) {
+            yAttrID = this.findPlottableAttribute(srcDataSet, xAttrID);
         }
         if (yAttrID) {
             attrIDs.push(yAttrID);
+            yAttr = srcDataSet.attrFromID(yAttrID);
         }
     
         const derivationSpec: IDerivationSpec = {
                 attributeIDs: attrIDs,
                 filter: (aCase: ICase) => {
-                    let x = aCase[xName],
-                        y = aCase[yName];
+                    let x = aCase[xAttr ? xAttr.name : ''],
+                        y = aCase[yAttr ? yAttr.name : ''];
                     // exclude missing values
                     if ((x == null) || (x === '') || (y == null) || (y === '')) {
                         return undefined;
@@ -65,8 +93,8 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                         return undefined;
                     }
                     // return the filtered case
-                    aCase[xName] = x;
-                    aCase[yName] = y;
+                    aCase[xAttr ? xAttr.name : ''] = x;
+                    aCase[yAttr ? yAttr.name : ''] = y;
                     return aCase;
                 },
                 synchronize: true
@@ -74,18 +102,44 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             graphData = srcDataSet && srcDataSet.derive('graphData', derivationSpec);
 
         this.attachHandlers(undefined, graphData);
-        return graphData;
+        return { graphData, xAttrID, yAttrID };
     }
 
     attachHandlers(srcData?: IDataSet, graphData?: IDataSet) {
         const graphAttributeCount = graphData && graphData.attributes.length,
-              graphDataIncomplete = !graphAttributeCount || (graphAttributeCount < 2),
-              { xAttributeName: xName, yAttributeName: yName } = this;
+              graphDataIncomplete = !graphAttributeCount || (graphAttributeCount < 2);
         if (srcData) {
             srcData.addActionListener('graphSrc', (action) => {
-                if (graphDataIncomplete && (action.name === 'addAttributeWithID')) {
-                    // TODO: debounce this so we only recreate the graph once per batch
-                    this.setState({ graphData: this.createGraphData(srcData, xName, yName) });
+                switch (action.name) {
+                case 'addAttributeWithID':
+                    if (srcData.isInTransaction) {
+                        this.srcAttributesChanged = true;
+                    }
+                    else if (graphDataIncomplete) {
+                        this.setState(this.createGraphData(srcData));
+                    }
+                    break;
+                case 'setCaseValues':
+                case 'setCanonicalCaseValues':
+                    if (srcData.isInTransaction) {
+                        this.srcValuesChanged = true;
+                    }
+                    else if (graphDataIncomplete) {
+                        this.setState(this.createGraphData(srcData));
+                    }
+                    break;
+                case 'endTransaction':
+                    if (!srcData.isInTransaction) {
+                        if (graphDataIncomplete &&
+                            (this.srcAttributesChanged || this.srcValuesChanged)) {
+                            this.setState(this.createGraphData(srcData));
+                        }
+                        this.srcAttributesChanged = false;
+                        this.srcValuesChanged = false;
+                    }
+                    break;
+                default:
+                    break;
                 }
             });
         }
@@ -96,7 +150,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
     }
 
-    detachHandlers(srcData: IDataSet, graphData: IDataSet) {
+    detachHandlers(srcData?: IDataSet, graphData?: IDataSet) {
         if (srcData) {
             srcData.removeActionListener('graph');
         }
@@ -109,10 +163,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         const { dataSet } = nextProps;
         if (dataSet !== this.props.dataSet) {
             this.detachHandlers(this.props.dataSet, this.state.graphData);
-            const graphData = dataSet &&
-                                this.createGraphData(dataSet, this.xAttributeName, this.yAttributeName);
-            this.attachHandlers(dataSet, graphData);
-            this.setState({ graphData });
+            const newState = this.createGraphData(dataSet);
+            this.attachHandlers(dataSet, newState.graphData);
+            this.setState(newState);
         }
     }
 
@@ -121,18 +174,22 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     }
 
     render() {
-        if (!this.props.size.width || !this.props.size.height) { return null; }
+        if (!this.props.size.width || !this.props.size.height || !this.state.graphData) {
+            return null;
+        }
 
         const kPointRadius: number = 6;
 
         const
-            {graphData} = this.state,
+            { graphData, xAttrID, yAttrID } = this.state,
             graphCaseCount = graphData && graphData.cases.length;
-        let xAttr = graphData.attrFromName(this.xAttributeName),
-            yAttr = graphData.attrFromName(this.yAttributeName);
+        let xAttr = graphData.attrFromID(xAttrID || ''),
+            yAttr = graphData.attrFromID(yAttrID || '');
         let xValues: number[] = xAttr ? xAttr.values as number[] : [],
             yValues: number[] = yAttr ? yAttr.values as number[] : [];
-        let xMax = graphCaseCount ? d3.max(xValues) : 10,
+        let xMin = graphCaseCount ? Math.min(0, d3.min(xValues) || 0) : 0,
+            yMin = graphCaseCount ? Math.min(0, d3.min(yValues) || 0) : 0,
+            xMax = graphCaseCount ? d3.max(xValues) : 10,
             yMax = graphCaseCount ? d3.max(yValues) : 10;
 
         // Just for fun plot a _lot_ of random points instead of the ones from dataset
@@ -152,11 +209,11 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             height: number = this.props.size.height - margin.top - margin.bottom,
             x = d3.scaleLinear()
                 .range([0, width])
-                .domain([0, xMax || 1]).nice(),
+                .domain([xMin, xMax || 1]).nice(),
 
             y = d3.scaleLinear()
                 .range([height, 0])
-                .domain([0, yMax || 1]).nice(),
+                .domain([yMin, yMax || 1]).nice(),
 
             coordinates = xValues.map(function (iX: number, i: number) {
                 return {x: x(iX), y: y(yValues[i])};
@@ -180,7 +237,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .append('text')
             .attr('transform', 'translate(' + (width / 2) + ',' + (margin.bottom - 3) + ')')
             .style('text-anchor', 'middle')
-            .text(this.xAttributeName);
+            .text(xAttr ? xAttr.name : '');
 
         svg.append('g')
             .attr('class', 'y axis')
@@ -190,7 +247,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .attr('y', -margin.left + 20)
             .attr('x', -height / 2)
             .style('text-anchor', 'middle')
-            .text(this.yAttributeName);
+            .text(yAttr ? yAttr.name : '');
 
         svg.selectAll('circle')
             .data(coordinates)
