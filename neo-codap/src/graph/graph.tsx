@@ -18,7 +18,7 @@ interface IGraphProps {
 }
 
 interface IGraphState {
-    graphData: IDataSet;
+    graphData?: IDataSet;
     xAttrID?: string;
     yAttrID?: string;
 }
@@ -31,10 +31,8 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     constructor(props: IGraphProps) {
         super(props);
 
-        this.state = {
-            graphData: props.dataSet &&
-                        this.createGraphData(props.dataSet, {} as IGraphState)
-        };
+        this.state = this.createGraphData(props.dataSet);
+
         this.attachHandlers(this.props.dataSet);
     }
 
@@ -57,13 +55,14 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         return found ? (found as {} as IAttribute).id : undefined;
     }
 
-    createGraphData(srcDataSet: IDataSet, state: IGraphState) {
-        let { xAttrID, yAttrID } = state,
+    createGraphData(srcDataSet?: IDataSet): IGraphState {
+        if (!srcDataSet) { return {}; }
+
+        let { xAttrID, yAttrID } = this.state ? this.state : {} as IGraphState,
             xAttr: IAttribute, yAttr: IAttribute,
             attrIDs: string[] = [];
         if (!xAttrID) {
             xAttrID = this.findPlottableAttribute(srcDataSet);
-            this.setState({ xAttrID });
         }
         if (xAttrID) {
             attrIDs.push(xAttrID);
@@ -71,7 +70,6 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
         if (!yAttrID) {
             yAttrID = this.findPlottableAttribute(srcDataSet, xAttrID);
-            this.setState({ yAttrID });
         }
         if (yAttrID) {
             attrIDs.push(yAttrID);
@@ -104,7 +102,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             graphData = srcDataSet && srcDataSet.derive('graphData', derivationSpec);
 
         this.attachHandlers(undefined, graphData);
-        return graphData;
+        return { graphData, xAttrID, yAttrID };
     }
 
     attachHandlers(srcData?: IDataSet, graphData?: IDataSet) {
@@ -118,7 +116,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                         this.srcAttributesChanged = true;
                     }
                     else if (graphDataIncomplete) {
-                        this.setState({ graphData: this.createGraphData(srcData, this.state) });
+                        this.setState(this.createGraphData(srcData));
                     }
                     break;
                 case 'setCaseValues':
@@ -127,14 +125,14 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                         this.srcValuesChanged = true;
                     }
                     else if (graphDataIncomplete) {
-                        this.setState({ graphData: this.createGraphData(srcData, this.state) });
+                        this.setState(this.createGraphData(srcData));
                     }
                     break;
                 case 'endTransaction':
                     if (!srcData.isInTransaction) {
                         if (graphDataIncomplete &&
                             (this.srcAttributesChanged || this.srcValuesChanged)) {
-                            this.setState({ graphData: this.createGraphData(srcData, this.state) });
+                            this.setState(this.createGraphData(srcData));
                         }
                         this.srcAttributesChanged = false;
                         this.srcValuesChanged = false;
@@ -152,7 +150,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
     }
 
-    detachHandlers(srcData: IDataSet, graphData: IDataSet) {
+    detachHandlers(srcData?: IDataSet, graphData?: IDataSet) {
         if (srcData) {
             srcData.removeActionListener('graph');
         }
@@ -165,10 +163,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         const { dataSet } = nextProps;
         if (dataSet !== this.props.dataSet) {
             this.detachHandlers(this.props.dataSet, this.state.graphData);
-            const graphData = dataSet &&
-                                this.createGraphData(dataSet, this.state);
-            this.attachHandlers(dataSet, graphData);
-            this.setState({ graphData });
+            const newState = this.createGraphData(dataSet);
+            this.attachHandlers(dataSet, newState.graphData);
+            this.setState(newState);
         }
     }
 
@@ -177,7 +174,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     }
 
     render() {
-        if (!this.props.size.width || !this.props.size.height) { return null; }
+        if (!this.props.size.width || !this.props.size.height || !this.state.graphData) {
+            return null;
+        }
 
         const kPointRadius: number = 6;
 
