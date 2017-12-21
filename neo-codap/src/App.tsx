@@ -4,12 +4,13 @@ import { addAttributeToDataSet, addCasesToDataSet, ICase, DataSet, IDataSet } fr
 import { CaseTable } from './case-table/case-table';
 import { Graph } from './graph/graph';
 import * as queryString from 'query-string';
-const urlParams = queryString.parse(location.search),
+const isLocalHost = (window.location.hostname.indexOf('localhost') >= 0) ||
+                    (window.location.hostname.indexOf('127.0.0.1') >= 0),
+      urlParams = queryString.parse(location.search),
       mode = urlParams.mode != null ? urlParams.mode : 'all',
       fourSeals = require('./four-seals.json'),
       mammals = require('./mammals.json'),
-      chosenDataSetName = 'mammals',
-      rawData = { fourSeals, mammals }[chosenDataSetName],
+      samples: { [index: string]: ICase[] } = { fourSeals, mammals },
       showTable = (mode === 'all') || (mode === 'table'),
       showGraph = (mode === 'all') || (mode === 'graph');
 
@@ -27,33 +28,27 @@ class App extends React.Component<IAppProps, IAppState> {
   constructor(props: IAppProps) {
     super(props);
 
-    const dataSet = this.props.dataSet || DataSet.create({ name: chosenDataSetName });
-    this.initializeDataSetIfEmpty(dataSet);
+    const dataSet = this.props.dataSet || DataSet.create({ name: 'untitled' });
 
     this.state = {
       dataSet
     };
   }
 
-  initializeDataSetIfEmpty(dataSet?: IDataSet) {
-    if (dataSet && !dataSet.attributes.length && !dataSet.cases.length) {
-      this.loadDataSetFromDefaultData(dataSet);
-    }
-  }
-
-  loadDataSetFromDefaultData(dataSet: IDataSet) {
-    dataSet.setName(chosenDataSetName);
-    const firstCase = rawData && rawData[0];
+  handleSampleData = (sampleName: string) => {
+    const { dataSet } = this.state;
+    dataSet.setName(sampleName);
+    const sampleData = samples[sampleName],
+          firstCase = sampleData && sampleData[0];
     for (let name in firstCase) {
       addAttributeToDataSet(dataSet, { name });
     }
-    addCasesToDataSet(dataSet, rawData as {} as ICase[]);
+    addCasesToDataSet(dataSet, sampleData);
   }
 
   componentWillReceiveProps(nextProps: IAppProps) {
     const { dataSet } = nextProps;
     if (dataSet && (dataSet !== this.props.dataSet)) {
-      this.initializeDataSetIfEmpty(dataSet);
       this.setState({ dataSet });
     }
   }
@@ -64,7 +59,10 @@ class App extends React.Component<IAppProps, IAppState> {
     return showTable
             ? (
                 <div className={classes}>
-                  <CaseTable dataSet={this.state.dataSet} />
+                  <CaseTable
+                    dataSet={this.state.dataSet}
+                    onSampleData={isLocalHost ? this.handleSampleData : undefined}
+                  />
                 </div>
               )
             : null;

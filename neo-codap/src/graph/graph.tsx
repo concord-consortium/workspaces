@@ -31,6 +31,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             graphData: props.dataSet &&
                         this.createGraphData(props.dataSet, this.xAttributeName, this.yAttributeName)
         };
+        this.attachHandlers(this.props.dataSet);
     }
 
     createGraphData(srcDataSet: IDataSet, xName: string, yName: string) {
@@ -71,24 +72,52 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 synchronize: true
             },
             graphData = srcDataSet && srcDataSet.derive('graphData', derivationSpec);
+
+        this.attachHandlers(undefined, graphData);
+        return graphData;
+    }
+
+    attachHandlers(srcData?: IDataSet, graphData?: IDataSet) {
+        const graphAttributeCount = graphData && graphData.attributes.length,
+              graphDataIncomplete = !graphAttributeCount || (graphAttributeCount < 2),
+              { xAttributeName: xName, yAttributeName: yName } = this;
+        if (srcData) {
+            srcData.addActionListener('graphSrc', (action) => {
+                if (graphDataIncomplete && (action.name === 'addAttributeWithID')) {
+                    // TODO: debounce this so we only recreate the graph once per batch
+                    this.setState({ graphData: this.createGraphData(srcData, xName, yName) });
+                }
+            });
+        }
         if (graphData) {
             graphData.addActionListener('graph', (action) => {
                 this.forceUpdate();
             });
         }
-        return graphData;
+    }
+
+    detachHandlers(srcData: IDataSet, graphData: IDataSet) {
+        if (srcData) {
+            srcData.removeActionListener('graph');
+        }
+        if (graphData) {
+            graphData.removeActionListener('graph');
+        }
     }
     
     componentWillReceiveProps(nextProps: IGraphProps) {
         const { dataSet } = nextProps;
         if (dataSet !== this.props.dataSet) {
-            if (this.state.graphData) {
-                this.state.graphData.removeActionListener('graph');
-            }
+            this.detachHandlers(this.props.dataSet, this.state.graphData);
             const graphData = dataSet &&
                                 this.createGraphData(dataSet, this.xAttributeName, this.yAttributeName);
+            this.attachHandlers(dataSet, graphData);
             this.setState({ graphData });
         }
+    }
+
+    componentWillUnmount() {
+        this.detachHandlers(this.props.dataSet, this.state.graphData);
     }
 
     render() {

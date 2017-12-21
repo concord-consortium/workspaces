@@ -414,6 +414,9 @@ export const DataSet = types.model('DataSet', {
         const attribute = self.attributes[newIndex as number];
         attrIDMap[attribute.id] = attribute;
         attrNameMap[attribute.name] = attribute.id;
+        for (let i = attribute.values.length; i < self.cases.length; ++i) {
+          attribute.values.push(undefined);
+        }
       },
 
       removeAttribute(attributeID: string) {
@@ -498,7 +501,12 @@ export const DataSet = types.model('DataSet', {
       },
 
       addActionListener(key: string, listener: (action: ISerializedActionCall) => void) {
-        disposers[key] = onAction(self, (action) => listener(action), true);
+        if (typeof listener === 'function') {
+          disposers[key] = onAction(self, (action) => listener(action), true);
+        }
+        else {
+          console.log(`DataSet.addActionListener called for '${key}' with non-function argument!`);
+        }
       },
 
       removeActionListener(key: string) {
