@@ -6,10 +6,7 @@ import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishRespo
 import { loadDataSetFromFirebase } from "../../../shared/firebase-dataset";
 import * as firebase from "firebase";
 import sizeMe from "react-sizeme";
-// import html2canvas from "html2canvas";
-// var html2canvas = require("html2canvas");
-// import domtoimage from 'dom-to-image';
-// var domtoimage = require('dom-to-image');
+const html2canvas = require("html2canvas");
 
 
 interface ISizeMeSize {
@@ -28,7 +25,7 @@ interface NeoCodapState {
 class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   workspaceClient: WorkspaceClient;
   dataSetRef?: firebase.database.Reference;
-  appDOMNodeRef: HTMLElement;
+  appDOMNodeRef: HTMLElement | null;
 
   constructor (props:NeoCodapProps) {
     super(props)
@@ -50,47 +47,35 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
       },
 
       publish: (publication) => {
-        const mimeType = "image/png"
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
-          const thumbnailBlobPromise = new Promise<Blob>((resolve, reject) => {
-            const thumbnailCanvas:HTMLCanvasElement = document.createElement("canvas"),
-                  aspectRatio = this.props.size.width && this.props.size.height
-                                  ? this.props.size.width / this.props.size.height
-                                  : 1;
-            thumbnailCanvas.width = WorkspaceClientThumbnailWidth;
-            thumbnailCanvas.height = WorkspaceClientThumbnailWidth / aspectRatio;
-
-            const options = {
-              canvas: thumbnailCanvas,
-              width: thumbnailCanvas.width,
-              height: thumbnailCanvas.height
-            };
+          const artifactBlobPromise = () => new Promise<Blob>((resolve, reject) => {
             // domtoimage.toBlob(this.appDOMNodeRef)
             // .then(function (blob: Blob) {
-            //   blob ? resolve(blob) : reject("Couldn't get thumbnail drawing from canvas!");
+            //   blob ? resolve(blob) : reject("Couldn't get artifact blob from canvas!");
             // });
-        
-            // html2canvas(this.appDOMNodeRef, options).then((canvas: HTMLCanvasElement) => {
-            //   const blobSaver = (blob:Blob) => {
-            //     blob ? resolve(blob) : reject("Couldn't get thumbnail drawing from canvas!");
-            //   }
-            //   canvas.toBlob(blobSaver, "image/png");
-            // });
-            reject("Couldn't get thumbnail drawing from canvas!");
+
+            if (this.appDOMNodeRef) {
+              html2canvas(this.appDOMNodeRef).then((canvas: HTMLCanvasElement) => {
+                const blobSaver = (blob:Blob) => {
+                  blob ? resolve(blob) : reject("Couldn't get artifact blob from canvas!");
+                }
+                canvas.toBlob(blobSaver, "image/png");
+              });
+            }
+            else {
+              reject("No DOM node to render!");
+            }
           })
 
-          Promise.all([thumbnailBlobPromise])
-            .then(([thumbnailPNGBlob]) => {
-              publication.saveArtifactBlob({
+          artifactBlobPromise()
+            .then((blob) => {
+              publication.saveArtifact({
                 title: "Table/Graph",
-                blob: thumbnailPNGBlob,
-                mimeType,
-                thumbnailPNGBlob
+                blob: blob
               })
               .then((artifact) => resolve({}))
               .catch(reject)
             })
-            .catch(reject)
         })
       }
     })
@@ -102,7 +87,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
       <div className="neo-codap-wrapper">
         <NeoCodapApp
           dataSet={dataSet}
-          onDOMNodeRef={(ref: HTMLElement) => this.appDOMNodeRef = ref}
+          onDOMNodeRef={(ref: HTMLElement | null) => this.appDOMNodeRef = ref}
         />
       </div>
     )

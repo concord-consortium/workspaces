@@ -76,47 +76,16 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
       },
 
       publish: (publication) => {
-        const mimeType = "image/png"
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
           const drawingCanvas:HTMLCanvasElement = this.drawingTool.canvas.getElement()
-
-          const drawingBlobPromise = new Promise<Blob>((resolve, reject) => {
-            const blobSaver = (blob:Blob) => {
-              blob ? resolve(blob) : reject("Couldn't get drawing from canvas!")
+          drawingCanvas.toBlob((blob:Blob) => {
+            if (!blob) {
+              return reject("Couldn't get drawing from canvas!")
             }
-            drawingCanvas.toBlob(blobSaver, mimeType)
-          })
-
-          const thumbnailBlobPromise = new Promise<Blob>((resolve, reject) => {
-            const thumbnailCanvas:HTMLCanvasElement = document.createElement("canvas")
-            thumbnailCanvas.width = WorkspaceClientThumbnailWidth
-            thumbnailCanvas.height = WorkspaceClientThumbnailWidth * (drawingCanvas.height / drawingCanvas.width)
-
-            const thumbnailContext = thumbnailCanvas.getContext("2d")
-            if (thumbnailContext) {
-              thumbnailContext.drawImage(drawingCanvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height)
-              const blobSaver = (blob:Blob) => {
-                blob ? resolve(blob) : reject("Couldn't get thumbnail drawing from canvas!")
-              }
-              thumbnailCanvas.toBlob(blobSaver, "image/png")
-            }
-            else {
-              reject("Can't get thumbnail canvas!")
-            }
-          })
-
-          Promise.all([drawingBlobPromise, thumbnailBlobPromise])
-            .then(([drawingBlob, thumbnailPNGBlob]) => {
-              publication.saveArtifactBlob({
-                title: "Drawing",
-                blob: drawingBlob,
-                mimeType,
-                thumbnailPNGBlob
-              })
-              .then((artifact) => resolve({}))
-              .catch(reject)
-            })
+            publication.saveArtifact({title: "Drawing", blob})
+            .then((artifact) => resolve({}))
             .catch(reject)
+          }, "image/png")
         })
       }
     })
