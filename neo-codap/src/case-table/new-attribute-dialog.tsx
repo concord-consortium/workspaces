@@ -33,6 +33,12 @@ class NewAttributeDialog extends React.Component<INewAttributeDialogProps, INewA
     }
   }
 
+  handleKeyDown = (evt: React.KeyboardEvent<HTMLInputElement>) => {
+    if (evt.keyCode === 13) {
+      this.handleNewAttribute();
+    }
+  }
+
   render() {
     return (
       <Dialog
@@ -49,7 +55,9 @@ class NewAttributeDialog extends React.Component<INewAttributeDialogProps, INewA
           placeholder="Attribute name"
           value={this.state.name}
           onChange={this.handleNameChange}
+          onKeyDown={this.handleKeyDown}
           dir="auto"
+          ref={input => input && input.focus()}
         />
         <div className="nc-dialog-buttons">
           <Button
