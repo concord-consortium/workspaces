@@ -4,7 +4,7 @@ import { ISerializedActionCall } from 'mobx-state-tree/dist/middlewares/on-actio
 import { Attribute, IAttribute, IAttributeSnapshot, IValueType } from './attribute';
 // see https://medium.com/@martin_hotell/tree-shake-lodash-with-webpack-jest-and-typescript-2734fa13b5cd
 // for more efficient ways of importing lodash functions
-import * as _ from 'lodash';
+import { cloneDeep, findIndex } from 'lodash';
 
 export const CaseID = types.model('CaseID', {
   __id__: types.identifier(types.string)
@@ -46,7 +46,9 @@ export const DataSet = types.model('DataSet', {
 }).preProcessSnapshot((snapshot) => {
   const { id, ...others } = snapshot;
   return { id: id || uuid(), ...others };
-}).extend(self => {
+}).volatile(self => ({
+  transactionCount: 0
+})).extend(self => {
   let attrIDMap: { [index: string]: IAttribute } = {},
       // map from attribute names to attribute IDs
       attrNameMap: { [index: string]: string } = {},
@@ -142,6 +144,7 @@ export const DataSet = types.model('DataSet', {
     }
     else {
       self.cases.push(newCase);
+      beforeIndex = self.cases.length - 1;
     }
     caseIDMap[self.cases[beforeIndex].__id__] = beforeIndex;
   }
@@ -196,12 +199,16 @@ export const DataSet = types.model('DataSet', {
         const id = attrNameMap[name];
         return id ? attrIDMap[id] : undefined;
       },
+      attrIndexFromID(id: string) {
+        return findIndex(self.attributes, (attr) => attr.id === id );
+      },
       caseIndexFromID(id: string) {
         return caseIDMap[id];
       },
       nextCaseID(id: string) {
         const index = caseIDMap[id],
-              nextCase = index != null ? self.cases[index + 1] : undefined;
+              nextCase = (index != null) && (index < self.cases.length - 1)
+                          ? self.cases[index + 1] : undefined;
         return nextCase ? nextCase.__id__ : undefined;
       },
       getValue(caseID: string, attributeID: string) {
@@ -262,6 +269,9 @@ export const DataSet = types.model('DataSet', {
           if (aCase) { cases.push(aCase); }
         }
         return cases;
+      },
+      get isInTransaction() {
+        return self.transactionCount > 0;
       },
       get isSynchronizing() {
         return inFlightActions > 0;
@@ -398,6 +408,12 @@ export const DataSet = types.model('DataSet', {
       },
       beforeDestroy: function() {
         Object.keys(disposers).forEach((key: string) => disposers[key]());
+      },
+      beginTransaction() {
+        ++self.transactionCount;
+      },
+      endTransaction() {
+        --self.transactionCount;
       },
       setName: function(name: string) {
         self.name = name;
@@ -542,7 +558,7 @@ export function addAttributeToDataSet(dataset: IDataSet, snapshot: IAttributeSna
 }
 
 export function addCasesToDataSet(dataset: IDataSet, cases: ICase[], beforeID?: string | string[]) {
-  const newCases = _.cloneDeep(cases);
+  const newCases = cloneDeep(cases);
   newCases.forEach((aCase) => {
     if (!aCase.__id__) {
       aCase.__id__ = uuid();
@@ -552,7 +568,7 @@ export function addCasesToDataSet(dataset: IDataSet, cases: ICase[], beforeID?: 
 }
 
 export function addCanonicalCasesToDataSet(dataset: IDataSet, cases: ICase[], beforeID?: string | string[]) {
-  const newCases = _.cloneDeep(cases);
+  const newCases = cloneDeep(cases);
   newCases.forEach((aCase) => {
     if (!aCase.__id__) {
       aCase.__id__ = uuid();
