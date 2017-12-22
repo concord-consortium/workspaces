@@ -49,11 +49,6 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
       publish: (publication) => {
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
           const artifactBlobPromise = () => new Promise<Blob>((resolve, reject) => {
-            // domtoimage.toBlob(this.appDOMNodeRef)
-            // .then(function (blob: Blob) {
-            //   blob ? resolve(blob) : reject("Couldn't get artifact blob from canvas!");
-            // });
-
             if (this.appDOMNodeRef) {
               html2canvas(this.appDOMNodeRef).then((canvas: HTMLCanvasElement) => {
                 const blobSaver = (blob:Blob) => {
