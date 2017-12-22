@@ -54,7 +54,7 @@ class App extends React.Component<IAppProps, IAppState> {
 
   componentWillReceiveProps(nextProps: IAppProps) {
     const { dataSet } = nextProps;
-    if (dataSet && (dataSet !== this.props.dataSet)) {
+    if (dataSet && (dataSet !== this.state.dataSet)) {
       this.setState({ dataSet });
     }
   }

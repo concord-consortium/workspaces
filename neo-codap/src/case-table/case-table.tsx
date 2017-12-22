@@ -1,10 +1,12 @@
 import * as React from 'react';
+import { ISerializedActionCall } from 'mobx-state-tree/dist/middlewares/on-action';
 import TableHeaderMenu from './table-header-menu';
-import { addAttributeToDataSet, addCasesToDataSet, ICase, IDataSet } from '../data-manager/data-manager';
-import { IAttribute } from '../data-manager/attribute';
+import { addAttributeToDataSet, addCasesToDataSet, ICase, IInputCase, IDataSet } from '../data-manager/data-manager';
+import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, ColDef, ColumnApi } from 'ag-grid';
 import { ValueGetterParams, ValueFormatterParams, ValueSetterParams } from 'ag-grid/dist/lib/entities/colDef';
+import { assign, cloneDeep, findIndex, isEqual } from 'lodash';
 import 'ag-grid/dist/styles/ag-grid.css';
 import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
@@ -43,11 +45,11 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   gridApi: GridApi;
   gridColumnApi: ColumnApi;
 
-  gridColumnDefs: ColDef[];
-  gridRowData: (ICase | undefined)[];
+  gridColumnDefs: ColDef[] = [];
+  gridRowData: (ICase | undefined)[] = [];
 
   // we don't need to refresh for changes the table already knows about
-  isGridAwareChange: boolean;
+  localChanges: IInputCase[] = [];
 
   constructor(props: ICaseTableProps) {
     super(props);
@@ -60,8 +62,6 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       rowModelType: 'inMemory',
     };
 
-    this.isGridAwareChange = false;
-
     this.updateGridState(dataSet);
   }
 
@@ -72,17 +72,21 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
 
   getRowNodeId = (data: { id: string }) => data.id;
 
-  getCaseIndexColumnDef(dataSet: IDataSet): ColDef {
+  getCaseIndexColumnDef(): ColDef {
     return ({
       headerName: '',
       // tslint:disable-next-line:no-any
       headerComponentFramework: TableHeaderMenu as (new () => any),
       headerComponentParams: {
         onNewAttribute: (name: string) => {
-          addAttributeToDataSet(dataSet, { name });
+          if (this.props.dataSet) {
+            addAttributeToDataSet(this.props.dataSet, { name });
+          }
         },
         onNewCase: () => {
-          addCasesToDataSet(dataSet, [{}]);
+          if (this.props.dataSet) {
+            addCasesToDataSet(this.props.dataSet, [{}]);
+          }
         },
         onSampleData: this.props.onSampleData
       },
@@ -98,7 +102,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     });
   }
 
-  getAttributeColumnDef(dataSet: IDataSet, attribute: IAttribute): ColDef {
+  getAttributeColumnDef(attribute: IAttribute): ColDef {
     return ({
       headerName: attribute.name,
       field: attribute.name,
@@ -107,9 +111,19 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       editable: true,
       width: widths[attribute.name] || defaultWidth,
       valueGetter: (params: ValueGetterParams) => {
-        const caseID = params.node.id,
+        const { dataSet } = this.props,
+              caseID = params.node.id,
               attrID = params.colDef.colId;
-        return attrID ? dataSet.getValue(caseID, attrID) : undefined;
+        let value = dataSet && attrID ? dataSet.getValue(caseID, attrID) : undefined;
+        // valueGetter includes in-flight changes
+        this.localChanges.forEach((change) => {
+          if ((change.__id__ === caseID) && (attrID != null)) {
+            if (change[attrID] != null) {
+              value = change[attrID] as IValueType;
+            }
+          }
+        });
+        return value;
       },
       valueFormatter: (params: ValueFormatterParams) => {
         const colName = params.colDef.field || params.colDef.headerName || '',
@@ -124,20 +138,21 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
                   : params.value;
       },
       valueSetter: (params: ValueSetterParams) => {
-        if (params.newValue === params.oldValue) { return false; }
+        const { dataSet } = this.props;
+        if (!dataSet || (params.newValue === params.oldValue)) { return false; }
         const str = params.newValue && (typeof params.newValue === 'string')
                       ? params.newValue.trim() : undefined,
               num = str ? Number(str) : undefined,
-              attrName = params.colDef.field || attribute.name,
-              caseID = dataSet.cases[params.node.rowIndex].__id__,
+              attrID = attribute.id,
+              caseID = dataSet && dataSet.cases[params.node.rowIndex].__id__,
               caseValues = {
                 __id__: caseID,
-                [attrName]: (num != null) && isFinite(num) ? num : str
+                [attrID]: (num != null) && isFinite(num) ? num : str
               };
-        if (caseValues[attrName] === params.oldValue) { return false; }
-        this.isGridAwareChange = true;
-        dataSet.setCaseValues([caseValues]);
-        this.isGridAwareChange = false;
+        if (caseValues[attrID] === params.oldValue) { return false; }
+        // track in-flight changes
+        this.localChanges.push(cloneDeep(caseValues));
+        dataSet.setCanonicalCaseValues([caseValues]);
         return true;
       }
     });
@@ -146,9 +161,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   getColumnDefs(dataSet: IDataSet) {
     let cols: ColDef[];
     cols = dataSet.attributes.map((attr) =>
-      this.getAttributeColumnDef(dataSet, attr)
+      this.getAttributeColumnDef(attr)
     );
-    cols.unshift(this.getCaseIndexColumnDef(dataSet));
+    cols.unshift(this.getCaseIndexColumnDef());
     return cols;
   }
 
@@ -169,10 +184,35 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
+  isIgnorableChange(action: ISerializedActionCall) {
+    switch (action.name) {
+      case 'setCaseValues':
+      case 'setCanonicalCaseValues': {
+        const cases = action.args && action.args[0];
+        if (!cases) { return true; }
+        let ignoredChanges = 0;
+        cases.forEach((aCase: IInputCase) => {
+          const index = findIndex(this.localChanges, (change) => isEqual(assign({}, aCase, change), aCase));
+          if (index >= 0) {
+            // ignoring local change
+            this.localChanges.splice(index, 1);
+            ++ignoredChanges;
+          }
+        });
+        return ignoredChanges >= cases.length;
+      }
+      case 'addActionListener':
+      case 'removeActionListener':
+        return true;
+      default:
+        return false;
+    }
+  }
+
   attachDataSet(dataSet?: IDataSet) {
     if (dataSet) {
       dataSet.addActionListener('case-table', (action) => {
-        if (!this.isGridAwareChange) {
+        if (!this.isIgnorableChange(action)) {
           this.updateGridState(dataSet);
           this.forceUpdate();
         }

@@ -83,7 +83,11 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
     if (cases) {
       cases.forEach((aCase) => {
         const newCaseRef = firebaseRef.child(kCasesPath).push();
-        newCaseRef.set(aCase);
+        if (newCaseRef && newCaseRef.key) {
+          // store ID with case to avoid storing "empty" objects in Firebase
+          aCase[kLocalIDName] = newCaseRef.key;
+          newCaseRef.set(aCase);
+        }
       });
     }
   }
@@ -138,7 +142,7 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
         case 'addCanonicalCasesWithIDs': {
           const cases = call.args[0];
           applyActionToFirebase(() => {
-            pushCases((cases || []).map((aCase: IInputCase) => cloneWithoutID(aCase, kLocalIDName)));
+            pushCases((cases || []).map((aCase: IInputCase) => cloneDeep(aCase)));
           });
           break;
         }
@@ -250,11 +254,17 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
   
   function attachCaseHandlers(firebaseRef: FirebaseRef, dataSet: IDataSet) {
     const casesRef = firebaseRef.child(kCasesPath);
-  
+
     casesRef.on('child_added', (child) => {
       if (!child || !child.key) { return; }
       const snapshot: ICase = Object.assign({ [kLocalIDName]: child.key }, child.val());
-      applyFirebaseAction(() => dataSet.addCanonicalCasesWithIDs([snapshot]));
+      // cases added as empty objects earlier may already be in the DataSet
+      if (dataSet.caseIndexFromID(child.key) == null) {
+        applyFirebaseAction(() => dataSet.addCanonicalCasesWithIDs([snapshot]));
+      }
+      else {
+        applyFirebaseAction(() => dataSet.setCanonicalCaseValues([snapshot as IInputCase]));
+      }
     });
   
     casesRef.on('child_changed', (child) => {
