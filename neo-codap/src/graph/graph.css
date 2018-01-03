@@ -38,6 +38,12 @@
     fill: black;
 }
 
+.nc-graph-menu-popover {
+    position: absolute;
+    left: 60px;
+    top: 6px;
+}
+
 .nc-popover-container {
     position: absolute;
     left: 0;

@@ -4,7 +4,8 @@ import * as d3 from 'd3';
 import sizeMe from 'react-sizeme';
 import { IAttribute } from '../data-manager/attribute';
 import { ICase, IDataSet, IDerivationSpec } from '../data-manager/data-manager';
-import { Menu, MenuItem, Popover, Position } from '@blueprintjs/core';
+import SimpleDialog from '../utilities/simple-dialog';
+import { Button, IconName, Menu, MenuItem, Popover, Position } from '@blueprintjs/core';
 import { assign, find } from 'lodash';
 import './graph.css';
 
@@ -12,7 +13,7 @@ interface ISizeMeSize {
     width: number|null;
     height: number|null;
 }
-  
+
 interface IGraphProps {
     size: ISizeMeSize;
     dataSet: IDataSet;
@@ -27,6 +28,10 @@ interface IGraphData {
 interface IGraphState extends IGraphData {
     xMenuIsOpen: boolean;
     yMenuIsOpen: boolean;
+    isSimpleDialogOpen: boolean;
+    simpleDialogIcon?: IconName;
+    simpleDialogTitle?: string;
+    simpleDialogMessage?: string;
 }
 
 export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
@@ -39,7 +44,8 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
         this.state = assign(this.createGraphData(props.dataSet), {
                                 xMenuIsOpen: false,
-                                yMenuIsOpen: false
+                                yMenuIsOpen: false,
+                                isSimpleDialogOpen: false
                             });
 
         this.attachHandlers(this.props.dataSet);
@@ -206,6 +212,58 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
     }
 
+    configureSimpleDialog(icon: IconName, title: string, message: string) {
+        this.setState({
+            isSimpleDialogOpen: true,
+            simpleDialogIcon: icon,
+            simpleDialogTitle: title,
+            simpleDialogMessage: message
+        });
+    }
+
+    closeSimpleDialog = () => {
+        this.setState({ isSimpleDialogOpen: false });
+    }
+
+    renderSimpleDialog() {
+        return (
+            <SimpleDialog
+                iconName="pt-icon-info-sign"
+                title={this.state.simpleDialogTitle || ''}
+                message={this.state.simpleDialogMessage || ''}
+                isOpen={this.state.isSimpleDialogOpen}
+                onClose={this.closeSimpleDialog}
+            />
+        );
+    }
+
+    handleShowMovableLine = () => {
+        this.configureSimpleDialog('pt-icon-info-sign', `Not Implemented`,
+                        `The Movable Line feature is not yet implemented.`);
+    }
+
+    renderGraphMenu() {
+        return (
+            <Menu>
+                <MenuItem text="Show Movable Line" onClick={this.handleShowMovableLine} />
+            </Menu>
+        );
+    }
+
+    renderGraphMenuPopover() {
+        return (
+            <div className="nc-graph-menu-popover">
+                <Popover
+                    popoverClassName="nc-graph-menu"
+                    content={this.renderGraphMenu()}
+                    position={Position.BOTTOM_LEFT}
+                >
+                    <Button iconName="pt-icon-menu" />
+                </Popover>
+            </div>
+        );
+    }
+
     renderAttributeMenu(axisLabel: string) {
         const renderAttributeItems = () => {
             if (!this.props.dataSet) { return null; }
@@ -360,6 +418,8 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         return (
             <div className="neo-codap-graph">
                 {node.toReact()}
+                {this.renderGraphMenuPopover()}
+                {this.renderSimpleDialog()}
                 {this.renderXAxisPopover()}
                 {this.renderYAxisPopover()}
             </div>
