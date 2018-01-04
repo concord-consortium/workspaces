@@ -37,7 +37,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     constructor(props: IGraphProps) {
         super(props);
 
-        this.state = assign({}, this.createGraphData(props.dataSet), {
+        this.state = assign(this.createGraphData(props.dataSet), {
                                 xMenuIsOpen: false,
                                 yMenuIsOpen: false
                             });
