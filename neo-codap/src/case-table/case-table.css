@@ -12,6 +12,11 @@
   border-bottom: 1px dotted silver;
 }
 
+.ag-cell-edit-input {
+  font-size: 14px;
+  padding-left: 8px;
+}
+
 .nc-table-menu-popover {
   margin-left: 8px;
 }
