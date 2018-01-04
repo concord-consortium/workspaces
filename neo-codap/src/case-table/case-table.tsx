@@ -4,13 +4,12 @@ import TableHeaderMenu from './table-header-menu';
 import { addAttributeToDataSet, addCasesToDataSet, ICase, IInputCase, IDataSet } from '../data-manager/data-manager';
 import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
-import { GridReadyEvent, GridApi, ColDef, ColumnApi } from 'ag-grid';
+import { GridReadyEvent, GridApi, CellComp, ColDef, ColumnApi, RowRenderer } from 'ag-grid';
 import { ValueGetterParams, ValueFormatterParams, ValueSetterParams } from 'ag-grid/dist/lib/entities/colDef';
 import { assign, cloneDeep, findIndex, isEqual } from 'lodash';
 import 'ag-grid/dist/styles/ag-grid.css';
 import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
-// import { ICellRendererParams } from 'ag-grid';
 
 interface ICaseTableProps {
   dataSet?: IDataSet;
@@ -39,6 +38,16 @@ const widths: { [key: string]: number } = {
         Habitat: 100
       },
       defaultWidth = 80;
+
+const prevOnTabKeyDown = RowRenderer.prototype.onTabKeyDown;
+// monkey-patch tab key handling to always stop editing
+RowRenderer.prototype.onTabKeyDown = function (previousRenderedCell: CellComp, keyboardEvent: KeyboardEvent) {
+  prevOnTabKeyDown.call(this, previousRenderedCell, keyboardEvent);
+  // tab key always stops editing, even if not moving to next cell
+  if (previousRenderedCell.isEditing()) {
+    previousRenderedCell.stopEditing();
+  }
+};
 
 export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState> {
 
