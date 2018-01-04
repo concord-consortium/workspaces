@@ -37,3 +37,42 @@
     font-size: 11px;
     fill: black;
 }
+
+.nc-popover-container {
+    position: absolute;
+    left: 0;
+}
+
+.nc-popover-container .pt-popover-target {
+    width: 100%;
+    height: 100%;
+}
+
+.nc-popover-container .pt-popover-target .pt-tether-target {
+    width: 100%;
+    height: 100%;
+}
+
+.nc-popover-menu .pt-menu {
+    min-width: 120px;
+}
+
+.nc-x-popover-container {
+    bottom: 0;
+    width: 100%;
+    height: 14px;
+}
+
+.nc-x-popover-menu {
+    margin-left: 30px;
+}
+
+.nc-y-popover-container {
+    top: 0;
+    width: 18px;
+    height: 100%;
+}
+
+.nc-y-popover-menu {
+    margin-top: -8px;
+}

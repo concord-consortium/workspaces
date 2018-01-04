@@ -78,6 +78,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       // tslint:disable-next-line:no-any
       headerComponentFramework: TableHeaderMenu as (new () => any),
       headerComponentParams: {
+        dataSet: this.props.dataSet,
+        gridApi: this.gridApi,
         onNewAttribute: (name: string) => {
           if (this.props.dataSet) {
             addAttributeToDataSet(this.props.dataSet, { name });
@@ -86,6 +88,16 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         onNewCase: () => {
           if (this.props.dataSet) {
             addCasesToDataSet(this.props.dataSet, [{}]);
+          }
+        },
+        onRemoveAttribute: (id: string) => {
+          if (this.props.dataSet) {
+            this.props.dataSet.removeAttribute(id);
+          }
+        },
+        onRemoveCases: (ids: string[]) => {
+          if (this.props.dataSet) {
+            this.props.dataSet.removeCases(ids);
           }
         },
         onSampleData: this.props.onSampleData
@@ -226,6 +238,12 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
+  handleRowSelectionChanged = () => {
+    if (this.gridApi) {
+      this.gridApi.refreshHeader();
+    }
+  }
+
   componentWillReceiveProps(nextProps: ICaseTableProps) {
     const { dataSet } = nextProps;
     if (dataSet !== this.props.dataSet) {
@@ -249,6 +267,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           debug={false}
           rowSelection={this.state.rowSelection}
           rowDeselection={true}
+          onSelectionChanged={this.handleRowSelectionChanged}
           rowModelType={this.state.rowModelType}
           rowData={this.gridRowData}
           deltaRowDataMode={false}
