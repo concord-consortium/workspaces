@@ -1,6 +1,7 @@
 import * as React from "react"
 import * as firebase from "firebase"
 import * as queryString from "query-string"
+import * as superagent from "superagent"
 
 import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap, FirebaseDocument } from "../lib/document"
 import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap } from "../lib/window"
@@ -417,6 +418,40 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.location.href = `?${queryString.stringify(newParams)}`
   }
 
+  handleCreateActivityButton = () => {
+    const {documentInfo} = this.state
+    const {portalTokens, firebaseUser, document} = this.props
+    if (documentInfo && documentInfo.portalUrl && portalTokens && firebaseUser) {
+      const apiUrl = `${documentInfo.portalUrl}api/v1/external_activities/create_collabspace_activity`
+      const templateId = Document.StringifyTemplateHashParam(firebaseUser.uid, document.id)
+      const templateUrl = `${window.location.origin}${window.location.pathname}?template=${templateId}`
+      superagent
+        .get(apiUrl)
+        .query({name: documentInfo.name, url: templateUrl})
+        .set("Authorization", `Bearer/JWT ${portalTokens.rawPortalJWT}`)
+        .end((err, res) => {
+          if (err) {
+            alert((res.body ? res.body.message : null) || err)
+          }
+          else if (!res.body || !res.body.edit_url) {
+            alert("No edit url found in create activity response")
+          }
+          else {
+            documentInfo.portalEditUrl = res.body.edit_url
+            this.infoRef.set(documentInfo)
+            setTimeout(() => alert("The portal activity was created"), 10)
+          }
+        })
+    }
+  }
+
+  handleEditActivityButton = () => {
+    const {documentInfo} = this.state
+    if (documentInfo && documentInfo.portalEditUrl) {
+      window.location.href = documentInfo.portalEditUrl
+    }
+  }
+
   renderDocumentInfo() {
     const {documentInfo} = this.state
     if (!documentInfo) {
@@ -502,6 +537,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   renderToolbarButtons() {
     const {document} = this.props
+    const {documentInfo} = this.state
+    const showCreateActivityButton = documentInfo && documentInfo.portalUrl && !documentInfo.portalEditUrl
+    const editActivityUrl = documentInfo && documentInfo.portalEditUrl
     const showDemoButton = this.props.isTemplate && !document.isReadonly
     const showPublishButton = !this.props.isTemplate && !document.isReadonly
     return (
@@ -512,6 +550,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           <button type="button" onClick={this.handleAddCaseTableAndGraph}>Add Table &amp; Graph</button>
           </div>
         <div className="right-buttons">
+          {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
+          {editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}>Publish</button> : null}
         </div>

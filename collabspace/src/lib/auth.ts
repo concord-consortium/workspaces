@@ -77,7 +77,7 @@ export interface PortalUserConnectionStatusMap {
   [key: string]: PortalUserConnectionStatus
 }
 
-export type PortalUser = TeacherUser | StudentUser
+export type PortalUser = TeacherUser | StudentUser | User
 export interface PortalUserMap {
   [key: string]: PortalUser|null
 }
@@ -93,6 +93,15 @@ export interface TeacherUser {
 
 export interface StudentUser {
   type: "student"
+  id: string
+  firstName: string
+  lastName: string
+  fullName: string
+  initials: string
+}
+
+export interface User {
+  type: "user"
   id: string
   firstName: string
   lastName: string
@@ -163,7 +172,7 @@ export interface PortalFirebaseTeacherJWT extends BasePortalFirebaseJWT {
 
 export type PortalFirebaseJWT = PortalFirebaseStudentJWT | PortalFirebaseTeacherJWT
 
-export type PortalJWT = PortalStudentJWT | PortalTeacherJWT
+export type PortalJWT = PortalStudentJWT | PortalTeacherJWT | PortalUserJWT
 
 export interface BasePortalJWT {
   alg: string
@@ -186,6 +195,14 @@ export interface PortalTeacherJWT extends BasePortalJWT {
   user_type: "teacher"
   user_id: string
   teacher_id: number
+}
+
+export interface PortalUserJWT extends BasePortalJWT {
+  domain: string
+  user_type: "user"
+  user_id: string
+  first_name: string
+  last_name: string
 }
 
 export const getErrorMessage = (err: any, res:superagent.Response) => {
@@ -302,8 +319,42 @@ export const getClassInfo = (classInfoUrl:string, rawPortalJWT:string) => {
 
 export const collabSpaceAuth = () => {
   return new Promise<PortalInfo>((resolve, reject) => {
-    const params:AuthQueryParams = queryString.parse(window.location.search)
-    const {token, domain} = params
+    const queryParams:AuthQueryParams = queryString.parse(window.location.search)
+    const {jwtToken, token, domain} = queryParams
+
+    if (jwtToken) {
+      const decodedJWT:any = jwt.decode(jwtToken)
+      if (decodedJWT) {
+        const portalUserJWT:PortalUserJWT = decodedJWT
+        const {domain, user_id, user_type, first_name, last_name} = portalUserJWT
+        if (user_type === "user") {
+          getFirebaseJWTWithBearerToken(domain, "Bearer/JWT", jwtToken, queryParams.demo)
+            .then(([rawFirebaseJWT, firebaseJWT]) => {
+              const fullName = `${first_name} ${last_name}`
+              const user:User = {
+                type: "user",
+                id: user_id,
+                firstName: first_name,
+                lastName: last_name,
+                fullName,
+                initials: initials(fullName)
+              }
+              resolve({
+                user: user,
+                offering: null,
+                tokens: {
+                  domain,
+                  rawPortalJWT: jwtToken,
+                  portalJWT: portalUserJWT,
+                  rawFirebaseJWT,
+                  firebaseJWT
+                }
+              })
+            })
+          return
+        }
+      }
+    }
 
     // no token means not launched from portal so there is no portal user
     if (!token) {
@@ -318,14 +369,14 @@ export const collabSpaceAuth = () => {
       return reject("Missing domain query parameter (required when token parameter is present)")
     }
 
-    return getPortalJWTWithBearerToken(domain, "Bearer", token, params.demo)
+    return getPortalJWTWithBearerToken(domain, "Bearer", token, queryParams.demo)
       .then(([rawPortalJWT, portalJWT]) => {
         if (portalJWT.user_type !== "learner") {
           return reject("Non-student login to the CollabSpace is not allowed")
         }
         const portalStudentJWT:PortalStudentJWT = portalJWT
 
-        return getFirebaseJWTWithBearerToken(domain, "Bearer", token, params.demo)
+        return getFirebaseJWTWithBearerToken(domain, "Bearer", token, queryParams.demo)
           .then(([rawFirebaseJWT, firebaseJWT]) => {
             const classInfoUrl = portalStudentJWT.class_info_url
 
@@ -451,7 +502,7 @@ export const dashboardAuth = () => {
           getClassInfo(finalClassInfoUrl, jwtToken)
             .then((classInfo) => {
               const userLookup = new UserLookup(classInfo)
-              const user = userLookup.lookup(portalJWT.user_id)
+              const user = portalJWT.user_type !== "user" ? userLookup.lookup(portalJWT.user_id) : null
               if (!user) {
                 return reject("Current user not found in class roster")
               }

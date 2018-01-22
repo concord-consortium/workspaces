@@ -12,6 +12,8 @@ export interface FirebaseDocumentInfo {
   ownerId: string
   createdAt: number|Object
   name: string
+  portalUrl?: string
+  portalEditUrl?: string
 }
 
 export interface FirebaseDocument {
@@ -95,14 +97,15 @@ export class Document {
   destroy() {
   }
 
-  static CreateTemplateInFirebase(ownerId:string, documentId:string): Promise<Document> {
+  static CreateTemplateInFirebase(ownerId:string, documentId:string, portalUrl?:string): Promise<Document> {
     return new Promise<Document>((resolve, reject) => {
       const firebaseDocument:FirebaseDocument = {
         info: {
           version: "1.0.0",
           ownerId,
           createdAt: firebase.database.ServerValue.TIMESTAMP,
-          name: "Untitled"
+          name: "Untitled",
+          portalUrl
         }
       }
       const firebasePath = getUserTemplatePath(ownerId, documentId)
