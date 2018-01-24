@@ -2,10 +2,11 @@ import * as React from "react"
 import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth} from "../../../shared/workspace-client"
 import * as firebase from "firebase"
 import * as _ from "lodash"
+import * as queryString from "query-string"
 
 declare const DrawingTool:any
 
-export class FirebaseStorage {
+export class FirebaseStateStorage {
   dataRef: firebase.database.Reference
   readonly: boolean
   loadFunction: Function|null
@@ -30,6 +31,37 @@ export class FirebaseStorage {
 
   setLoadFunction(loadFunction: Function) {
     this.loadFunction = loadFunction
+  }
+}
+
+export class FirebaseStreamingStorage {
+  dataRef: firebase.database.Reference
+  readonly: boolean
+  respondToEventFunction: Function|null
+
+  constructor (dataRef: firebase.database.Reference, readonly: boolean) {
+    this.dataRef = dataRef
+    this.readonly = readonly
+
+    dataRef.on("child_added", (snapshot:firebase.database.DataSnapshot) => {
+      if (this.respondToEventFunction) {
+        const val = snapshot.val()
+        this.respondToEventFunction(val.event, val.data)
+      }
+    })
+  }
+
+  saveStreamEvent(event: string, data:any) {
+    if (!this.readonly) {
+      this.dataRef.push({
+        event: event,
+        data: data.toObject()
+      })
+    }
+  }
+
+  setRespondToEventFunction(respondToEventFunction: Function) {
+    this.respondToEventFunction = respondToEventFunction
   }
 }
 
@@ -67,10 +99,15 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
     this.handleResize()
     window.addEventListener("resize", this.handleDebounceResize, false)
 
+    var params = queryString.parse(window.location.hash)
+    var streaming = !!params.streaming
+
     this.WorkspaceClient = new WorkspaceClient({
       init: (req) => {
         this.setState({readonly: req.readonly})
-        const firebaseStorage = new FirebaseStorage(this.WorkspaceClient.dataRef, req.readonly)
+        const firebaseStorage = streaming
+          ? new FirebaseStreamingStorage(this.WorkspaceClient.dataRef, req.readonly)
+          : new FirebaseStateStorage(this.WorkspaceClient.dataRef, req.readonly)
         this.drawingTool.addStore(firebaseStorage)
         return {}
       },

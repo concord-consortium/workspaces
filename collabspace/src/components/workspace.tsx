@@ -266,7 +266,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   handleAddDrawingButton = () => {
     const title = (prompt("Enter the title of the drawing", "Untitled Drawing") || "").trim()
     if (title.length > 0) {
-      this.windowManager.add(this.constructRelativeUrl("drawing-tool.html"), title)
+      this.windowManager.add(this.constructRelativeUrl("drawing-tool.html#streaming=1"), title)
     }
   }
 
