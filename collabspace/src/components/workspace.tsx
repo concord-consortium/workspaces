@@ -263,7 +263,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   constructRelativeUrl(filename:string) {
     const {location} = window
-    return `${location.origin}${location.pathname}${filename}`
+    return `${location.origin}${location.pathname.replace("index.html", "")}${filename}`
   }
 
   handleAddDrawingButton = () => {
