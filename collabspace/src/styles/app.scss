@@ -679,6 +679,110 @@ a {
         }
       }
     }
+
+    $upload-image-dialog-height: 300px;
+    $upload-image-dialog-width: 700px;
+    $upload-image-dialog-margin: 20px;
+    $upload-image-dialog-placeholder-width: ($upload-image-dialog-width - ($upload-image-dialog-margin * 4)) / 2;
+    $upload-image-dialog-placeholder-height: $upload-image-dialog-height - ($upload-image-dialog-margin * 2);
+    $upload-image-dialog-form-width: $upload-image-dialog-placeholder-width;
+
+    .upload-image {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+
+      .upload-image-background {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        background-color: #000;
+        opacity: 0.5;
+      }
+
+      .upload-image-form {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        .upload-image-dialog {
+          width: $upload-image-dialog-width;
+          height: $upload-image-dialog-height + $titlebar-height;
+          background-color: #fff;
+          border: 1px solid #000;
+
+          .upload-image-dialog-titlebar {
+            height: $titlebar-height;
+            background-color: #3E90AC;
+            color: #fff;
+
+            .upload-image-dialog-titlebar-title {
+              display: inline-block;
+              margin: 3px 0 0 6px;
+              font-size: 12px;
+            }
+          }
+
+          .upload-image-dialog-placeholder {
+            float: left;
+            margin: 20px;
+            background-color: #bbb;
+            width: $upload-image-dialog-placeholder-width;
+            height: $upload-image-dialog-placeholder-height;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            &.uploaded {
+              background-color: #fff;
+            }
+
+            img {
+              max-width: $upload-image-dialog-placeholder-width;
+              max-height: $upload-image-dialog-placeholder-height;
+            }
+          }
+
+          .upload-image-dialog-form {
+            font-size: 14px;
+            float: right;
+            margin: $upload-image-dialog-margin;
+            width: $upload-image-dialog-form-width;
+
+            input {
+              font-size: 14px;
+              width: $upload-image-dialog-form-width;
+            }
+
+            div {
+              margin: 20px 0;
+            }
+
+            label {
+              display: block;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+
+            button {
+              border: 1px solid #313131;
+              padding: 3px 8px;
+              font-size: 14px;
+              margin-right: 10px;
+            }
+          }
+        }
+      }
+    }
   }
 
   .demo {

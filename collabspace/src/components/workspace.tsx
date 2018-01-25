@@ -16,6 +16,7 @@ import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
+import { UploadImageDialogComponent } from "./upload-image-dialog"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
@@ -40,6 +41,7 @@ export interface WorkspaceComponentState extends WindowManagerState {
   groupUsers: PortalUserConnectionStatusMap|null
   viewArtifact: FirebaseArtifact|null
   publishing: boolean
+  showUploadImageDialog: boolean
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -67,7 +69,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       debugInfo: portalOffering ? `Class ID: ${portalOffering.classInfo.classHash}` : "",
       groupUsers: null,
       viewArtifact: null,
-      publishing: false
+      publishing: false,
+      showUploadImageDialog: false
     }
   }
 
@@ -268,6 +271,19 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     if (title.length > 0) {
       this.windowManager.add(this.constructRelativeUrl("drawing-tool.html#streaming=1"), title)
     }
+  }
+
+  handleUploadImageButton = () => {
+    this.setState({showUploadImageDialog: true});
+  }
+
+  handleHideUploadImageDialog = () => {
+    this.setState({showUploadImageDialog: false});
+  }
+
+  handleAddUploadedImage = (title: string, imageUrl:string) => {
+    this.setState({showUploadImageDialog: false});
+    this.windowManager.add(this.constructRelativeUrl(`drawing-tool.html#streaming=1&backgroundUrl=${encodeURIComponent(imageUrl)}`), title)
   }
 
   handleAddCaseTable = () => {
@@ -508,6 +524,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="buttons">
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
+          <button type="button" onClick={this.handleUploadImageButton}>Upload Image</button>
           <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
           <button type="button" onClick={this.handleAddCaseTableAndGraph}>Add Table &amp; Graph</button>
           </div>
@@ -593,6 +610,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
            />
   }
 
+  renderUploadImageDialog() {
+    if (!this.state.showUploadImageDialog) {
+      return null
+    }
+    return <UploadImageDialogComponent offering={this.props.portalOffering} onAddUploadedImage={this.handleAddUploadedImage} onCancelUploadedImage={this.handleHideUploadImageDialog} />
+  }
+
   renderArtifact() {
     if (!this.state.viewArtifact) {
       return null
@@ -617,6 +641,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderWindowArea()}
         {this.renderSidebarComponent()}
         {this.renderArtifact()}
+        {this.renderUploadImageDialog()}
         {this.renderReadonlyBlocker()}
       </div>
     )

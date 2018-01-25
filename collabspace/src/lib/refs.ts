@@ -75,3 +75,8 @@ export const getArtifactsRef = (offering:PortalOffering, artifactId?:string) => 
 export const getArtifactsStoragePath = (offering:PortalOffering, publicationId:string) => {
   return `artifacts/${getOfferingPath(offering)}/publications/${publicationId}`
 }
+
+export const getUploadsStoragePath = (offering:PortalOffering|null, uploadId?:string) => {
+  const prefix = offering ? `${getClassPath(offering)}/uploads` : 'uploads'
+  return uploadId ? `${prefix}/${uploadId}` : prefix
+}

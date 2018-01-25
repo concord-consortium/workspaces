@@ -11,41 +11,41 @@
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
-/******/
+
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
-/******/
+
 /******/ 		// Check if module is in cache
 /******/ 		if(installedModules[moduleId])
 /******/ 			return installedModules[moduleId].exports;
-/******/
+
 /******/ 		// Create a new module (and put it into the cache)
 /******/ 		var module = installedModules[moduleId] = {
 /******/ 			i: moduleId,
 /******/ 			l: false,
 /******/ 			exports: {}
 /******/ 		};
-/******/
+
 /******/ 		// Execute the module function
 /******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-/******/
+
 /******/ 		// Flag the module as loaded
 /******/ 		module.l = true;
-/******/
+
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
-/******/
-/******/
+
+
 /******/ 	// expose the modules object (__webpack_modules__)
 /******/ 	__webpack_require__.m = modules;
-/******/
+
 /******/ 	// expose the module cache
 /******/ 	__webpack_require__.c = installedModules;
-/******/
+
 /******/ 	// identity function for calling harmony imports with the correct context
 /******/ 	__webpack_require__.i = function(value) { return value; };
-/******/
+
 /******/ 	// define getter function for harmony exports
 /******/ 	__webpack_require__.d = function(exports, name, getter) {
 /******/ 		if(!__webpack_require__.o(exports, name)) {
@@ -56,7 +56,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 			});
 /******/ 		}
 /******/ 	};
-/******/
+
 /******/ 	// getDefaultExport function for compatibility with non-harmony modules
 /******/ 	__webpack_require__.n = function(module) {
 /******/ 		var getter = module && module.__esModule ?
@@ -65,13 +65,13 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 		__webpack_require__.d(getter, 'a', getter);
 /******/ 		return getter;
 /******/ 	};
-/******/
+
 /******/ 	// Object.prototype.hasOwnProperty.call
 /******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
-/******/
+
 /******/ 	// __webpack_public_path__
 /******/ 	__webpack_require__.p = "";
-/******/
+
 /******/ 	// Load entry module and return exports
 /******/ 	return __webpack_require__(__webpack_require__.s = 39);
 /******/ })
@@ -866,6 +866,7 @@ LineTool.prototype.mouseUp = function (e) {
   LineTool.super.mouseUp.call(this, e);
   this._processNewShape(this.curr);
   this.canvas.renderAll();
+  this.canvas.trigger('object:modified', {target: this.curr});
   this.actionComplete(this.curr);
   this.curr = undefined;
   this.master.pushToHistory();
@@ -913,6 +914,8 @@ var multitouchSupport = __webpack_require__(13);
 
 __webpack_require__(36);
 
+var UNDO_REDO_DISABLED = true;
+
 var DEF_OPTIONS = {
   width: 800,
   height: 600,
@@ -945,7 +948,15 @@ var EVENTS = {
   UNDO_POSSIBLE:   'undo:possible',
   UNDO_IMPOSSIBLE: 'undo:impossible',
   REDO_POSSIBLE:   'redo:possible',
-  REDO_IMPOSSIBLE: 'redo:impossible'
+  REDO_IMPOSSIBLE: 'redo:impossible',
+
+  // events used to stream changes
+  OBJECT_ADDED: 'object:added',
+  OBJECT_MODIFIED: 'object:modified',
+  TEXT_CHANGED: 'text:changed',
+  OBJECT_REMOVED: 'object:removed',
+  OBJECT_TO_FRONT: 'object:bringToFront',
+  OBJECT_TO_BACK: 'object:sendToBack'
 };
 
 // Note that some object properties aren't serialized by default by FabricJS.
@@ -981,8 +992,9 @@ function DrawingTool(selector, options, settings) {
   this._initStores();
   this._initTools();
   this._initStateHistory();
+  this._initStreamEventWatcher();
 
-  new UIManager(this);
+  new UIManager(this, UNDO_REDO_DISABLED);
 
   // Apply a fix that changes native FabricJS rescaling behavior into resizing.
   rescale2resize(this.canvas);
@@ -1103,7 +1115,7 @@ DrawingTool.prototype.load = function (jsonOrObject, callback, noHistoryUpdate) 
   else {
     state = jsonOrObject;
   }
-  
+
   state = convertState(state);
 
   // Process Drawing Tool specific options.
@@ -1309,7 +1321,8 @@ DrawingTool.prototype._setObjectProp = function (object, type, value) {
   object.set(type, value);
 };
 
-DrawingTool.prototype._sendSelectionTo = function (where) {
+DrawingTool.prototype._sendSelectionTo = function (where, skipDispatch) {
+  var self = this;
   if (this.canvas.getActiveObject()) {
     // Simple case, only a single object is selected.
     send(this.canvas.getActiveObject());
@@ -1331,6 +1344,9 @@ DrawingTool.prototype._sendSelectionTo = function (where) {
     }
     if (where === 'front') {
       obj.bringToFront();
+      if (!skipDispatch) {
+        self._dispatch.emit(EVENTS.OBJECT_TO_FRONT, obj);
+      }
       // Make sure that custom control point are send to front AFTER shape itself.
       if (obj._dt_controlPoints) {
         obj._dt_controlPoints.forEach(function (cp) {
@@ -1345,6 +1361,9 @@ DrawingTool.prototype._sendSelectionTo = function (where) {
         });
       }
       obj.sendToBack();
+      if (!skipDispatch) {
+        self._dispatch.emit(EVENTS.OBJECT_TO_BACK, obj);
+      }
     }
   }
 };
@@ -1638,7 +1657,7 @@ DrawingTool.prototype._setDimensions = function (width, height) {
 };
 
 DrawingTool.prototype._initStateHistory = function () {
-  this._history = new UndoRedo(this);
+  this._history = new UndoRedo(this, UNDO_REDO_DISABLED);
   this.canvas.on('object:modified', function () {
     this.pushToHistory();
   }.bind(this));
@@ -1650,10 +1669,20 @@ DrawingTool.prototype._initStores = function() {
 
 DrawingTool.prototype.addStore = function(storeImp) {
   var loadFunction = this.load.bind(this);
+  var respondToEventFunction = this.respondToEvent.bind(this);
   var stores = this.stores;
   if(stores.indexOf(storeImp) == -1) {
-    storeImp.setLoadFunction(loadFunction);
-    this.stores.push(storeImp);
+    if (typeof storeImp.setLoadFunction === 'function') {
+      storeImp.setLoadFunction(loadFunction);
+      this.stores.push(storeImp);
+    }
+    else if (typeof storeImp.setRespondToEventFunction === 'function') {
+      storeImp.setRespondToEventFunction(respondToEventFunction);
+      this.stores.push(storeImp);
+    }
+    else {
+      console.error('store does not implement required `setLoadFunction(loadFunction)` or `setRespondToEventFunction(respondToEventFunction)`');
+    }
   }
 };
 
@@ -1662,19 +1691,170 @@ DrawingTool.prototype.notifySave = function(serializedJson) {
   var stores = this.stores || [];
   for(var i=0; i < stores.length; i++) {
     store = stores[i];
-    if(typeof store.save === 'function'){
-      try {
-        store.save(serializedJson);
+    if(typeof store.setLoadFunction === 'function') {
+      if(typeof store.save === 'function'){
+        try {
+          store.save(serializedJson);
+        }
+        catch (problem) {
+          console.error('unable to call `save(serializedJson)` on store');
+          console.error(problem);
+        }
       }
-      catch (problem) {
-        console.error('unable to call `save(serializedJson)` on store');
-        console.error(problem);
+      else {
+        console.error('store does not implement required `save(serializedJson)` function!');
       }
-    }
-    else {
-      console.error('store does not implement required `save(serializedJson)` function!');
     }
   }
+};
+
+DrawingTool.prototype.notifyStreamEvent = function (event, data) {
+  var store = null;
+  var stores = this.stores || [];
+  for(var i=0; i < stores.length; i++) {
+    store = stores[i];
+    if(typeof store.setRespondToEventFunction === 'function') {
+      if(typeof store.saveStreamEvent === 'function'){
+        try {
+          store.saveStreamEvent(event, data);
+        }
+        catch (problem) {
+          console.error('unable to call `saveStreamEvent(event, data)` on store');
+          console.error(problem);
+        }
+      }
+      else {
+        console.error('store does not implement required `saveStreamEvent(event, data)` function!');
+      }
+    }
+  }
+};
+
+DrawingTool.prototype.respondToEvent = function (event, data) {
+  var fabricObject;
+
+  if (data.clientId === this.clientId) {
+    return;
+  }
+  console.log("remote event", event, data.uuid, data.clientId, this.clientId);
+
+  // note: this should be the same list of events in _initStreamEventWatcher (with the exception of TEXT_CHANGED which is changed to OBJECT_MODIFIED)
+  switch (event) {
+    case EVENTS.OBJECT_ADDED:
+      if(data.type === 'group') {
+        data.objects = data.__objects;
+        //delete data.fill;
+      }
+      fabric.util.enlivenObjects([data], function(fabricObjects) {
+        fabricObjects.forEach(function(fabricObject) {
+          // Prevent infinite loop, because this triggers canvas object:added, which in turn calls this function.
+          fabricObject.remote = true;
+          this.canvas.add(fabricObject);
+          delete fabricObject.remote;
+          this.canvas.renderAll();
+        }.bind(this));
+      }.bind(this));
+      break;
+
+    case EVENTS.OBJECT_MODIFIED:
+      if (data.type === 'group') {
+        //delete data.fill;
+        //delete data.stroke;
+      }
+
+      fabricObject = this.canvas.getObjectByUUID(data.uuid);
+      if (fabricObject) {
+        fabricObject.set(data);
+        this.canvas.renderAll();
+      }
+      break;
+
+    case EVENTS.OBJECT_REMOVED:
+      fabricObject = this.canvas.getObjectByUUID(data.uuid);
+      if (fabricObject) {
+        this.canvas.remove(fabricObject);
+      }
+      break;
+
+    case EVENTS.OBJECT_TO_FRONT:
+    case EVENTS.OBJECT_TO_BACK:
+      fabricObject = this.canvas.getObjectByUUID(data.uuid);
+      var currentSelection = this.getSelection();
+      this.select(fabricObject);
+      this._sendSelectionTo(event === EVENTS.OBJECT_TO_FRONT ? 'front' : 'back', true);
+      this.select(currentSelection);
+      break;
+  }
+};
+
+DrawingTool.prototype._initStreamEventWatcher = function () {
+  var self = this,
+      processEvent = function (event, data) {
+        data.clientId = self.clientId;
+        console.log("local event", event, data.uuid, data.clientId);
+        self.notifyStreamEvent(event, data);
+      },
+      watchCanvas = function (event, substituteEvent) {
+        self.canvas.on(event, function (e) {
+          if (!e.target.remote) {
+            processEvent(substituteEvent || event, e.target);
+          }
+        });
+      },
+      watchDrawTool = function (event) {
+        self.on(event, function (data) {
+          processEvent(event, data);
+        });
+      };
+
+  // create a local client id so we can ignore events from ourselves
+  this.clientId = this._uuidGen();
+
+  // listen to canvas events
+  watchCanvas(EVENTS.OBJECT_ADDED);
+  watchCanvas(EVENTS.OBJECT_MODIFIED);
+  watchCanvas(EVENTS.TEXT_CHANGED, EVENTS.OBJECT_MODIFIED);
+  watchCanvas(EVENTS.OBJECT_REMOVED);
+
+  // listen to drawing tool events
+  watchDrawTool(EVENTS.OBJECT_TO_FRONT);
+  watchDrawTool(EVENTS.OBJECT_TO_BACK);
+
+  // add uuids to fabric
+  fabric.Object.prototype.setOptions = (function(setOptions) {
+    return function(options) {
+      setOptions.apply(this, [options]);
+      this.uuid = this.uuid || self._uuidGen();
+      this.clientId = self.clientId;
+    };
+  })(fabric.Object.prototype.setOptions);
+
+  fabric.Object.prototype.toObject = (function(toObject) {
+    return function(propertiesToInclude) {
+      propertiesToInclude = (propertiesToInclude || []).concat(['uuid', 'clientId']);
+      return toObject.apply(this, [propertiesToInclude]);
+    };
+  })(fabric.Object.prototype.toObject);
+
+  fabric.Canvas.prototype.getObjectByUUID = function(uuid) {
+    var object = null;
+    var objects = this.getObjects();
+
+    for (var i = 0, len = this.size(); i < len; i++) {
+      if (objects[i].uuid && objects[i].uuid === uuid) {
+        object = objects[i];
+        break;
+      }
+    }
+    return object;
+  };
+};
+
+DrawingTool.prototype._uuidGen = function() {
+  return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 };
 
 module.exports = DrawingTool;
@@ -2485,6 +2665,7 @@ BasicShapeTool.prototype.mouseUp = function (e) {
   BasicShapeTool.super.mouseUp.call(this, e);
   this._processNewShape(this.curr);
   this.canvas.renderAll();
+  this.canvas.trigger('object:modified', {target: this.curr});
   this.actionComplete(this.curr);
   this.curr = undefined;
   this.master.pushToHistory();
@@ -2582,7 +2763,6 @@ module.exports = FreeDrawTool;
 /* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* globals require */
 var fabric    = __webpack_require__(2);
 var inherit   = __webpack_require__(0);
 var ShapeTool = __webpack_require__(4);
@@ -2622,7 +2802,8 @@ StampTool.prototype.mouseDown = function (e) {
       scaleY: 0,
       originX: 'center',
       originY: 'center',
-      selectable: false
+      selectable: false,
+      uuid: this.master._uuidGen()
     });
     this._curr = clonedStamp;
     this.canvas.add(this._curr);
@@ -2664,6 +2845,7 @@ StampTool.prototype.mouseUp = function (e) {
   if (!this._curr) return;
   this._processNewShape(this._curr);
   this.canvas.renderAll();
+  this.canvas.trigger('object:modified', {target: this._curr});
   this.actionComplete(this._curr);
   this._curr = undefined;
   this.master.pushToHistory();
@@ -2713,7 +2895,7 @@ StampTool.prototype._loadNonSVGImage = function (url, callback) {
       crossOrigin: img.crossOrigin
     });
     fabricObj._dt_sourceURL = url;
-    callback(fabricObj, img)
+    callback(fabricObj, img);
   }, null, 'anonymous');
 };
 
@@ -3664,8 +3846,9 @@ var Palette        = __webpack_require__(26);
 var generateStamps = __webpack_require__(24);
 var uiDefinition   = __webpack_require__(29);
 
-function UIManager(drawingTool) {
+function UIManager(drawingTool, undoRedoDisabled) {
   this.drawingTool = drawingTool;
+  this.undoRedoDisabled = undoRedoDisabled;
 
   this.$tools = $('<div>')
     .addClass('dt-tools')
@@ -3723,6 +3906,9 @@ UIManager.prototype._createPalette = function (paletteOptions) {
 };
 
 UIManager.prototype._createButton = function (buttonOptions) {
+  if (this.undoRedoDisabled && ((buttonOptions.name === 'undo') || buttonOptions.name === 'redo')) {
+    return;
+  }
   var BtnClass = buttonOptions.buttonClass || BasicButton;
   var button = new BtnClass(buttonOptions, this, this.drawingTool);
   var buttonName = button.name || getUniqueName();
@@ -3756,24 +3942,30 @@ module.exports = UIManager;
 
 var MAX_HISTORY_LENGTH = 20;
 
-function UndoRedo(drawTool) {
+function UndoRedo(drawTool, disabled) {
   this.dt = drawTool;
   this._suppressHistoryUpdate = false;
+  this.disabled = !!disabled;
 
   this.reset();
 
-  this.dt.$element.on('keydown', function (e) {
-    if (e.keyCode === 90 /* Z */ && (e.ctrlKey || e.metaKey)) {
-      this.undo();
-      e.preventDefault();
-    } else if (e.keyCode === 89 /* V */ && (e.ctrlKey || e.metaKey)) {
-      this.redo();
-      e.preventDefault();
-    }
-  }.bind(this));
+  if (!disabled) {
+    this.dt.$element.on('keydown', function (e) {
+      if (e.keyCode === 90 /* Z */ && (e.ctrlKey || e.metaKey)) {
+        this.undo();
+        e.preventDefault();
+      } else if (e.keyCode === 89 /* V */ && (e.ctrlKey || e.metaKey)) {
+        this.redo();
+        e.preventDefault();
+      }
+    }.bind(this));
+  }
 }
 
 UndoRedo.prototype.undo = function () {
+  if (this.disabled) {
+    return;
+  }
   var prevState = this._storage[this._idx - 1];
   if (!prevState) {
     return;
@@ -3783,6 +3975,9 @@ UndoRedo.prototype.undo = function () {
 };
 
 UndoRedo.prototype.redo = function () {
+  if (this.disabled) {
+    return;
+  }
   var nextState = this._storage[this._idx + 1];
   if (!nextState) {
     return;
@@ -3821,6 +4016,9 @@ UndoRedo.prototype._lastState = function () {
 };
 
 UndoRedo.prototype._load = function (state) {
+  if (this.disabled) {
+    return;
+  }
   // Note that #load is a normal action that updates history. However when
   // a state is restored from the history, it's definitely unwanted.
   this.dt.load(state, null, true);
@@ -4789,4 +4987,3 @@ module.exports = DrawingTool;
 /***/ })
 /******/ ]);
 });
-//# sourceMappingURL=drawing-tool.js.map

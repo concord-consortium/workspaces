@@ -6,6 +6,11 @@ import * as queryString from "query-string"
 
 declare const DrawingTool:any
 
+export interface DrawingToolQueryParams {
+  streaming?: string
+  backgroundUrl?: string
+}
+
 export class FirebaseStateStorage {
   dataRef: firebase.database.Reference
   readonly: boolean
@@ -99,8 +104,12 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
     this.handleResize()
     window.addEventListener("resize", this.handleDebounceResize, false)
 
-    var params = queryString.parse(window.location.hash)
+    var params:DrawingToolQueryParams = queryString.parse(window.location.hash)
     var streaming = !!params.streaming
+
+    if (params.backgroundUrl) {
+      this.drawingTool.setBackgroundImage(params.backgroundUrl, "resizeCanvasToBackground")
+    }
 
     this.WorkspaceClient = new WorkspaceClient({
       init: (req) => {
