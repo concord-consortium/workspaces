@@ -395,7 +395,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     let newParams:AuthQueryParams = {}
     if (portalJWT.user_type === "learner") {
       newParams = {
-        jwtToken: rawPortalJWT
+        portalJWT: rawPortalJWT
       }
     }
     else {
@@ -405,7 +405,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         return
       }
       newParams = {
-        jwtToken: rawPortalJWT,
+        portalJWT: rawPortalJWT,
         classInfoUrl,
         offeringId
       }
@@ -422,12 +422,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const {documentInfo} = this.state
     const {portalTokens, firebaseUser, document} = this.props
     if (documentInfo && documentInfo.portalUrl && portalTokens && firebaseUser) {
-      const apiUrl = `${documentInfo.portalUrl}api/v1/external_activities/create_collabspace_activity`
+      const apiUrl = `${documentInfo.portalUrl}api/v1/external_activities/create`
       const templateId = Document.StringifyTemplateHashParam(firebaseUser.uid, document.id)
-      const templateUrl = `${window.location.origin}${window.location.pathname}?template=${templateId}`
+      const templateUrl = `${window.location.origin}${window.location.pathname}#template=${templateId}`
       superagent
         .get(apiUrl)
-        .query({name: documentInfo.name, url: templateUrl})
+        .query({name: documentInfo.name, url: templateUrl, append_auth_token: 1})
         .set("Authorization", `Bearer/JWT ${portalTokens.rawPortalJWT}`)
         .end((err, res) => {
           if (err) {
@@ -538,7 +538,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   renderToolbarButtons() {
     const {document} = this.props
     const {documentInfo} = this.state
-    const showCreateActivityButton = documentInfo && documentInfo.portalUrl && !documentInfo.portalEditUrl
+    const showCreateActivityButton = documentInfo && documentInfo.portalUrl && !documentInfo.portalEditUrl && !document.isReadonly
+    const showEditActivityButton = documentInfo && documentInfo.portalUrl && documentInfo.portalEditUrl && !document.isReadonly && this.props.isTemplate
     const editActivityUrl = documentInfo && documentInfo.portalEditUrl
     const showDemoButton = this.props.isTemplate && !document.isReadonly
     const showPublishButton = !this.props.isTemplate && !document.isReadonly
@@ -551,7 +552,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           </div>
         <div className="right-buttons">
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
-          {editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
+          {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}>Publish</button> : null}
         </div>

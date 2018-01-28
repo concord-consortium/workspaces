@@ -13,7 +13,8 @@ export interface AuthQueryParams {
   token?: string
   domain?: string
   domain_uid?: string
-  jwtToken?: string
+  portalJWT?: string
+  //jwtToken?: string
   document?: string
   publication?: string
   offering?: string
@@ -320,15 +321,15 @@ export const getClassInfo = (classInfoUrl:string, rawPortalJWT:string) => {
 export const collabSpaceAuth = () => {
   return new Promise<PortalInfo>((resolve, reject) => {
     const queryParams:AuthQueryParams = queryString.parse(window.location.search)
-    const {jwtToken, token, domain} = queryParams
+    const {token, domain, portalJWT} = queryParams
 
-    if (jwtToken) {
-      const decodedJWT:any = jwt.decode(jwtToken)
+    if (portalJWT) {
+      const decodedJWT:any = jwt.decode(portalJWT)
       if (decodedJWT) {
         const portalUserJWT:PortalUserJWT = decodedJWT
         const {domain, user_id, user_type, first_name, last_name} = portalUserJWT
         if (user_type === "user") {
-          getFirebaseJWTWithBearerToken(domain, "Bearer/JWT", jwtToken, queryParams.demo)
+          getFirebaseJWTWithBearerToken(domain, "Bearer/JWT", portalJWT, queryParams.demo)
             .then(([rawFirebaseJWT, firebaseJWT]) => {
               const fullName = `${first_name} ${last_name}`
               const user:User = {
@@ -344,7 +345,7 @@ export const collabSpaceAuth = () => {
                 offering: null,
                 tokens: {
                   domain,
-                  rawPortalJWT: jwtToken,
+                  rawPortalJWT: portalJWT,
                   portalJWT: portalUserJWT,
                   rawFirebaseJWT,
                   firebaseJWT
@@ -469,20 +470,20 @@ export const dashboardAuth = () => {
   return new Promise<PortalInfo>((resolve, reject) => {
 
     const params:AuthQueryParams = queryString.parse(window.location.search)
-    const {jwtToken, offering, token, domain, demo, classInfoUrl} = params
+    const {portalJWT, offering, token, domain, demo, classInfoUrl} = params
 
-    if (jwtToken) {
-      const portalJWT:PortalJWT = jwt.decode(jwtToken) as PortalJWT
-      if (!portalJWT) {
+    if (portalJWT) {
+      const portalToken:PortalJWT = jwt.decode(portalJWT) as PortalJWT
+      if (!portalToken) {
         return reject("Invalid portalJWT param")
       }
 
       let classInfoUrl:string|null = null
       let offeringId:number = 0
 
-      if (portalJWT.user_type === "learner") {
-        classInfoUrl = portalJWT.class_info_url
-        offeringId = portalJWT.offering_id
+      if (portalToken.user_type === "learner") {
+        classInfoUrl = portalToken.class_info_url
+        offeringId = portalToken.offering_id
       }
       else if (params.classInfoUrl && params.offeringId) {
         classInfoUrl = params.classInfoUrl
@@ -496,33 +497,33 @@ export const dashboardAuth = () => {
       // needed to do this to keep typescript from complaining about classInfoUrl usage below
       const finalClassInfoUrl = classInfoUrl
 
-      return getFirebaseJWTWithBearerToken(portalJWT.domain, "Bearer/JWT", jwtToken, params.demo)
+      return getFirebaseJWTWithBearerToken(portalToken.domain, "Bearer/JWT", portalJWT, params.demo)
         .then(([rawFirebaseJWT, firebaseJWT]) => {
 
-          getClassInfo(finalClassInfoUrl, jwtToken)
+          getClassInfo(finalClassInfoUrl, portalJWT)
             .then((classInfo) => {
               const userLookup = new UserLookup(classInfo)
-              const user = portalJWT.user_type !== "user" ? userLookup.lookup(portalJWT.user_id) : null
+              const user = portalToken.user_type !== "user" ? userLookup.lookup(portalToken.user_id) : null
               if (!user) {
                 return reject("Current user not found in class roster")
               }
 
               const domainParser = document.createElement("a")
-              domainParser.href = portalJWT.domain
+              domainParser.href = portalToken.domain
 
               resolve({
                 user: user,
                 offering: {
                   id: offeringId,
-                  domain: isDemo(portalJWT.domain) ? "demo" : domainParser.host,
+                  domain: isDemo(portalToken.domain) ? "demo" : domainParser.host,
                   classInfo: classInfo,
-                  isDemo: isDemo(portalJWT.domain),
+                  isDemo: isDemo(portalToken.domain),
                   classInfoUrl: finalClassInfoUrl
                 },
                 tokens: {
-                  domain: portalJWT.domain,
-                  rawPortalJWT: jwtToken,
-                  portalJWT,
+                  rawPortalJWT: portalJWT,
+                  domain: portalToken.domain,
+                  portalJWT: portalToken,
                   rawFirebaseJWT,
                   firebaseJWT
                 }

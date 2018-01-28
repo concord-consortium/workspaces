@@ -36,7 +36,6 @@ export type HashActionParam = "create-template"
 export interface AppHashParams {
   template: string|null
   demo?: string
-  action?: HashActionParam
 }
 
 export interface AppQueryParams {
@@ -44,6 +43,7 @@ export interface AppQueryParams {
   token?: string|number
   domain?: string
   domain_uid?: string|number
+  portalAction?: string
 }
 
 export class AppComponent extends React.Component<AppComponentProps, AppComponentState> {
@@ -86,6 +86,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
 
         this.handleParseHash()
         window.addEventListener("hashchange", this.handleParseHash)
+
+        this.handleParseQuery();
       })
     })
     .catch((error) => {
@@ -96,6 +98,24 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   handleSetTitle = (documentName?:string|null) => {
     const suffix = documentName ? `: ${documentName}` : ""
     document.title = this.startingTitle + suffix
+  }
+
+  handleParseQuery = () => {
+    const params:AppQueryParams = queryString.parse(window.location.search)
+    if (params.portalAction) {
+      switch (params.portalAction) {
+        case "authoring_launch":
+          const {firebaseUser, portalTokens} = this.state
+          if (firebaseUser && portalTokens) {
+            const {uid} = firebaseUser
+            const documentId = uuidV4()
+            Document.CreateTemplateInFirebase(uid, documentId, portalTokens.domain)
+              .then((document) => window.location.href = `?portalJWT=${portalTokens.rawPortalJWT}#template=${Document.StringifyTemplateHashParam(uid, documentId)}`)
+              .catch((error) => this.setState({actionError: error}))
+          }
+          break
+      }
+    }
   }
 
   handleParseHash = () => {
@@ -127,20 +147,6 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       }
       else {
         this.setState({documentError: "Invalid collaborative space template in url!"})
-      }
-    }
-    else if (params.action) {
-      switch (params.action) {
-        case "create-template":
-          const {firebaseUser, portalTokens} = this.state
-          if (firebaseUser && portalTokens) {
-            const {uid} = firebaseUser
-            const documentId = uuidV4()
-            Document.CreateTemplateInFirebase(uid, documentId, portalTokens.domain)
-              .then((document) => window.location.hash = `template=${Document.StringifyTemplateHashParam(uid, documentId)}`)
-              .catch((error) => this.setState({actionError: error}))
-          }
-          break
       }
     }
   }
