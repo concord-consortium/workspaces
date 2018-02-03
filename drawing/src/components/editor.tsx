@@ -46,6 +46,18 @@ export class EditorView extends React.Component<EditorViewProps, EditorViewState
       this.codeMirror.focus()
     }
 
+    /*
+    TODO
+    this.codeMirror.on("beforeSelectionChange", (editor, obj) => {
+      if (!this.props.enabled) {
+        const ranges:any[] = (obj as any).ranges
+        , update:Function} = obj as any
+        obj.
+      }
+      debugger
+    })
+    */
+
     this.props.events.listen(Events.UndoPressed, this.ifEnabled(() => this.firepad.undo()))
     this.props.events.listen(Events.RedoPressed, this.ifEnabled(() => this.firepad.redo()))
   }
@@ -69,6 +81,10 @@ export class EditorView extends React.Component<EditorViewProps, EditorViewState
   }
 
   render() {
-    return <textarea ref="editor" className="editor" />
+    return (
+      <div className="editor">
+        <textarea ref="editor" />
+      </div>
+    )
   }
 }

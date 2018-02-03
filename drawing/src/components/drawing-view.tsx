@@ -51,12 +51,13 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
   }
 
   render() {
+    const editing = this.state.mode === "editing"
     return (
       <div>
         <ToolbarView mode={this.state.mode} events={this.events} />
         <div className="workspace" style={{left: TOOLBAR_WIDTH}}>
-          <EditorView firebaseRef={this.props.firebaseRef} events={this.events} enabled={this.state.mode === "editing"} />
-          <DrawingLayerView firebaseRef={this.props.firebaseRef} events={this.events} enabled={this.state.mode === "drawing"} />
+          <EditorView firebaseRef={this.props.firebaseRef} events={this.events} enabled={editing} />
+          <DrawingLayerView firebaseRef={this.props.firebaseRef} events={this.events} enabled={!editing} />
         </div>
       </div>
     )

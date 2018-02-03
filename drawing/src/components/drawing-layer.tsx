@@ -106,10 +106,10 @@ export class LineObject implements DrawingObject {
     if (this.points.length === 0) {
       return null
     }
-    const stroke = this.selected ? SELECTION_COLOR : this.color
     const [first, ...rest] = this.points
     const commands = `M ${first.x} ${first.y} ${rest.map((point) => `L ${point.x} ${point.y}`).join(" ")}`
-    return <path key={key} d={commands} stroke={stroke} fill="none" strokeWidth="3" onClick={() => handleClick ? handleClick(this) : null} />
+    const filter = this.selected ? "url(#highlight)" : ""
+    return <path key={key} d={commands} filter={filter} stroke={this.color} fill="none" strokeWidth="3" onClick={() => handleClick ? handleClick(this) : null} />
   }
 }
 
@@ -141,7 +141,8 @@ export class ImageObject implements DrawingObject {
   }
 
   render(key:any, handleClick?:(obj:DrawingObject) => void) : JSX.Element|null {
-    return <image xlinkHref={this.src} x={this.x} y={this.y} onClick={() => handleClick ? handleClick(this) : null} />
+    const filter = this.selected ? "url(#highlight)" : ""
+    return <image key={key} xlinkHref={this.src} x={this.x} y={this.y} filter={filter} onClick={() => handleClick ? handleClick(this) : null} />
   }
 }
 
@@ -518,6 +519,11 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   renderSVG() {
     return (
       <svg xmlnsXlink= "http://www.w3.org/1999/xlink">
+        <filter id="highlight">
+          <feMorphology result="offset" in="SourceGraphic" operator="dilate" radius="3"/>
+          <feColorMatrix result="drop" in="offset" type="matrix" values="1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 1 0" />
+          <feBlend in="SourceGraphic" in2="drop" mode="normal" />
+        </filter>
         {Object.keys(this.state.objects).map(this.renderObject)}
         {this.state.currentLine ? this.state.currentLine.render("current") : null}
         {this.state.selectionBox ? this.state.selectionBox.render() : null}
