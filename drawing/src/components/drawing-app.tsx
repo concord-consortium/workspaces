@@ -17,8 +17,6 @@ export class DrawingApp extends React.Component<DrawingAppProps, DrawingAppState
   constructor(props:DrawingAppProps){
     super(props)
 
-    this.parseHash = this.parseHash.bind(this)
-
     this.state = {
       authenticated: false,
       drawingRef: null
@@ -26,32 +24,20 @@ export class DrawingApp extends React.Component<DrawingAppProps, DrawingAppState
   }
 
   componentWillMount() {
-    firebase.initializeApp(FirebaseConfig)
-    firebase.auth().signInAnonymously()
-      .then(() => {
-        this.setState({authenticated: true})
-
-        this.parseHash()
-        window.addEventListener("hashchange", this.parseHash)
-      })
-      .catch((err) => {
-        alert(err)
-      })
-  }
-
-  parseHash() {
-    if (this.state.drawingRef) {
-      this.state.drawingRef.off()
-      this.setState({drawingRef: null})
-    }
-
-    const params = queryString.parse(window.location.hash)
+    const params = queryString.parse(window.location.search)
     if (params.drawing) {
-      var drawingRef = firebase.database().ref("/drawings").child(params.drawing)
-      this.setState({drawingRef})
+      firebase.initializeApp(FirebaseConfig)
+      firebase.auth().signInAnonymously()
+        .then(() => {
+          var drawingRef = firebase.database().ref("/drawings").child(params.drawing)
+          this.setState({drawingRef, authenticated: true})
+        })
+        .catch((err) => {
+          alert(err)
+        })
     }
     else {
-      window.location.hash = `drawing=${uuid()}`
+      window.location.search = `drawing=${uuid()}`
     }
   }
 
