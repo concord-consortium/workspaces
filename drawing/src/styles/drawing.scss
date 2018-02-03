@@ -13,18 +13,84 @@ body {
   background-repeat: no-repeat;
 }
 
-#drawing {
+%no-select {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.toolbar {
+  position: fixed;
+  top: 0;
+  width: 0; /* set in code */
+  left: 0;
+  bottom: 0;
+  background-color: #eee;
+  cursor: pointer;
+
+  .buttons {
+    padding: 5px;
+    font-size: 24px;
+    text-align: center;
+
+    .button {
+      @extend %no-select;
+      padding: 2px;
+      margin-bottom: 5px;
+      &.selected {
+        background-color: #777;
+        color: #fff;
+      }
+    }
+  }
+}
+
+.workspace {
   position: fixed;
   top: 0;
   right: 0;
-  left: 0;
+  left: 0; /* set in code */
   bottom: 0;
-}
 
-.firepad {
-  width: 100%;
-  height: 100%;
-}
-a.powered-by-firepad {
-  display: none;
+  $firepad-toolbar-height: 40px;
+  .firepad {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
+    .firepad-toolbar {
+      height: $firepad-toolbar-height;
+      line-height: initial;
+      border-bottom: none;
+
+      a.firepad-btn {
+        color: #000;
+      }
+    }
+    a.powered-by-firepad {
+      display: none;
+    }
+  }
+  .firepad-with-toolbar .CodeMirror {
+    top: $firepad-toolbar-height;
+  }
+
+  .drawing-layer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+  }
 }
