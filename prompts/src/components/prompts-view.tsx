@@ -141,7 +141,7 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
     this.renderPage = this.renderPage.bind(this)
 
     this.state = {
-      authenticated: true,
+      authenticated: false,
       updateActivity: null,
       activityId: null,
       activity: null,
