@@ -3,6 +3,34 @@ import * as firebase from "firebase"
 import { EventEmitter, Events } from "../lib/events"
 import { TOOLBAR_WIDTH } from "./toolbar"
 
+const SELECTION_COLOR = "#ccff00"
+
+export class SelectionBox {
+  start: Point
+  end: Point
+  nw: Point
+  se: Point
+
+  constructor (x: number, y: number) {
+    this.start = {x, y}
+    this.end = {x, y}
+  }
+
+  closed() {
+    const minX = Math.min(this.start.x, this.end.x)
+    const minY = Math.min(this.start.y, this.end.y)
+    const maxX = Math.max(this.start.x, this.end.x)
+    const maxY = Math.max(this.start.y, this.end.y)
+    this.nw = {x: minX, y: minY}
+    this.se = {x: maxX, y: maxY}
+  }
+
+  contains(p:Point): boolean {
+    const {nw, se} = this
+    return (p.x >= nw.x) && (p.y >= nw.y) && (p.x <= se.x) && (p.y <= se.y)
+  }
+}
+
 export interface DrawingLayerViewProps {
   enabled: boolean
   firebaseRef: firebase.database.Reference
@@ -12,11 +40,13 @@ export interface DrawingLayerViewProps {
 export interface DrawingLayerViewState {
   currentLine: Line|null
   objects: ObjectMap
+  selectionBox: SelectionBox|null
 }
 
 export interface DrawingObject {
   selected: boolean
   serialize(): string
+  inSelection(selectionBox:SelectionBox): boolean
   render(key:any, handleClick?:(obj:DrawingObject) => void): JSX.Element | null
 }
 
@@ -45,11 +75,21 @@ export class Line implements DrawingObject {
     })
   }
 
+  inSelection(selectionBox:SelectionBox) {
+    const {points} = this
+    for (let i = 0; i < points.length; i++) {
+      if (selectionBox.contains(points[i])) {
+        return true
+      }
+    }
+    return false
+  }
+
   render(key:any, handleClick?:(obj:DrawingObject) => void) : JSX.Element|null {
     if (this.points.length === 0) {
       return null
     }
-    const stroke = this.selected ? "#ccff00" : this.color
+    const stroke = this.selected ? SELECTION_COLOR : this.color
     const [first, ...rest] = this.points
     const commands = `M ${first.x} ${first.y} ${rest.map((point) => `L ${point.x} ${point.y}`).join(" ")}`
     return <path key={key} d={commands} stroke={stroke} fill="none" strokeWidth="3" onClick={() => handleClick ? handleClick(this) : null} />
@@ -128,6 +168,21 @@ export class SelectionDrawingTool implements DrawingTool {
     this.drawingLayer = drawingLayer
   }
 
+  handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    const handleMouseMove = (e:MouseEvent) => {
+      this.drawingLayer.updateSelectionBox(e.clientX - TOOLBAR_WIDTH, e.clientY)
+    }
+    const handleMouseUp = (e:MouseEvent) => {
+      this.drawingLayer.endSelectionBox()
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+
+    this.drawingLayer.startSelectionBox(e.clientX - TOOLBAR_WIDTH, e.clientY)
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+  }
+
   handleObjectClick(obj:DrawingObject) {
     obj.selected = true
     this.drawingLayer.forceUpdate()
@@ -145,7 +200,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
     this.state = {
       currentLine: null,
-      objects: {}
+      objects: {},
+      selectionBox: null
     }
 
     this.tools = {
@@ -159,6 +215,15 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   }
 
   addListeners() {
+    window.addEventListener("keyup", (e) => {
+      if (this.props.enabled) {
+        switch (e.keyCode) {
+          case 46:
+            this.handleDelete()
+            break;
+        }
+      }
+    })
     this.props.events.listen(Events.EditModeSelected, () => this.setCurrentTool(null))
     this.props.events.listen(Events.LineDrawingToolSelected, (data) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.color)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
@@ -190,6 +255,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   setCurrentTool(tool:DrawingTool|null) {
     this.currentTool = tool
+    this.setState({selectionBox: null})
 
     if (tool !== this.tools.selection) {
       this.forEachObject((object) => {
@@ -203,7 +269,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     const {objects} = this.state
     Object.keys(objects).forEach((key) => {
       const object = objects[key]
-      if (object && object.selected) {
+      if (object) {
         callback(object, key)
       }
     })
@@ -235,6 +301,34 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     }
   }
 
+  startSelectionBox(x:number, y: number) {
+    this.setState({selectionBox: new SelectionBox(x, y)})
+  }
+
+  updateSelectionBox(x:number, y: number) {
+    const {selectionBox} = this.state
+    if (selectionBox) {
+      selectionBox.end = {x, y}
+      this.setState({selectionBox})
+    }
+  }
+
+  endSelectionBox() {
+    const {selectionBox} = this.state
+    if (selectionBox) {
+      selectionBox.closed()
+      this.forEachObject((object) => {
+        object.selected = object.inSelection(selectionBox)
+      })
+      this.setState({selectionBox: null})
+    }
+  }
+
+  renderSelectionBox(selectionBox:SelectionBox) {
+    const {start, end} = selectionBox
+    return <rect x={start.x} y={start.y} width={end.x - start.x} height={end.y - start.y} fill="none" stroke={SELECTION_COLOR} strokeWidth="2" strokeDasharray="10 5" />
+  }
+
   renderObject = (key:string) => {
     const object = this.state.objects[key]
     return object ? object.render(key, this.handleObjectClick) : null
@@ -245,6 +339,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       <svg>
         {Object.keys(this.state.objects).map(this.renderObject)}
         {this.state.currentLine ? this.state.currentLine.render("current") : null}
+        {this.state.selectionBox ? this.renderSelectionBox(this.state.selectionBox) : null}
       </svg>
     )
   }
