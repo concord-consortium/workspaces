@@ -53,7 +53,7 @@ export interface DrawingLayerViewProps {
 }
 
 export interface DrawingLayerViewState {
-  currentLine: Line|null
+  currentLine: LineObject|null
   objects: ObjectMap
   selectionBox: SelectionBox|null
 }
@@ -70,7 +70,7 @@ export type DrawingObjectTypes = "line"
 
 export interface Point {x: number, y: number}
 
-export class Line implements DrawingObject {
+export class LineObject implements DrawingObject {
   key: string|null
   points: Point[]
   color: string
@@ -113,11 +113,44 @@ export class Line implements DrawingObject {
   }
 }
 
+export class ImageObject implements DrawingObject {
+  key: string|null
+  selected: boolean
+  x: number
+  y: number
+  src: string
+
+  constructor (json?:any) {
+    this.src = json ? json.src : ""
+    this.x = json ? json.x : 0
+    this.y = json ? json.y : 0
+  }
+
+  serialize() {
+    return JSON.stringify({
+      type: "image",
+      src: this.src,
+      x: this.x,
+      y: this.y
+    })
+  }
+
+  inSelection(selectionBox:SelectionBox) {
+    const {x, y} = this
+    return selectionBox.contains({x, y})
+  }
+
+  render(key:any, handleClick?:(obj:DrawingObject) => void) : JSX.Element|null {
+    return <image xlinkHref={this.src} x={this.x} y={this.y} onClick={() => handleClick ? handleClick(this) : null} />
+  }
+}
+
 interface ObjectConstructorMap {
-  [key: string]: (typeof Line)|null
+  [key: string]: (typeof LineObject)|(typeof ImageObject)|null
 }
 const objectConstructors:ObjectConstructorMap = {
-  "line": Line
+  "line": LineObject,
+  "image": ImageObject
 }
 
 interface ObjectMap {
@@ -130,6 +163,7 @@ export interface DrawingToolMap {
 
 export interface DrawingTool {
   handleMouseDown?(e:React.MouseEvent<HTMLDivElement>): void
+  handleClick?(e:React.MouseEvent<HTMLDivElement>): void
   handleObjectClick?(obj:DrawingObject): void
 }
 
@@ -148,7 +182,7 @@ export class LineDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
-    const line:Line = new Line({color: this.color})
+    const line:LineObject = new LineObject({color: this.color})
     const addPoint = (e:MouseEvent|React.MouseEvent<HTMLDivElement>) => {
       if ((e.clientX >= 0) && (e.clientY >= 0)) {
         line.points.push({x: e.clientX - TOOLBAR_WIDTH, y: e.clientY})
@@ -203,6 +237,25 @@ export class SelectionDrawingTool implements DrawingTool {
   handleObjectClick(obj:DrawingObject) {
     obj.selected = true
     this.drawingLayer.forceUpdate()
+  }
+}
+
+export class ImageDrawingTool implements DrawingTool {
+  drawingLayer:DrawingLayerView
+  src: string
+
+  constructor(drawingLayer:DrawingLayerView) {
+    this.drawingLayer = drawingLayer
+  }
+
+  setSrc(src:string) {
+    this.src = src
+    return this
+  }
+
+  handleClick(e:React.MouseEvent<HTMLDivElement>) {
+    const image:ImageObject = new ImageObject({x: e.clientX - TOOLBAR_WIDTH, y: e.clientY, src: this.src})
+    this.drawingLayer.commandManager.execute(new ToggleObjectCommand(image))
   }
 }
 
@@ -305,7 +358,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
     this.tools = {
       line: new LineDrawingTool(this),
-      selection: new SelectionDrawingTool(this)
+      selection: new SelectionDrawingTool(this),
+      image: new ImageDrawingTool(this)
     }
     this.currentTool = null
 
@@ -318,7 +372,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       if (this.props.enabled) {
         switch (e.keyCode) {
           case 46:
-            this.handleDelete()
+            this.props.events.emit(Events.DeletePressed)
             break
           case 89:
             if (e.ctrlKey || e.metaKey) {
@@ -336,6 +390,9 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     this.props.events.listen(Events.EditModeSelected, () => this.setCurrentTool(null))
     this.props.events.listen(Events.LineDrawingToolSelected, (data) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.color)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
+    this.props.events.listen(Events.CoinToolSelected, (data) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setSrc(data.image)))
+    this.props.events.listen(Events.PouchToolSelected, (data) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setSrc(data.image)))
+
     this.props.events.listen(Events.UndoPressed, () => this.commandManager.undo())
     this.props.events.listen(Events.RedoPressed, () => this.commandManager.redo())
     this.props.events.listen(Events.DeletePressed, this.handleDelete)
@@ -418,6 +475,12 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     }
   }
 
+  handleClick = (e:React.MouseEvent<HTMLDivElement>) => {
+    if (this.currentTool && this.currentTool.handleClick) {
+      this.currentTool.handleClick(e)
+    }
+  }
+
   handleObjectClick = (obj:DrawingObject) => {
     if (this.currentTool && this.currentTool.handleObjectClick) {
       this.currentTool.handleObjectClick(obj)
@@ -454,7 +517,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   renderSVG() {
     return (
-      <svg>
+      <svg xmlnsXlink= "http://www.w3.org/1999/xlink">
         {Object.keys(this.state.objects).map(this.renderObject)}
         {this.state.currentLine ? this.state.currentLine.render("current") : null}
         {this.state.selectionBox ? this.state.selectionBox.render() : null}
@@ -465,7 +528,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   render() {
     const style = this.props.enabled ? {} : {pointerEvents: "none"};
     return (
-      <div className="drawing-layer" style={style} onMouseDown={this.handleMouseDown}>
+      <div className="drawing-layer" style={style} onMouseDown={this.handleMouseDown} onClick={this.handleClick}>
         {this.renderSVG()}
       </div>
     )

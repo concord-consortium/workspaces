@@ -46,6 +46,8 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     this.events.listen(Events.EditModeSelected, () => this.setEditingMode(true))
     this.events.listen(Events.LineDrawingToolSelected, () => this.setEditingMode(false))
     this.events.listen(Events.SelectionToolSelected, () => this.setEditingMode(false))
+    this.events.listen(Events.CoinToolSelected, () => this.setEditingMode(false))
+    this.events.listen(Events.PouchToolSelected, () => this.setEditingMode(false))
   }
 
   render() {
