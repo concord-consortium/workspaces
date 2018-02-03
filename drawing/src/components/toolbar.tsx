@@ -73,7 +73,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
           <div className={this.modalButtonClass("drawRedLine")} title="Red Line Drawing Mode" onClick={this.handleLineDrawingToolButton(RED)} style={{color: RED}}>🖉</div>
           <div className={this.modalButtonClass("drawBlueLine")} title="Blue Line Drawing Mode" onClick={this.handleLineDrawingToolButton(BLUE)} style={{color: BLUE}}>🖉</div>
           <div className={this.modalButtonClass("drawGreenLine")} title="Green Line Drawing Mode" onClick={this.handleLineDrawingToolButton(GREEN)} style={{color: GREEN}}>🖉</div>
-          <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}>🡼</div>
+          <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}>⬚</div>
           <div className="button" title="Undo" onClick={this.handleUndoButton}>↶</div>
           <div className="button" title="Redo" onClick={this.handleRedoButton}>↷</div>
           <div className="button" title="Delete" onClick={this.handleDeleteButton}>🗑</div>

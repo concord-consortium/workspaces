@@ -14,9 +14,10 @@ export class SelectionBox {
   constructor (x: number, y: number) {
     this.start = {x, y}
     this.end = {x, y}
+    this.computeBox()
   }
 
-  closed() {
+  computeBox() {
     const minX = Math.min(this.start.x, this.end.x)
     const minY = Math.min(this.start.y, this.end.y)
     const maxX = Math.max(this.start.x, this.end.x)
@@ -25,9 +26,23 @@ export class SelectionBox {
     this.se = {x: maxX, y: maxY}
   }
 
+  update(x: number, y:number) {
+    this.end = {x, y}
+    this.computeBox()
+  }
+
+  close() {
+    this.computeBox()
+  }
+
   contains(p:Point): boolean {
     const {nw, se} = this
     return (p.x >= nw.x) && (p.y >= nw.y) && (p.x <= se.x) && (p.y <= se.y)
+  }
+
+  render() {
+    const {nw, se} = this
+    return <rect x={nw.x} y={nw.y} width={se.x - nw.x} height={se.y - nw.y} fill="none" stroke={SELECTION_COLOR} strokeWidth="2" strokeDasharray="10 5" />
   }
 }
 
@@ -308,7 +323,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   updateSelectionBox(x:number, y: number) {
     const {selectionBox} = this.state
     if (selectionBox) {
-      selectionBox.end = {x, y}
+      selectionBox.update(x, y)
       this.setState({selectionBox})
     }
   }
@@ -316,17 +331,12 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   endSelectionBox() {
     const {selectionBox} = this.state
     if (selectionBox) {
-      selectionBox.closed()
+      selectionBox.close()
       this.forEachObject((object) => {
         object.selected = object.inSelection(selectionBox)
       })
       this.setState({selectionBox: null})
     }
-  }
-
-  renderSelectionBox(selectionBox:SelectionBox) {
-    const {start, end} = selectionBox
-    return <rect x={start.x} y={start.y} width={end.x - start.x} height={end.y - start.y} fill="none" stroke={SELECTION_COLOR} strokeWidth="2" strokeDasharray="10 5" />
   }
 
   renderObject = (key:string) => {
@@ -339,7 +349,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       <svg>
         {Object.keys(this.state.objects).map(this.renderObject)}
         {this.state.currentLine ? this.state.currentLine.render("current") : null}
-        {this.state.selectionBox ? this.renderSelectionBox(this.state.selectionBox) : null}
+        {this.state.selectionBox ? this.state.selectionBox.render() : null}
       </svg>
     )
   }

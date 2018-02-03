@@ -37,7 +37,7 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
 
   setEditingMode(editing:boolean) {
     if (this.toolbarElement) {
-      this.toolbarElement.style.opacity = editing ? "1" : "0.25"
+      this.toolbarElement.style.opacity = editing ? "1" : "0.5"
     }
     this.setState({mode: editing ? "editing" : "drawing"})
   }
