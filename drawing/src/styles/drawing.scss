@@ -31,7 +31,14 @@ body {
   background-color: #eee;
   cursor: pointer;
 
+
   .buttons {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    border-right: 1px solid #aaa;
     padding: 5px;
     font-size: 24px;
     text-align: center;

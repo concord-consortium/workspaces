@@ -221,10 +221,14 @@ export class SelectionDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
+
     const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
       this.drawingLayer.updateSelectionBox(e.clientX - TOOLBAR_WIDTH, e.clientY)
     }
     const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
       this.drawingLayer.endSelectionBox()
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("mouseup", handleMouseUp)
