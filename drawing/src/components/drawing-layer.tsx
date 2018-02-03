@@ -59,6 +59,7 @@ export interface DrawingLayerViewState {
 }
 
 export interface DrawingObject {
+  key: string|null
   selected: boolean
   serialize(): string
   inSelection(selectionBox:SelectionBox): boolean
@@ -70,6 +71,7 @@ export type DrawingObjectTypes = "line"
 export interface Point {x: number, y: number}
 
 export class Line implements DrawingObject {
+  key: string|null
   points: Point[]
   color: string
   selected: boolean
@@ -162,7 +164,7 @@ export class LineDrawingTool implements DrawingTool {
       const first = line.points[0]
       const last = line.points[line.points.length - 1]
       if (!((line.points.length === 2) && (first.x === last.x) && (first.y === last.y))) {
-        this.drawingLayer.objectsRef.push(line.serialize())
+        this.drawingLayer.commandManager.execute(new ToggleObjectCommand(line))
       }
       this.drawingLayer.setState({currentLine: null})
       window.removeEventListener("mousemove", handleMouseMove)
@@ -204,11 +206,91 @@ export class SelectionDrawingTool implements DrawingTool {
   }
 }
 
+export interface Command {
+  undo(drawingLayer:DrawingLayerView): void
+  execute(drawingLayer:DrawingLayerView): void
+}
+
+export class ToggleObjectCommand implements Command {
+  key: string|null
+  object: DrawingObject
+
+  constructor (object:DrawingObject) {
+    this.object = object
+  }
+
+  execute(drawingLayer:DrawingLayerView) {
+    drawingLayer.addObject(this.object)
+  }
+
+  undo(drawingLayer:DrawingLayerView) {
+    drawingLayer.deleteObject(this.object)
+  }
+}
+
+export class DeleteObjectsCommand implements Command {
+  objects: DrawingObject[]
+
+  constructor (objects:DrawingObject[]) {
+    this.objects = objects
+  }
+
+  execute(drawingLayer:DrawingLayerView) {
+    this.objects.forEach((object) => drawingLayer.deleteObject(object))
+  }
+
+  undo(drawingLayer:DrawingLayerView) {
+    this.objects.forEach((object) => drawingLayer.addObject(object))
+  }
+}
+
+export class CommandManager {
+  drawingLayer: DrawingLayerView
+  stack: Command[]
+  stackIndex: number
+
+  constructor(drawingLayer:DrawingLayerView) {
+    this.drawingLayer = drawingLayer
+    this.stack = []
+    this.stackIndex = -1
+  }
+
+  execute(command:Command) {
+    command.execute(this.drawingLayer)
+    this.stack.splice(this.stackIndex + 1)
+    this.stack.push(command)
+    this.stackIndex = this.stack.length - 1
+  }
+
+  undo() {
+    if (this.canUndo()) {
+      const command = this.stack[this.stackIndex--]
+      command.undo(this.drawingLayer)
+    }
+  }
+
+  redo() {
+    if (this.canRedo()) {
+      const command = this.stack[++this.stackIndex]
+      command.execute(this.drawingLayer)
+    }
+  }
+
+  canUndo() {
+    return this.stackIndex >= 0
+  }
+
+  canRedo() {
+    return this.stackIndex < this.stack.length - 1
+  }
+}
+
 export class DrawingLayerView extends React.Component<DrawingLayerViewProps, DrawingLayerViewState> {
   objects: ObjectMap
   objectsRef: firebase.database.Reference
   currentTool: DrawingTool|null
   tools: DrawingToolMap
+  commandManager: CommandManager
 
   constructor(props:DrawingLayerViewProps){
     super(props)
@@ -218,6 +300,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       objects: {},
       selectionBox: null
     }
+
+    this.commandManager = new CommandManager(this)
 
     this.tools = {
       line: new LineDrawingTool(this),
@@ -235,13 +319,25 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         switch (e.keyCode) {
           case 46:
             this.handleDelete()
-            break;
+            break
+          case 89:
+            if (e.ctrlKey || e.metaKey) {
+              this.props.events.emit(Events.RedoPressed)
+            }
+            break
+          case 90:
+            if (e.ctrlKey || e.metaKey) {
+              this.props.events.emit(Events.UndoPressed)
+            }
+            break
         }
       }
     })
     this.props.events.listen(Events.EditModeSelected, () => this.setCurrentTool(null))
     this.props.events.listen(Events.LineDrawingToolSelected, (data) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.color)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
+    this.props.events.listen(Events.UndoPressed, () => this.commandManager.undo())
+    this.props.events.listen(Events.RedoPressed, () => this.commandManager.redo())
     this.props.events.listen(Events.DeletePressed, this.handleDelete)
 
     this.objectsRef = this.props.firebaseRef.child("drawing").child("objects")
@@ -253,7 +349,9 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         if (json) {
           let Object = objectConstructors[json.type]
           if (Object) {
-            this.state.objects[snapshot.key] = new Object(json)
+            const object = new Object(json)
+            object.key = snapshot.key
+            this.state.objects[snapshot.key] = object
             this.setState({objects: this.state.objects})
           }
         }
@@ -266,6 +364,16 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         this.setState({objects: this.state.objects})
       }
     })
+  }
+
+  addObject(object:DrawingObject) {
+    object.key = this.objectsRef.push(object.serialize()).key
+  }
+
+  deleteObject(object:DrawingObject) {
+    if (object.key) {
+      this.objectsRef.child(object.key).set(null)
+    }
   }
 
   setCurrentTool(tool:DrawingTool|null) {
@@ -292,14 +400,14 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   handleDelete = () => {
     if (this.props.enabled) {
-      const updates:any = {}
-      this.forEachObject((object, key) => {
-        if (object.selected && key) {
-          updates[key] = null
+      const objects:DrawingObject[] = []
+      this.forEachObject((object) => {
+        if (object.selected) {
+          objects.push(object)
         }
       })
-      if (Object.keys(updates).length > 0) {
-        this.objectsRef.update(updates)
+      if (objects.length > 0) {
+        this.commandManager.execute(new DeleteObjectsCommand(objects))
       }
     }
   }
