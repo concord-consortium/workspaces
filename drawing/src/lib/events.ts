@@ -1,8 +1,10 @@
 export enum Events {
   EditModeSelected,
-  DrawingModeSelected,
+  LineDrawingToolSelected,
+  SelectionToolSelected,
   UndoPressed,
-  RedoPressed
+  RedoPressed,
+  DeletePressed
 }
 
 export type EventEmitterCallback = (data?:any) => void

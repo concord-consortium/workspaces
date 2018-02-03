@@ -18,6 +18,7 @@ export interface DrawingViewState {
 
 export class DrawingView extends React.Component<DrawingViewProps, DrawingViewState> {
   events: EventEmitter
+  toolbarElement: HTMLDivElement
 
   constructor(props:DrawingViewProps){
     super(props)
@@ -30,9 +31,21 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     this.addEventListeners()
   }
 
+  componentDidMount() {
+    this.toolbarElement = document.getElementsByClassName("firepad-toolbar")[0] as HTMLDivElement
+  }
+
+  setEditingMode(editing:boolean) {
+    if (this.toolbarElement) {
+      this.toolbarElement.style.opacity = editing ? "1" : "0.25"
+    }
+    this.setState({mode: editing ? "editing" : "drawing"})
+  }
+
   addEventListeners() {
-    this.events.listen(Events.EditModeSelected, () => this.setState({mode: "editing"}))
-    this.events.listen(Events.DrawingModeSelected, () => this.setState({mode: "drawing"}))
+    this.events.listen(Events.EditModeSelected, () => this.setEditingMode(true))
+    this.events.listen(Events.LineDrawingToolSelected, () => this.setEditingMode(false))
+    this.events.listen(Events.SelectionToolSelected, () => this.setEditingMode(false))
   }
 
   render() {
