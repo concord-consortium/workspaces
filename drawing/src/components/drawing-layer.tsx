@@ -282,6 +282,10 @@ export class SelectionDrawingTool implements DrawingTool {
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
     e.preventDefault()
+    const addToSelectedObjects = e.ctrlKey || e.metaKey
+    const start = getWorkspacePoint(e)
+    this.drawingLayer.startSelectionBox(start)
+
 
     const handleMouseMove = (e:MouseEvent) => {
       e.preventDefault()
@@ -290,13 +294,11 @@ export class SelectionDrawingTool implements DrawingTool {
     }
     const handleMouseUp = (e:MouseEvent) => {
       e.preventDefault()
-      this.drawingLayer.endSelectionBox()
+      this.drawingLayer.endSelectionBox(addToSelectedObjects)
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("mouseup", handleMouseUp)
     }
 
-    const start = getWorkspacePoint(e)
-    this.drawingLayer.startSelectionBox(start)
     window.addEventListener("mousemove", handleMouseMove)
     window.addEventListener("mouseup", handleMouseUp)
   }
@@ -659,14 +661,16 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     }
   }
 
-  endSelectionBox() {
+  endSelectionBox(addToSelectedObjects:boolean) {
     const {selectionBox} = this.state
     if (selectionBox) {
       selectionBox.close()
-      const selectedObjects:DrawingObject[] = []
+      const selectedObjects:DrawingObject[] = addToSelectedObjects ? this.state.selectedObjects : []
       this.forEachObject((object) => {
         if (object.inSelection(selectionBox)) {
-          selectedObjects.push(object)
+          if (selectedObjects.indexOf(object) === -1) {
+            selectedObjects.push(object)
+          }
         }
       })
       this.setState({selectionBox: null, selectedObjects})
