@@ -1,12 +1,20 @@
 import * as React from "react"
 import * as firebase from "firebase"
 import { EventEmitter, Events } from "../lib/events"
-import { TOOLBAR_WIDTH } from "./toolbar"
+import { TOOLBAR_WIDTH, ImageButtonData } from "./toolbar"
 
 const SELECTION_COLOR = "#777"
+const SELECTION_BOX_PADDING = 10
 
 export const getWorkspacePoint = (e:MouseEvent|React.MouseEvent<any>):Point => {
   return {x: e.clientX - TOOLBAR_WIDTH, y: e.clientY}
+}
+
+export interface ImageSetItem {
+  src: string
+  width: number
+  height: number
+  title: string
 }
 
 export class SelectionBox {
@@ -138,10 +146,10 @@ export class LineObject implements DrawingObject {
       se.y = Math.max(se.y, lastPoint.y + dp.dy)
       lastPoint = {x: lastPoint.x + dp.dx, y: lastPoint.y + dp.dy}
     })
-    nw.x -= 10
-    nw.y -= 10
-    se.x += 10
-    se.y += 10
+    nw.x -= SELECTION_BOX_PADDING
+    nw.y -= SELECTION_BOX_PADDING
+    se.x += SELECTION_BOX_PADDING
+    se.y += SELECTION_BOX_PADDING
     return {nw, se}
   }
 
@@ -155,10 +163,10 @@ export class ImageObject implements DrawingObject {
   key: string|null
   x: number
   y: number
-  src: string
+  imageSetItem: ImageSetItem
 
   constructor (json?:any) {
-    this.src = json ? json.src : ""
+    this.imageSetItem = json ? json.imageSetItem : {src: "", width: 0, height: 0, title: ""}
     this.x = json ? json.x : 0
     this.y = json ? json.y : 0
   }
@@ -166,14 +174,14 @@ export class ImageObject implements DrawingObject {
   serialize() {
     return JSON.stringify({
       type: "image",
-      src: this.src,
+      imageSetItem: this.imageSetItem,
       x: this.x,
       y: this.y
     })
   }
 
   update(json:any) {
-    this.src = json.src || this.src
+    this.imageSetItem = json.imageSetItem || this.imageSetItem
     this.x = json.x || this.x
     this.y = json.y || this.y
   }
@@ -184,12 +192,15 @@ export class ImageObject implements DrawingObject {
   }
 
   getBoundingBox() {
-    const {x, y} = this
-    return {nw: {x, y}, se: {x, y}}
+    const {width, height} = this.imageSetItem
+    const nw:Point = {x: this.x - SELECTION_BOX_PADDING, y: this.y - SELECTION_BOX_PADDING}
+    const se:Point = {x: this.x + width + SELECTION_BOX_PADDING, y: this.y + height + SELECTION_BOX_PADDING}
+    return {nw, se}
   }
 
   render(key:any, handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void) : JSX.Element|null {
-    return <image key={key} xlinkHref={this.src} x={this.x} y={this.y} onClick={(e) => handleClick ? handleClick(e, this) : null} />
+    const {imageSetItem} = this
+    return <image key={key} xlinkHref={imageSetItem.src} x={this.x} y={this.y} width={imageSetItem.width} height={imageSetItem.height} onClick={(e) => handleClick ? handleClick(e, this) : null} />
   }
 }
 
@@ -305,20 +316,21 @@ export class SelectionDrawingTool implements DrawingTool {
 
 export class ImageDrawingTool implements DrawingTool {
   drawingLayer:DrawingLayerView
-  src: string
+  imageSetItem: ImageSetItem
 
   constructor(drawingLayer:DrawingLayerView) {
     this.drawingLayer = drawingLayer
   }
 
-  setSrc(src:string) {
-    this.src = src
+  setImageSetItem(imageSetItem:ImageSetItem) {
+    this.imageSetItem = imageSetItem
     return this
   }
 
   handleClick(e:React.MouseEvent<HTMLDivElement>) {
     const p = getWorkspacePoint(e)
-    const image:ImageObject = new ImageObject({x: p.x, y: p.y, src: this.src})
+    const {width, height} = this.imageSetItem
+    const image:ImageObject = new ImageObject({x: p.x - (width / 2), y: p.y - (height / 2), imageSetItem: this.imageSetItem})
     this.drawingLayer.commandManager.execute(new ToggleObjectCommand(image))
   }
 }
@@ -483,8 +495,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     this.props.events.listen(Events.EditModeSelected, () => this.setCurrentTool(null))
     this.props.events.listen(Events.LineDrawingToolSelected, (data) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.color)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
-    this.props.events.listen(Events.CoinToolSelected, (data) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setSrc(data.image)))
-    this.props.events.listen(Events.PouchToolSelected, (data) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setSrc(data.image)))
+    this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setImageSetItem(data.imageSetItem)))
 
     this.props.events.listen(Events.UndoPressed, () => this.commandManager.undo())
     this.props.events.listen(Events.RedoPressed, () => this.commandManager.redo())

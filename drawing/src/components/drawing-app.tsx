@@ -10,6 +10,7 @@ export interface DrawingAppProps {}
 export interface DrawingAppState {
   authenticated: boolean
   drawingRef: firebase.database.Reference|null
+  imageSetUrl: string|null
 }
 
 export class DrawingApp extends React.Component<DrawingAppProps, DrawingAppState> {
@@ -19,25 +20,32 @@ export class DrawingApp extends React.Component<DrawingAppProps, DrawingAppState
 
     this.state = {
       authenticated: false,
-      drawingRef: null
+      drawingRef: null,
+      imageSetUrl: null
     }
   }
 
   componentWillMount() {
     const params = queryString.parse(window.location.search)
+    const images = params.images || null
+
     if (params.drawing) {
       firebase.initializeApp(FirebaseConfig)
       firebase.auth().signInAnonymously()
         .then(() => {
           var drawingRef = firebase.database().ref("/drawings").child(params.drawing)
-          this.setState({drawingRef, authenticated: true})
+          this.setState({drawingRef, imageSetUrl: images, authenticated: true})
         })
         .catch((err) => {
           alert(err)
         })
     }
     else {
-      window.location.search = `drawing=${uuid()}`
+      const params:any = {drawing: uuid()}
+      if (images) {
+        params.images = images
+      }
+      window.location.search = queryString.stringify(params)
     }
   }
 
@@ -46,7 +54,7 @@ export class DrawingApp extends React.Component<DrawingAppProps, DrawingAppState
       return <div className="loading">Authenticating...</div>
     }
     if (this.state.drawingRef) {
-      return <DrawingView firebaseRef={this.state.drawingRef} />
+      return <DrawingView firebaseRef={this.state.drawingRef} imageSetUrl={this.state.imageSetUrl} />
     }
     return <div className="loading">Loading...</div>
   }

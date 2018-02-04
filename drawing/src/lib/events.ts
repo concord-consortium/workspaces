@@ -2,8 +2,7 @@ export enum Events {
   EditModeSelected,
   LineDrawingToolSelected,
   SelectionToolSelected,
-  CoinToolSelected,
-  PouchToolSelected,
+  ImageToolSelected,
   UndoPressed,
   RedoPressed,
   DeletePressed
