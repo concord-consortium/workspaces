@@ -72,6 +72,10 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   }
 
   render() {
+    /*
+    <div className={this.modalButtonClass("coin")} title="Coin" onClick={this.handleCoinToolButton}><img src={coinImage} /></div>
+    <div className={this.modalButtonClass("pouch")} title="Pouch" onClick={this.handlePouchToolButton}><img src={pouchImage} /></div>
+    */
     return (
       <div className="toolbar" style={{width: TOOLBAR_WIDTH}}>
         <div className="buttons">
@@ -80,8 +84,6 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
           <div className={this.modalButtonClass("drawRedLine")} title="Red Line Drawing Mode" onClick={this.handleLineDrawingToolButton(RED)} style={{color: RED}}>🖉</div>
           <div className={this.modalButtonClass("drawBlueLine")} title="Blue Line Drawing Mode" onClick={this.handleLineDrawingToolButton(BLUE)} style={{color: BLUE}}>🖉</div>
           <div className={this.modalButtonClass("drawGreenLine")} title="Green Line Drawing Mode" onClick={this.handleLineDrawingToolButton(GREEN)} style={{color: GREEN}}>🖉</div>
-          <div className={this.modalButtonClass("coin")} title="Coin" onClick={this.handleCoinToolButton}><img src={coinImage} /></div>
-          <div className={this.modalButtonClass("pouch")} title="Pouch" onClick={this.handlePouchToolButton}><img src={pouchImage} /></div>
           <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}>⬚</div>
           <div className="button" title="Undo" onClick={this.handleUndoButton}>↶</div>
           <div className="button" title="Redo" onClick={this.handleRedoButton}>↷</div>

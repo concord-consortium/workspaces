@@ -3,7 +3,11 @@ import * as firebase from "firebase"
 import { EventEmitter, Events } from "../lib/events"
 import { TOOLBAR_WIDTH } from "./toolbar"
 
-const SELECTION_COLOR = "#ccff00"
+const SELECTION_COLOR = "#777"
+
+export const getWorkspacePoint = (e:MouseEvent|React.MouseEvent<any>):Point => {
+  return {x: e.clientX - TOOLBAR_WIDTH, y: e.clientY}
+}
 
 export class SelectionBox {
   start: Point
@@ -11,9 +15,9 @@ export class SelectionBox {
   nw: Point
   se: Point
 
-  constructor (x: number, y: number) {
-    this.start = {x, y}
-    this.end = {x, y}
+  constructor (start:Point) {
+    this.start = start
+    this.end = start
     this.computeBox()
   }
 
@@ -26,8 +30,8 @@ export class SelectionBox {
     this.se = {x: maxX, y: maxY}
   }
 
-  update(x: number, y:number) {
-    this.end = {x, y}
+  update(p:Point) {
+    this.end = p
     this.computeBox()
   }
 
@@ -55,67 +59,100 @@ export interface DrawingLayerViewProps {
 export interface DrawingLayerViewState {
   currentLine: LineObject|null
   objects: ObjectMap
+  selectedObjects: DrawingObject[]
   selectionBox: SelectionBox|null
 }
 
+export interface BoundingBox {
+  nw: Point
+  se: Point
+}
 export interface DrawingObject {
   key: string|null
-  selected: boolean
+  x: number
+  y: number
   serialize(): string
+  update(json:any): void
   inSelection(selectionBox:SelectionBox): boolean
-  render(key:any, handleClick?:(obj:DrawingObject) => void): JSX.Element | null
+  getBoundingBox(): BoundingBox
+  render(key:any, handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void): JSX.Element | null
 }
 
 export type DrawingObjectTypes = "line"
 
 export interface Point {x: number, y: number}
+export interface DeltaPoint {dx: number, dy: number}
 
 export class LineObject implements DrawingObject {
   key: string|null
-  points: Point[]
+  x: number
+  y: number
+  deltaPoints: DeltaPoint[]
   color: string
-  selected: boolean
 
   constructor (json?:any) {
-    this.points = []
-    if (json) {
-      this.points = json.points || []
-      this.color = json.color || "#000"
-    }
+    this.x = json ? (json.x || 0) : 0
+    this.y = json ? (json.y || 0) : 0
+    this.deltaPoints = json ? (json.deltaPoints || []) : []
+    this.color = json ? (json.color || "#000") : "#000"
   }
 
   serialize() {
     return JSON.stringify({
       type: "line",
       color: this.color,
-      points: this.points
+      x: this.x,
+      y: this.y,
+      deltaPoints: this.deltaPoints
     })
   }
 
+  update(json:any) {
+    this.x = json.x || this.x
+    this.y = json.y || this.y
+    this.deltaPoints = json.deltaPoints || this.deltaPoints
+    this.color = json.color || this.color
+  }
+
   inSelection(selectionBox:SelectionBox) {
-    const {points} = this
-    for (let i = 0; i < points.length; i++) {
-      if (selectionBox.contains(points[i])) {
+    const {x, y, deltaPoints} = this
+    for (let i = 0; i < deltaPoints.length; i++) {
+      const {dx, dy} = deltaPoints[i]
+      const point:Point = {x: x + dx, y: y + dy}
+      if (selectionBox.contains(point)) {
         return true
       }
     }
     return false
   }
 
-  render(key:any, handleClick?:(obj:DrawingObject) => void) : JSX.Element|null {
-    if (this.points.length === 0) {
-      return null
-    }
-    const [first, ...rest] = this.points
-    const commands = `M ${first.x} ${first.y} ${rest.map((point) => `L ${point.x} ${point.y}`).join(" ")}`
-    const filter = this.selected ? "url(#highlight)" : ""
-    return <path key={key} d={commands} filter={filter} stroke={this.color} fill="none" strokeWidth="3" onClick={() => handleClick ? handleClick(this) : null} />
+  getBoundingBox() {
+    const {x, y} = this
+    const nw:Point = {x, y}
+    const se:Point = {x, y}
+    let lastPoint:Point = {x, y}
+    this.deltaPoints.forEach((dp) => {
+      nw.x = Math.min(nw.x, lastPoint.x + dp.dx)
+      nw.y = Math.min(nw.y, lastPoint.y + dp.dy)
+      se.x = Math.max(se.x, lastPoint.x + dp.dx)
+      se.y = Math.max(se.y, lastPoint.y + dp.dy)
+      lastPoint = {x: lastPoint.x + dp.dx, y: lastPoint.y + dp.dy}
+    })
+    nw.x -= 10
+    nw.y -= 10
+    se.x += 10
+    se.y += 10
+    return {nw, se}
+  }
+
+  render(key:any, handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void) : JSX.Element|null {
+    const commands = `M ${this.x} ${this.y} ${this.deltaPoints.map((point) => `l ${point.dx} ${point.dy}`).join(" ")}`
+    return <path key={key} d={commands} stroke={this.color} fill="none" strokeWidth="3" onClick={(e) => handleClick ? handleClick(e, this) : null} />
   }
 }
 
 export class ImageObject implements DrawingObject {
   key: string|null
-  selected: boolean
   x: number
   y: number
   src: string
@@ -135,14 +172,24 @@ export class ImageObject implements DrawingObject {
     })
   }
 
+  update(json:any) {
+    this.src = json.src || this.src
+    this.x = json.x || this.x
+    this.y = json.y || this.y
+  }
+
   inSelection(selectionBox:SelectionBox) {
     const {x, y} = this
     return selectionBox.contains({x, y})
   }
 
-  render(key:any, handleClick?:(obj:DrawingObject) => void) : JSX.Element|null {
-    const filter = this.selected ? "url(#highlight)" : ""
-    return <image key={key} xlinkHref={this.src} x={this.x} y={this.y} filter={filter} onClick={() => handleClick ? handleClick(this) : null} />
+  getBoundingBox() {
+    const {x, y} = this
+    return {nw: {x, y}, se: {x, y}}
+  }
+
+  render(key:any, handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void) : JSX.Element|null {
+    return <image key={key} xlinkHref={this.src} x={this.x} y={this.y} onClick={(e) => handleClick ? handleClick(e, this) : null} />
   }
 }
 
@@ -165,7 +212,7 @@ export interface DrawingToolMap {
 export interface DrawingTool {
   handleMouseDown?(e:React.MouseEvent<HTMLDivElement>): void
   handleClick?(e:React.MouseEvent<HTMLDivElement>): void
-  handleObjectClick?(obj:DrawingObject): void
+  handleObjectClick?(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject): void
 }
 
 export class LineDrawingTool implements DrawingTool {
@@ -183,10 +230,15 @@ export class LineDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
-    const line:LineObject = new LineObject({color: this.color})
+    const start = getWorkspacePoint(e)
+    const line:LineObject = new LineObject({x: start.x, y: start.y, color: this.color})
+
+    let lastPoint = start
     const addPoint = (e:MouseEvent|React.MouseEvent<HTMLDivElement>) => {
-      if ((e.clientX >= 0) && (e.clientY >= 0)) {
-        line.points.push({x: e.clientX - TOOLBAR_WIDTH, y: e.clientY})
+      const p = getWorkspacePoint(e)
+      if ((p.x >= 0) && (p.y >= 0)) {
+        line.deltaPoints.push({dx: p.x - lastPoint.x, dy: p.y - lastPoint.y})
+        lastPoint = p
         this.drawingLayer.setState({currentLine: line})
       }
     }
@@ -195,10 +247,8 @@ export class LineDrawingTool implements DrawingTool {
       addPoint(e)
     }
     const handleMouseUp = (e:MouseEvent) => {
-      addPoint(e)
-      const first = line.points[0]
-      const last = line.points[line.points.length - 1]
-      if (!((line.points.length === 2) && (first.x === last.x) && (first.y === last.y))) {
+      if (line.deltaPoints.length > 0) {
+        addPoint(e)
         this.drawingLayer.commandManager.execute(new ToggleObjectCommand(line))
       }
       this.drawingLayer.setState({currentLine: null})
@@ -206,7 +256,6 @@ export class LineDrawingTool implements DrawingTool {
       window.removeEventListener("mouseup", handleMouseUp)
     }
 
-    addPoint(e)
     this.drawingLayer.setState({currentLine: line})
     window.addEventListener("mousemove", handleMouseMove)
     window.addEventListener("mouseup", handleMouseUp)
@@ -225,7 +274,8 @@ export class SelectionDrawingTool implements DrawingTool {
 
     const handleMouseMove = (e:MouseEvent) => {
       e.preventDefault()
-      this.drawingLayer.updateSelectionBox(e.clientX - TOOLBAR_WIDTH, e.clientY)
+      const p = getWorkspacePoint(e)
+      this.drawingLayer.updateSelectionBox(p)
     }
     const handleMouseUp = (e:MouseEvent) => {
       e.preventDefault()
@@ -234,14 +284,22 @@ export class SelectionDrawingTool implements DrawingTool {
       window.removeEventListener("mouseup", handleMouseUp)
     }
 
-    this.drawingLayer.startSelectionBox(e.clientX - TOOLBAR_WIDTH, e.clientY)
+    const start = getWorkspacePoint(e)
+    this.drawingLayer.startSelectionBox(start)
     window.addEventListener("mousemove", handleMouseMove)
     window.addEventListener("mouseup", handleMouseUp)
   }
 
-  handleObjectClick(obj:DrawingObject) {
-    obj.selected = true
-    this.drawingLayer.forceUpdate()
+  handleObjectClick(e:React.MouseEvent<HTMLDivElement>, obj:DrawingObject) {
+    const {selectedObjects} = this.drawingLayer.state
+    const index = selectedObjects.indexOf(obj)
+    if (index === -1) {
+      selectedObjects.push(obj)
+    }
+    else {
+      selectedObjects.splice(index, 1)
+    }
+    this.drawingLayer.setState({selectedObjects})
   }
 }
 
@@ -259,7 +317,8 @@ export class ImageDrawingTool implements DrawingTool {
   }
 
   handleClick(e:React.MouseEvent<HTMLDivElement>) {
-    const image:ImageObject = new ImageObject({x: e.clientX - TOOLBAR_WIDTH, y: e.clientY, src: this.src})
+    const p = getWorkspacePoint(e)
+    const image:ImageObject = new ImageObject({x: p.x, y: p.y, src: this.src})
     this.drawingLayer.commandManager.execute(new ToggleObjectCommand(image))
   }
 }
@@ -290,7 +349,7 @@ export class DeleteObjectsCommand implements Command {
   objects: DrawingObject[]
 
   constructor (objects:DrawingObject[]) {
-    this.objects = objects
+    this.objects = objects.slice()
   }
 
   execute(drawingLayer:DrawingLayerView) {
@@ -299,6 +358,34 @@ export class DeleteObjectsCommand implements Command {
 
   undo(drawingLayer:DrawingLayerView) {
     this.objects.forEach((object) => drawingLayer.addObject(object))
+  }
+}
+
+export class MoveObjectsCommand implements Command {
+  objects: DrawingObject[]
+  start: Point[]
+  end: Point[]
+
+  constructor (objects:DrawingObject[], start:Point[], end:Point[]) {
+    this.objects = objects.slice()
+    this.start = start
+    this.end = end
+  }
+
+  execute(drawingLayer:DrawingLayerView) {
+    this.update(drawingLayer, this.end)
+  }
+
+  undo(drawingLayer:DrawingLayerView) {
+    this.update(drawingLayer, this.start)
+  }
+
+  private update(drawingLayer:DrawingLayerView, points:Point[]) {
+    this.objects.forEach((object, index) => {
+      object.x = points[index].x
+      object.y = points[index].y
+      drawingLayer.updateObject(object)
+    })
   }
 }
 
@@ -356,7 +443,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     this.state = {
       currentLine: null,
       objects: {},
-      selectionBox: null
+      selectionBox: null,
+      selectedObjects: []
     }
 
     this.commandManager = new CommandManager(this)
@@ -409,9 +497,9 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         const val = snapshot.val()
         const json = val ? JSON.parse(val) : null
         if (json) {
-          let Object = objectConstructors[json.type]
-          if (Object) {
-            const object = new Object(json)
+          let ObjectConstructor = objectConstructors[json.type]
+          if (ObjectConstructor) {
+            const object = new ObjectConstructor(json)
             object.key = snapshot.key
             this.state.objects[snapshot.key] = object
             this.setState({objects: this.state.objects})
@@ -420,10 +508,30 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       }
     })
 
+    this.objectsRef.on("child_changed", (snapshot) => {
+      if (snapshot && snapshot.key) {
+        const val = snapshot.val()
+        const json = val ? JSON.parse(val) : null
+        const object = this.state.objects[snapshot.key]
+        if (json && object) {
+          object.update(json)
+          this.forceUpdate()
+        }
+      }
+    })
+
     this.objectsRef.on("child_removed", (snapshot) => {
       if (snapshot && snapshot.key) {
-        delete this.state.objects[snapshot.key]
-        this.setState({objects: this.state.objects})
+        const object = this.state.objects[snapshot.key]
+        if (object) {
+          const {selectedObjects} = this.state
+          const index = selectedObjects.indexOf(object)
+          if (index !== -1) {
+            selectedObjects.splice(index, 1)
+          }
+          delete this.state.objects[snapshot.key]
+          this.setState({objects: this.state.objects, selectedObjects})
+        }
       }
     })
   }
@@ -438,16 +546,15 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     }
   }
 
+  updateObject(object:DrawingObject) {
+    if (object.key) {
+      this.objectsRef.child(object.key).set(object.serialize())
+    }
+  }
+
   setCurrentTool(tool:DrawingTool|null) {
     this.currentTool = tool
-    this.setState({selectionBox: null})
-
-    if (tool !== this.tools.selection) {
-      this.forEachObject((object) => {
-        object.selected = false
-      })
-      this.forceUpdate()
-    }
+    this.setState({selectionBox: null, selectedObjects: []})
   }
 
   forEachObject(callback: (object:DrawingObject, key?:string) => void) {
@@ -462,14 +569,9 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   handleDelete = () => {
     if (this.props.enabled) {
-      const objects:DrawingObject[] = []
-      this.forEachObject((object) => {
-        if (object.selected) {
-          objects.push(object)
-        }
-      })
-      if (objects.length > 0) {
-        this.commandManager.execute(new DeleteObjectsCommand(objects))
+      const {selectedObjects} = this.state
+      if (selectedObjects.length > 0) {
+        this.commandManager.execute(new DeleteObjectsCommand(selectedObjects))
       }
     }
   }
@@ -486,20 +588,62 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     }
   }
 
-  handleObjectClick = (obj:DrawingObject) => {
+  handleObjectClick = (e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => {
     if (this.currentTool && this.currentTool.handleObjectClick) {
-      this.currentTool.handleObjectClick(obj)
+      this.currentTool.handleObjectClick(e, obj)
     }
   }
 
-  startSelectionBox(x:number, y: number) {
-    this.setState({selectionBox: new SelectionBox(x, y)})
+  handleSelectedObjectMouseDown = (e:React.MouseEvent<any>, obj:DrawingObject) => {
+    let moved = false
+    const {selectedObjects} = this.state
+    const starting:Point = getWorkspacePoint(e)
+    const start = selectedObjects.map((object) => {return {x: object.x, y: object.y}})
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const current:Point = getWorkspacePoint(e)
+      const dx = current.x - starting.x
+      const dy = current.y - starting.y
+      moved = moved || ((dx !== 0) && (dy !== 0))
+
+      selectedObjects.forEach((object, index) => {
+        object.x = start[index].x + dx
+        object.y = start[index].y + dy
+      })
+      this.forceUpdate()
+    }
+    const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+      if (moved) {
+        const end = selectedObjects.map((object) => {return {x: object.x, y: object.y}})
+        this.commandManager.execute(new MoveObjectsCommand(selectedObjects, start, end))
+      }
+      else {
+        this.handleObjectClick(e, obj)
+      }
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
   }
 
-  updateSelectionBox(x:number, y: number) {
+  startSelectionBox(p:Point) {
+    this.setState({selectionBox: new SelectionBox(p)})
+  }
+
+  updateSelectionBox(p:Point) {
     const {selectionBox} = this.state
     if (selectionBox) {
-      selectionBox.update(x, y)
+      selectionBox.update(p)
       this.setState({selectionBox})
     }
   }
@@ -508,10 +652,13 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     const {selectionBox} = this.state
     if (selectionBox) {
       selectionBox.close()
+      const selectedObjects:DrawingObject[] = []
       this.forEachObject((object) => {
-        object.selected = object.inSelection(selectionBox)
+        if (object.inSelection(selectionBox)) {
+          selectedObjects.push(object)
+        }
       })
-      this.setState({selectionBox: null})
+      this.setState({selectionBox: null, selectedObjects})
     }
   }
 
@@ -520,15 +667,18 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     return object ? object.render(key, this.handleObjectClick) : null
   }
 
+  renderSelectedObjects() {
+    return this.state.selectedObjects.map((object, index) => {
+      const {nw, se} = object.getBoundingBox()
+      return <rect key={index} x={nw.x} y={nw.y} width={se.x - nw.x} height={se.y - nw.y} fill={SELECTION_COLOR} fillOpacity="0" stroke={SELECTION_COLOR} strokeWidth="2" strokeDasharray="10 5" onMouseDown={(e) => this.handleSelectedObjectMouseDown(e, object)} />
+    })
+  }
+
   renderSVG() {
     return (
       <svg xmlnsXlink= "http://www.w3.org/1999/xlink">
-        <filter id="highlight">
-          <feMorphology result="offset" in="SourceGraphic" operator="dilate" radius="3"/>
-          <feColorMatrix result="drop" in="offset" type="matrix" values="1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 1 0" />
-          <feBlend in="SourceGraphic" in2="drop" mode="normal" />
-        </filter>
         {Object.keys(this.state.objects).map(this.renderObject)}
+        {this.renderSelectedObjects()}
         {this.state.currentLine ? this.state.currentLine.render("current") : null}
         {this.state.selectionBox ? this.state.selectionBox.render() : null}
       </svg>
