@@ -397,7 +397,7 @@ export class MoveObjectsCommand implements Command {
   private update(drawingLayer:DrawingLayerView, points:Point[]) {
     this.objects.forEach((object, index) => {
       // make sure the object hasn't been deleted in the interim
-      if (object.key && drawingLayer.objects[object.key]) {
+      if (object.key && drawingLayer.state.objects[object.key]) {
         object.x = points[index].x
         object.y = points[index].y
         drawingLayer.updateObject(object)
