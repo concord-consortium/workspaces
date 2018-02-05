@@ -60,7 +60,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   }
 
   handleEditModeButton = () => this.props.events.emit(Events.EditModeSelected)
-  handleLineDrawingToolButton = (lineColor:LineColor) => () => this.props.events.emit(Events.LineDrawingToolSelected, {color: lineColor.hex})
+  handleLineDrawingToolButton = (lineColor:LineColor) => () => this.props.events.emit(Events.LineDrawingToolSelected, lineColor)
   handleSelectionToolButton = () => this.props.events.emit(Events.SelectionToolSelected)
   handleImageToolButton = (data:ImageButtonData) => this.props.events.emit(Events.ImageToolSelected, {imageSetItem: data.imageSetItem})
   handleUndoButton = () => this.props.events.emit(Events.UndoPressed)

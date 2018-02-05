@@ -1,7 +1,7 @@
 import * as React from "react"
 import * as firebase from "firebase"
 import { EventEmitter, Events } from "../lib/events"
-import { TOOLBAR_WIDTH, ImageButtonData } from "./toolbar"
+import { TOOLBAR_WIDTH, ImageButtonData, LineColor } from "./toolbar"
 
 const SELECTION_COLOR = "#777"
 const SELECTION_BOX_PADDING = 10
@@ -396,9 +396,12 @@ export class MoveObjectsCommand implements Command {
 
   private update(drawingLayer:DrawingLayerView, points:Point[]) {
     this.objects.forEach((object, index) => {
-      object.x = points[index].x
-      object.y = points[index].y
-      drawingLayer.updateObject(object)
+      // make sure the object hasn't been deleted in the interim
+      if (object.key && drawingLayer.objects[object.key]) {
+        object.x = points[index].x
+        object.y = points[index].y
+        drawingLayer.updateObject(object)
+      }
     })
   }
 }
@@ -478,6 +481,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     window.addEventListener("keyup", (e) => {
       if (this.props.enabled) {
         switch (e.keyCode) {
+          case 8:
           case 46:
             this.props.events.emit(Events.DeletePressed)
             break
@@ -495,7 +499,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       }
     })
     this.props.events.listen(Events.EditModeSelected, () => this.setCurrentTool(null))
-    this.props.events.listen(Events.LineDrawingToolSelected, (data) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.color)))
+    this.props.events.listen(Events.LineDrawingToolSelected, (data:LineColor) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.hex)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
     this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setImageSetItem(data.imageSetItem)))
 
