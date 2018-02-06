@@ -1,7 +1,7 @@
 import * as React from "react"
 import * as firebase from "firebase"
 import { EventEmitter, Events } from "../lib/events"
-import { TOOLBAR_WIDTH, ImageButtonData, LineColor } from "./toolbar"
+import { TOOLBAR_WIDTH, ImageButtonData, LineButtonData } from "./toolbar"
 
 const SELECTION_COLOR = "#777"
 const HOVER_COLOR = "#ccff00"
@@ -59,10 +59,15 @@ export class SelectionBox {
   }
 }
 
+export interface ImageDataUriMap {
+  [key: string]: string|null
+}
+
 export interface DrawingLayerViewProps {
   enabled: boolean
   firebaseRef: firebase.database.Reference
   events: EventEmitter
+  imageSetItems: ImageSetItem[]
 }
 
 export interface DrawingLayerViewState {
@@ -71,6 +76,9 @@ export interface DrawingLayerViewState {
   selectedObjects: DrawingObject[]
   selectionBox: SelectionBox|null
   hoverObject: DrawingObject|null
+  svgWidth: number|string
+  svgHeight: number|string
+  imageDataUriCache: ImageDataUriMap
 }
 
 export interface BoundingBox {
@@ -81,6 +89,7 @@ export interface DrawingObjectOptions {
   key:any
   handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void
   handleHover?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject, hovering: boolean) => void
+  drawingLayer?: DrawingLayerView
 }
 export interface DrawingObject {
   key: string|null
@@ -218,9 +227,14 @@ export class ImageObject implements DrawingObject {
   render(options:DrawingObjectOptions) : JSX.Element|null {
     const {key, handleClick, handleHover} = options
     const {imageSetItem} = this
+    const src = options.drawingLayer && options.drawingLayer.state.imageDataUriCache[imageSetItem.src]
+    if (!src) {
+      return null
+    }
+
     return <image
               key={key}
-              xlinkHref={imageSetItem.src}
+              xlinkHref={src}
               x={this.x}
               y={this.y}
               width={imageSetItem.width}
@@ -490,7 +504,10 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       objects: {},
       selectionBox: null,
       selectedObjects: [],
-      hoverObject: null
+      hoverObject: null,
+      svgWidth: "100%",
+      svgHeight: "100%",
+      imageDataUriCache: {}
     }
 
     this.commandManager = new CommandManager(this)
@@ -502,8 +519,43 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     }
     this.currentTool = null
 
+    this.updateImageDataUriCache(this.props.imageSetItems)
+
     this.objects = {}
     this.addListeners()
+  }
+
+  componentWillMount() {
+    window.addEventListener("resize", this.setSVGSize)
+    this.setSVGSize()
+  }
+
+  componentWillReceiveProps(nextProps:DrawingLayerViewProps) {
+    this.updateImageDataUriCache(nextProps.imageSetItems)
+  }
+
+  updateImageDataUriCache(imageSetItems:ImageSetItem[]) {
+    imageSetItems.forEach((imageSetItem) => {
+      if (!this.state.imageDataUriCache[imageSetItem.src]) {
+        const image = new Image()
+        image.onload = () => {
+          const canvas = document.createElement("canvas") as HTMLCanvasElement
+          canvas.width = imageSetItem.width
+          canvas.height = imageSetItem.height
+          const context = canvas.getContext("2d")
+          if (context) {
+            context.drawImage(image, 0, 0)
+            this.state.imageDataUriCache[imageSetItem.src] = canvas.toDataURL("image/png")
+            this.setState({imageDataUriCache: this.state.imageDataUriCache})
+          }
+        }
+        image.src = imageSetItem.src
+      }
+    })
+  }
+
+  setSVGSize = () => {
+    this.setState({svgWidth: window.innerWidth - TOOLBAR_WIDTH, svgHeight: window.innerHeight})
   }
 
   addListeners() {
@@ -528,7 +580,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       }
     })
     this.props.events.listen(Events.EditModeSelected, () => this.setCurrentTool(null))
-    this.props.events.listen(Events.LineDrawingToolSelected, (data:LineColor) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.hex)))
+    this.props.events.listen(Events.LineDrawingToolSelected, (data:LineButtonData) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.lineColor.hex)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
     this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setImageSetItem(data.imageSetItem)))
 
@@ -718,7 +770,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   renderObject = (key:string) => {
     const object = this.state.objects[key]
-    return object ? object.render({key, handleClick: this.handleObjectClick, handleHover: this.handleObjectHover}) : null
+    return object ? object.render({key, handleClick: this.handleObjectClick, handleHover: this.handleObjectHover, drawingLayer: this}) : null
   }
 
   renderSelectedObjects(selectedObjects:DrawingObject[], color:string) {
@@ -743,9 +795,10 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   }
 
   renderSVG() {
+    const {svgWidth, svgHeight} = this.state
     const hoveringOverAlreadySelectedObject = this.state.hoverObject ? this.state.selectedObjects.indexOf(this.state.hoverObject) !== -1 : false
     return (
-      <svg xmlnsXlink= "http://www.w3.org/1999/xlink">
+      <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={svgWidth} height={svgHeight}>
         {Object.keys(this.state.objects).map(this.renderObject)}
         {this.renderSelectedObjects(this.state.selectedObjects, SELECTION_COLOR)}
         {this.state.hoverObject ? this.renderSelectedObjects([this.state.hoverObject], hoveringOverAlreadySelectedObject ? SELECTION_COLOR : HOVER_COLOR) : null}

@@ -5,7 +5,8 @@ export enum Events {
   ImageToolSelected,
   UndoPressed,
   RedoPressed,
-  DeletePressed
+  DeletePressed,
+  ScreenCapturePressed
 }
 
 export type EventEmitterCallback = (data?:any) => void

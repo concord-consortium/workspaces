@@ -5,6 +5,7 @@ import { DrawingLayerView, ImageSetItem } from "./drawing-layer"
 import { ToolbarView } from "./toolbar"
 import { EventEmitter, Events } from "../lib/events"
 import { TOOLBAR_WIDTH } from "./toolbar"
+import * as html2canvas from "html2canvas"
 
 export type DrawingMode = "drawing" | "editing"
 
@@ -36,6 +37,10 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
 
     this.events = new EventEmitter()
     this.addEventListeners()
+  }
+
+  refs: {
+    workspace: HTMLDivElement
   }
 
   componentDidMount() {
@@ -76,11 +81,29 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     xhr.send()
   }
 
-  setEditingMode(editing:boolean) {
+  setToolbarOpacity(opacity:string) {
     if (this.toolbarElement) {
-      this.toolbarElement.style.opacity = editing ? "1" : "0.5"
+      this.toolbarElement.style.opacity = opacity
     }
+  }
+
+  setEditingMode(editing:boolean) {
+    this.setToolbarOpacity(editing ? "1" : "0.5")
     this.setState({mode: editing ? "editing" : "drawing"})
+  }
+
+  captureScreen(callback:(err: any|null, canvas?:HTMLCanvasElement) => void) {
+    const restoreToolbarOpacity = () => this.setToolbarOpacity(this.state.mode === "editing" ? "1" : "0.5")
+    this.setToolbarOpacity("0.01") // 0 screws up the font rendering somehow
+    html2canvas(this.refs.workspace, {allowTaint: true})
+      .then((canvas) => {
+        restoreToolbarOpacity()
+        callback(null, canvas)
+      })
+      .catch((e) => {
+        restoreToolbarOpacity()
+        callback(e)
+      })
   }
 
   addEventListeners() {
@@ -88,6 +111,7 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     this.events.listen(Events.LineDrawingToolSelected, () => this.setEditingMode(false))
     this.events.listen(Events.SelectionToolSelected, () => this.setEditingMode(false))
     this.events.listen(Events.ImageToolSelected, () => this.setEditingMode(false))
+    this.events.listen(Events.ScreenCapturePressed, ({callback: callback}) => this.captureScreen(callback))
   }
 
   render() {
@@ -95,9 +119,9 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     return (
       <div>
         <ToolbarView mode={this.state.mode} events={this.events} imageSetItems={this.state.imageSetItems} />
-        <div className="workspace" style={{left: TOOLBAR_WIDTH}}>
+        <div className="workspace" ref="workspace" style={{left: TOOLBAR_WIDTH}}>
           <EditorView firebaseRef={this.props.firebaseRef} events={this.events} enabled={editing} />
-          <DrawingLayerView firebaseRef={this.props.firebaseRef} events={this.events} enabled={!editing} />
+          <DrawingLayerView firebaseRef={this.props.firebaseRef} events={this.events} enabled={!editing} imageSetItems={this.state.imageSetItems} />
         </div>
       </div>
     )

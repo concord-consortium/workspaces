@@ -37,6 +37,7 @@ export interface ToolbarViewState {
   selectedButton: ToolbarModalButton
   selectedImageSetItem: ImageSetItem|null
   selectedLineColor: LineColor
+  testScreenCaptureUrl: string|null
 }
 
 export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewState> {
@@ -46,7 +47,8 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     this.state = {
       selectedButton: "edit",
       selectedImageSetItem: null,
-      selectedLineColor: lineColors[0]
+      selectedLineColor: lineColors[0],
+      testScreenCaptureUrl: null
     }
 
     this.addEventListeners()
@@ -60,12 +62,25 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   }
 
   handleEditModeButton = () => this.props.events.emit(Events.EditModeSelected)
-  handleLineDrawingToolButton = (lineColor:LineColor) => () => this.props.events.emit(Events.LineDrawingToolSelected, lineColor)
+  handleLineDrawingToolButton = (lineColor:LineColor) => () => this.props.events.emit(Events.LineDrawingToolSelected, {lineColor})
   handleSelectionToolButton = () => this.props.events.emit(Events.SelectionToolSelected)
   handleImageToolButton = (data:ImageButtonData) => this.props.events.emit(Events.ImageToolSelected, {imageSetItem: data.imageSetItem})
   handleUndoButton = () => this.props.events.emit(Events.UndoPressed)
   handleRedoButton = () => this.props.events.emit(Events.RedoPressed)
   handleDeleteButton = () => this.props.events.emit(Events.DeletePressed)
+
+  handleTestScreenCapture = () => {
+    this.props.events.emit(Events.ScreenCapturePressed, {callback: (err:any|null, canvas:HTMLCanvasElement) => {
+      if (err) {
+        alert(err.toString())
+      }
+      this.setState({testScreenCaptureUrl: canvas ? canvas.toDataURL().replace("image/png", "image/octet-stream") : null})
+    }})
+  }
+
+  handleClearTestScreenCapture = () => {
+    setTimeout(() => this.setState({testScreenCaptureUrl: null}), 10)
+  }
 
   lineButtonClass(color:LineColor) {
     const selected = "line" === this.state.selectedButton && (color === this.state.selectedLineColor)
@@ -79,7 +94,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
   renderLineButtons() {
     return lineColors.map((lineColor, index) => {
-      const selected = "line" === this.state.selectedButton && (lineColor === this.state.selectedLineColor)
+      const selected = ("line" === this.state.selectedButton) && (lineColor === this.state.selectedLineColor)
       const className = `button ${selected ? "selected" : ""}`
       return <div key={index} className={className} title={`${lineColor.name} Line Drawing Mode`} onClick={this.handleLineDrawingToolButton(lineColor)} style={{color: lineColor.hex}}>🖉</div>
     })
@@ -102,6 +117,11 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
           <div className="button" title="Undo" onClick={this.handleUndoButton}>↶</div>
           <div className="button" title="Redo" onClick={this.handleRedoButton}>↷</div>
           <div className="button" title="Delete" onClick={this.handleDeleteButton}>🗑</div>
+
+          {this.state.testScreenCaptureUrl
+            ? <a className="button" title="Download Screen Capture" href={this.state.testScreenCaptureUrl} download="capture.png" onClick={this.handleClearTestScreenCapture}>▼</a>
+            : <div className="button" title="Screen Capture" onClick={this.handleTestScreenCapture}>⎙</div>
+          }
         </div>
       </div>
     )
