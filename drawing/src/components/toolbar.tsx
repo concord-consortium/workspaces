@@ -78,16 +78,16 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   }
 
   renderLineButtons() {
-    return lineColors.map((lineColor) => {
+    return lineColors.map((lineColor, index) => {
       const selected = "line" === this.state.selectedButton && (lineColor === this.state.selectedLineColor)
       const className = `button ${selected ? "selected" : ""}`
-      return <div className={className} title={`${lineColor.name} Line Drawing Mode`} onClick={this.handleLineDrawingToolButton(lineColor)} style={{color: lineColor.hex}}>🖉</div>
+      return <div key={index} className={className} title={`${lineColor.name} Line Drawing Mode`} onClick={this.handleLineDrawingToolButton(lineColor)} style={{color: lineColor.hex}}>🖉</div>
     })
   }
 
   renderImageSetItems() {
-    return this.props.imageSetItems.map((imageSetItem) => {
-      return <div className={this.modalButtonClass("image", imageSetItem)} title={imageSetItem.title} onClick={() => this.handleImageToolButton({imageSetItem})}><img src={imageSetItem.src} /></div>
+    return this.props.imageSetItems.map((imageSetItem, index) => {
+      return <div key={index} className={this.modalButtonClass("image", imageSetItem)} title={imageSetItem.title} onClick={() => this.handleImageToolButton({imageSetItem})}><img src={imageSetItem.src} /></div>
     })
   }
 

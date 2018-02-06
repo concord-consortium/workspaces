@@ -4,6 +4,7 @@ import { EventEmitter, Events } from "../lib/events"
 import { TOOLBAR_WIDTH, ImageButtonData, LineColor } from "./toolbar"
 
 const SELECTION_COLOR = "#777"
+const HOVER_COLOR = "#ccff00"
 const SELECTION_BOX_PADDING = 10
 
 export const getWorkspacePoint = (e:MouseEvent|React.MouseEvent<any>):Point => {
@@ -69,11 +70,17 @@ export interface DrawingLayerViewState {
   objects: ObjectMap
   selectedObjects: DrawingObject[]
   selectionBox: SelectionBox|null
+  hoverObject: DrawingObject|null
 }
 
 export interface BoundingBox {
   nw: Point
   se: Point
+}
+export interface DrawingObjectOptions {
+  key:any
+  handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void
+  handleHover?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject, hovering: boolean) => void
 }
 export interface DrawingObject {
   key: string|null
@@ -83,7 +90,7 @@ export interface DrawingObject {
   update(json:any): void
   inSelection(selectionBox:SelectionBox): boolean
   getBoundingBox(): BoundingBox
-  render(key:any, handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void): JSX.Element | null
+  render(options:DrawingObjectOptions): JSX.Element | null
 }
 
 export type DrawingObjectTypes = "line"
@@ -153,9 +160,19 @@ export class LineObject implements DrawingObject {
     return {nw, se}
   }
 
-  render(key:any, handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void) : JSX.Element|null {
+  render(options:DrawingObjectOptions) : JSX.Element|null {
+    const {key, handleClick, handleHover} = options
     const commands = `M ${this.x} ${this.y} ${this.deltaPoints.map((point) => `l ${point.dx} ${point.dy}`).join(" ")}`
-    return <path key={key} d={commands} stroke={this.color} fill="none" strokeWidth="3" onClick={(e) => handleClick ? handleClick(e, this) : null} />
+    return <path
+              key={key}
+              d={commands}
+              stroke={this.color}
+              fill="none"
+              strokeWidth="3"
+              onClick={(e) => handleClick ? handleClick(e, this) : null}
+              onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
+              onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
+             />
   }
 }
 
@@ -198,9 +215,20 @@ export class ImageObject implements DrawingObject {
     return {nw, se}
   }
 
-  render(key:any, handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void) : JSX.Element|null {
+  render(options:DrawingObjectOptions) : JSX.Element|null {
+    const {key, handleClick, handleHover} = options
     const {imageSetItem} = this
-    return <image key={key} xlinkHref={imageSetItem.src} x={this.x} y={this.y} width={imageSetItem.width} height={imageSetItem.height} onClick={(e) => handleClick ? handleClick(e, this) : null} />
+    return <image
+              key={key}
+              xlinkHref={imageSetItem.src}
+              x={this.x}
+              y={this.y}
+              width={imageSetItem.width}
+              height={imageSetItem.height}
+              onClick={(e) => handleClick ? handleClick(e, this) : null}
+              onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
+              onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
+            />
   }
 }
 
@@ -461,7 +489,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       currentLine: null,
       objects: {},
       selectionBox: null,
-      selectedObjects: []
+      selectedObjects: [],
+      hoverObject: null
     }
 
     this.commandManager = new CommandManager(this)
@@ -571,7 +600,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   setCurrentTool(tool:DrawingTool|null) {
     this.currentTool = tool
-    this.setState({selectionBox: null, selectedObjects: []})
+    this.setState({selectionBox: null, selectedObjects: [], hoverObject: null})
   }
 
   forEachObject(callback: (object:DrawingObject, key?:string) => void) {
@@ -608,6 +637,12 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   handleObjectClick = (e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => {
     if (this.currentTool && this.currentTool.handleObjectClick) {
       this.currentTool.handleObjectClick(e, obj)
+    }
+  }
+
+  handleObjectHover = (e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject, hovering: boolean) => {
+    if (this.currentTool === this.tools.selection) {
+      this.setState({hoverObject: hovering ? obj : null})
     }
   }
 
@@ -683,22 +718,38 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   renderObject = (key:string) => {
     const object = this.state.objects[key]
-    return object ? object.render(key, this.handleObjectClick) : null
+    return object ? object.render({key, handleClick: this.handleObjectClick, handleHover: this.handleObjectHover}) : null
   }
 
-  renderSelectedObjects() {
-    return this.state.selectedObjects.map((object, index) => {
+  renderSelectedObjects(selectedObjects:DrawingObject[], color:string) {
+    return selectedObjects.map((object, index) => {
       const {nw, se} = object.getBoundingBox()
-      return <rect key={index} x={nw.x} y={nw.y} width={se.x - nw.x} height={se.y - nw.y} fill={SELECTION_COLOR} fillOpacity="0" stroke={SELECTION_COLOR} strokeWidth="2" strokeDasharray="10 5" onMouseDown={(e) => this.handleSelectedObjectMouseDown(e, object)} />
+      return <rect
+                key={index}
+                x={nw.x}
+                y={nw.y}
+                width={se.x - nw.x}
+                height={se.y - nw.y}
+                fill={color}
+                fillOpacity="0"
+                stroke={color}
+                strokeWidth="2"
+                strokeDasharray="10 5"
+                onMouseDown={(e) => this.handleSelectedObjectMouseDown(e, object)}
+                onMouseEnter={(e) => this.handleObjectHover(e, object, true) }
+                onMouseLeave={(e) => this.handleObjectHover(e, object, false) }
+               />
     })
   }
 
   renderSVG() {
+    const hoveringOverAlreadySelectedObject = this.state.hoverObject ? this.state.selectedObjects.indexOf(this.state.hoverObject) !== -1 : false
     return (
       <svg xmlnsXlink= "http://www.w3.org/1999/xlink">
         {Object.keys(this.state.objects).map(this.renderObject)}
-        {this.renderSelectedObjects()}
-        {this.state.currentLine ? this.state.currentLine.render("current") : null}
+        {this.renderSelectedObjects(this.state.selectedObjects, SELECTION_COLOR)}
+        {this.state.hoverObject ? this.renderSelectedObjects([this.state.hoverObject], hoveringOverAlreadySelectedObject ? SELECTION_COLOR : HOVER_COLOR) : null}
+        {this.state.currentLine ? this.state.currentLine.render({key: "current"}) : null}
         {this.state.selectionBox ? this.state.selectionBox.render() : null}
       </svg>
     )
