@@ -43,6 +43,22 @@ body {
     font-size: 24px;
     text-align: center;
 
+    .flyout-top-button {
+      position: relative;
+
+      .flyout-toggle {
+        position: absolute;
+        top: 16px;
+        left: 22px;
+        font-size: 9px;
+        padding: 5px;
+      }
+      .flyout-toggle:hover {
+        background-color: #fff;
+        color: #000;
+      }
+    }
+
     .button {
       @extend %no-select;
       padding: 2px;
@@ -54,6 +70,8 @@ body {
       img {
         max-width: 24px;
         max-height: 24px;
+        display: inline;
+        padding-top: 4px;
       }
     }
 

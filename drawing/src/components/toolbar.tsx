@@ -27,23 +27,8 @@ export interface LineButtonData {
 
 export type ToolbarModalButton = "edit" | "line" | "image" | "select"
 
-export interface ToolbarFlyoutMenuViewProps {
-}
-
-export interface ToolbarFlyoutMenuViewState {
-}
-
-export class ToolbarFlyoutMenuView extends React.Component<ToolbarFlyoutMenuViewProps, ToolbarFlyoutMenuViewState> {
-  constructor(props:ToolbarFlyoutMenuViewProps){
-    super(props)
-
-    this.state = {
-      open: false
-    }
-  }
-}
-
 export interface ToolbarFlyoutViewProps {
+  selected: boolean
 }
 
 export interface ToolbarFlyoutViewState {
@@ -70,22 +55,40 @@ export class ToolbarFlyoutView extends React.Component<ToolbarFlyoutViewProps, T
     this.setState({open: !this.state.open})
   }
 
+  handleChildClick = (e:React.MouseEvent<HTMLDivElement>, index:number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    this.setState({selectedIndex: index, open: false})
+    const children = this.props.children as any
+    const selected = children ? children[index] : null
+    if (selected && selected.props.onClick) {
+      selected.props.onClick()
+    }
+  }
+
   renderOpen() {
+    const children = React.Children.map(this.props.children, (child, index) => {
+      return <div className="flyout-menu-item" onClick={(e) => this.handleChildClick(e, index)}>{child}</div>
+    })
     return (
-      <div className="flyout-menu">{this.props.children}</div>
+      <div className="flyout-menu">{children}</div>
     )
   }
 
   render() {
+    const {open, selectedIndex} = this.state
     const children = this.props.children as any
-    const selected = children ? children[this.state.selectedIndex] : null
+    const selected = children ? children[selectedIndex] : null
     if (!selected) {
       return null
     }
+    const {props} = selected
+    const className = this.props.selected ? "button selected" : "button"
     return (
-      <div>
-        <div className="button" title={selected.props.title} onClick={this.handleToggleOpen}>{selected.props.children}</div>
-        {this.state.open ? this.renderOpen() : null}
+      <div className="flyout-top-button">
+        <div className={className} title={props.title} style={props.style} onClick={(e) => this.handleChildClick(e, selectedIndex)}>{props.children}</div>
+        {open ? this.renderOpen() : null}
+        <div className="flyout-toggle" onClick={this.handleToggleOpen}>{open ? "▼" : "▶"}</div>
       </div>
     )
   }
@@ -145,32 +148,27 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
   renderLineButtons() {
     return lineColors.map((lineColor, index) => {
-      const selected = ("line" === this.state.selectedButton) && (lineColor === this.state.selectedLineColor)
-      const className = `button ${selected ? "selected" : ""}`
-      return <div key={index} className={className} title={`${lineColor.name} Line Drawing Mode`} onClick={this.handleLineDrawingToolButton(lineColor)} style={{color: lineColor.hex}}>🖉</div>
+      return <div key={index} className="button" title={`${lineColor.name} Line Drawing Mode`} onClick={this.handleLineDrawingToolButton(lineColor)} style={{color: lineColor.hex}}>🖉</div>
     })
   }
 
   renderImageSetItems() {
     return this.props.imageSetItems.map((imageSetItem, index) => {
-      return <div key={index} className={this.modalButtonClass("image", imageSetItem)} title={imageSetItem.title} onClick={() => this.handleImageToolButton({imageSetItem})}><img src={imageSetItem.src} /></div>
+      return <div key={index} className="button" title={imageSetItem.title} onClick={() => this.handleImageToolButton({imageSetItem})}><img src={imageSetItem.src} /></div>
     })
   }
 
   render() {
-    /*
-              <ToolbarFlyoutView>
-            <div className="button" title="first">1</div>
-            <div className="button" title="second">2</div>
-            <div className="button" title="third">3</div>
-          </ToolbarFlyoutView>
-    */
     return (
       <div className="toolbar" style={{width: TOOLBAR_WIDTH}}>
         <div className="buttons">
           <div className={this.modalButtonClass("edit")} title="Edit Mode" onClick={this.handleEditModeButton}>A</div>
-          {this.renderLineButtons()}
-          {this.renderImageSetItems()}
+          <ToolbarFlyoutView selected={"line" === this.state.selectedButton}>
+            {this.renderLineButtons()}
+          </ToolbarFlyoutView>
+          <ToolbarFlyoutView selected={"image" === this.state.selectedButton}>
+            {this.renderImageSetItems()}
+          </ToolbarFlyoutView>
           <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}>⬚</div>
           <div className="button" title="Undo" onClick={this.handleUndoButton}>↶</div>
           <div className="button" title="Redo" onClick={this.handleRedoButton}>↷</div>
