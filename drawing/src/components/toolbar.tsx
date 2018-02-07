@@ -17,6 +17,12 @@ export const lineColors:LineColor[] = [
   {name: "Blue", hex: "#00f"},
 ]
 
+export interface PolygonButtonData {
+  type: string
+  stroke?: string
+  fill?: string
+}
+
 export interface ImageButtonData {
   imageSetItem: ImageSetItem
 }
@@ -25,7 +31,7 @@ export interface LineButtonData {
   lineColor: LineColor
 }
 
-export type ToolbarModalButton = "edit" | "line" | "image" | "select"
+export type ToolbarModalButton = "edit" | "line" | "rectangle" | "ellipse" | "image" | "select"
 
 export interface ToolbarFlyoutViewProps {
   selected: boolean
@@ -102,9 +108,6 @@ export interface ToolbarViewProps {
 
 export interface ToolbarViewState {
   selectedButton: ToolbarModalButton
-  selectedImageSetItem: ImageSetItem|null
-  selectedLineColor: LineColor
-  testScreenCaptureUrl: string|null
 }
 
 export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewState> {
@@ -113,9 +116,6 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
     this.state = {
       selectedButton: "edit",
-      selectedImageSetItem: null,
-      selectedLineColor: lineColors[0],
-      testScreenCaptureUrl: null
     }
 
     this.addEventListeners()
@@ -123,26 +123,25 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
   addEventListeners() {
     this.props.events.listen(Events.EditModeSelected, () => this.setState({selectedButton: "edit"}))
-    this.props.events.listen(Events.LineDrawingToolSelected, (data:LineButtonData) => this.setState({selectedButton: "line", selectedLineColor: data.lineColor}))
-    this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setState({selectedButton: "image", selectedImageSetItem: data.imageSetItem}))
+    this.props.events.listen(Events.LineDrawingToolSelected, (data:LineButtonData) => this.setState({selectedButton: "line"}))
+    this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setState({selectedButton: "image"}))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setState({selectedButton: "select"}))
+    this.props.events.listen(Events.RectangleToolSelected, () => this.setState({selectedButton: "rectangle"}))
+    this.props.events.listen(Events.EllipseToolSelected, () => this.setState({selectedButton: "ellipse"}))
   }
 
   handleEditModeButton = () => this.props.events.emit(Events.EditModeSelected)
   handleLineDrawingToolButton = (lineColor:LineColor) => () => this.props.events.emit(Events.LineDrawingToolSelected, {lineColor})
   handleSelectionToolButton = () => this.props.events.emit(Events.SelectionToolSelected)
-  handleImageToolButton = (data:ImageButtonData) => this.props.events.emit(Events.ImageToolSelected, {imageSetItem: data.imageSetItem})
+  handleImageToolButton = (data:ImageButtonData) => () => this.props.events.emit(Events.ImageToolSelected, {imageSetItem: data.imageSetItem})
+  handleRectangleToolButton = (data:PolygonButtonData) => () => this.props.events.emit(Events.RectangleToolSelected, {fill: data.fill, stroke: data.stroke})
+  handleEllipsisToolButton = (data:PolygonButtonData) => () => this.props.events.emit(Events.EllipseToolSelected, {fill: data.fill, stroke: data.stroke})
   handleUndoButton = () => this.props.events.emit(Events.UndoPressed)
   handleRedoButton = () => this.props.events.emit(Events.RedoPressed)
   handleDeleteButton = () => this.props.events.emit(Events.DeletePressed)
 
-  lineButtonClass(color:LineColor) {
-    const selected = "line" === this.state.selectedButton && (color === this.state.selectedLineColor)
-    return `button ${selected ? "selected" : ""}`
-  }
-
-  modalButtonClass(type:ToolbarModalButton, imageSetItem?:ImageSetItem) {
-    const selected = type === this.state.selectedButton && ((type !== "image") || (imageSetItem === this.state.selectedImageSetItem))
+  modalButtonClass(type:ToolbarModalButton) {
+    const selected = type === this.state.selectedButton
     return `button ${selected ? "selected" : ""}`
   }
 
@@ -154,8 +153,19 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
   renderImageSetItems() {
     return this.props.imageSetItems.map((imageSetItem, index) => {
-      return <div key={index} className="button" title={imageSetItem.title} onClick={() => this.handleImageToolButton({imageSetItem})}><img src={imageSetItem.src} /></div>
+      return <div key={index} className="button" title={imageSetItem.title} onClick={this.handleImageToolButton({imageSetItem})}><img src={imageSetItem.src} /></div>
     })
+  }
+
+  renderPolygons(name: string, outline:string, solid:string, handler:(data:PolygonButtonData) => any) {
+    const polygons:JSX.Element[] = []
+    lineColors.forEach((lineColor, index) => {
+      polygons.push(<div key={`outline-${index}`} className="button" title={`${lineColor.name} Outline ${name} Drawing Mode`} onClick={handler({type: name.toLowerCase(), stroke: lineColor.hex, fill: "none"})} style={{color: lineColor.hex}}>{outline}</div>)
+    })
+    lineColors.forEach((lineColor, index) => {
+      polygons.push(<div key={`solid-${index}`} className="button" title={`${lineColor.name} Solid ${name} Drawing Mode`} onClick={handler({type: name.toLowerCase(), stroke: lineColor.hex, fill: lineColor.hex})} style={{color: lineColor.hex}}>{solid}</div>)
+    })
+    return polygons
   }
 
   render() {
@@ -165,6 +175,12 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
           <div className={this.modalButtonClass("edit")} title="Edit Mode" onClick={this.handleEditModeButton}>A</div>
           <ToolbarFlyoutView selected={"line" === this.state.selectedButton}>
             {this.renderLineButtons()}
+          </ToolbarFlyoutView>
+          <ToolbarFlyoutView selected={"rectangle" === this.state.selectedButton}>
+            {this.renderPolygons("Rectangle", "◻", "◼", this.handleRectangleToolButton)}
+          </ToolbarFlyoutView>
+          <ToolbarFlyoutView selected={"ellipse" === this.state.selectedButton}>
+            {this.renderPolygons("Ellipsis", "⬭", "⬬", this.handleEllipsisToolButton)}
           </ToolbarFlyoutView>
           <ToolbarFlyoutView selected={"image" === this.state.selectedButton}>
             {this.renderImageSetItems()}

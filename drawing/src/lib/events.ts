@@ -3,6 +3,8 @@ export enum Events {
   LineDrawingToolSelected,
   SelectionToolSelected,
   ImageToolSelected,
+  RectangleToolSelected,
+  EllipseToolSelected,
   UndoPressed,
   RedoPressed,
   DeletePressed
