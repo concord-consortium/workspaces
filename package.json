@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Concord Consortium Workspaces",
   "scripts": {
-    "build": "npm-run-all --parallel cs:build nc:build prompts:build copy-root",
+    "build": "npm-run-all --parallel cs:build nc:build prompts:build drawing:build copy-root",
     "clean": "rm -rf dist",
     "copy-root": "copyfiles -f root/**/*.* dist/",
     "cs:build": "cd collabspace && cross-env NODE_ENV=production webpack",
@@ -27,7 +27,15 @@
     "prompts:browse": "live-server dist/prompts/",
     "prompts:start": "npm-run-all --parallel prompts:build:watch prompts:browse",
     "prompts:dev:start": "npm-run-all --parallel prompts:dev:build:watch prompts:browse",
-    "prompts:dev:start:secure": "npm-run-all --parallel prompts:dev:build:watch prompts:browse:secure"
+    "prompts:dev:start:secure": "npm-run-all --parallel prompts:dev:build:watch prompts:browse:secure",
+    "drawing:build": "cd drawing && cross-env NODE_ENV=production webpack",
+    "drawing:build:watch": "cd drawing && cross-env NODE_ENV=production webpack -w",
+    "drawing:dev:build": "cd drawing && cross-env NODE_ENV=development webpack",
+    "drawing:dev:build:watch": "cd drawing && cross-env NODE_ENV=development webpack -w",
+    "drawing:browse": "live-server dist/drawing/",
+    "drawing:start": "npm-run-all --parallel drawing:build:watch drawing:browse",
+    "drawing:dev:start": "npm-run-all --parallel drawing:dev:build:watch drawing:browse",
+    "drawing:dev:start:secure": "npm-run-all --parallel drawing:dev:build:watch drawing:browse:secure"
   },
   "repository": {
     "type": "git",
@@ -41,10 +49,14 @@
   "homepage": "https://github.com/concord-consortium/workspaces#readme",
   "dependencies": {
     "@blueprintjs/core": "^1.35.0",
+    "@types/codemirror": "^0.0.55",
+    "@types/html2canvas": "^0.5.35",
     "ag-grid": "^14.2.0",
     "ag-grid-react": "^14.2.0",
+    "codemirror": "^5.34.0",
     "d3": "^4.12.0",
-    "html2canvas": "^1.0.0-alpha.4",
+    "firepad": "^1.4.0",
+    "html2canvas": "^1.0.0-alpha.9",
     "mobx": "^3.4.0",
     "mobx-react": "^4.3.5",
     "mobx-state-tree": "^1.3.1",
