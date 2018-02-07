@@ -108,6 +108,44 @@ module.exports = [
     },
     {
         entry: {
+            "drawing-tool-v2": "./src/drawing-tool-v2.tsx",
+            "drawing-tool-v2-globals": globalsList
+        },
+
+        output: {
+            filename: jsFilename,
+            path: distPath + "/assets"
+        },
+
+        devtool: isDev ? "source-map" : "",
+
+        resolve: {
+            extensions: [".webpack.js", ".web.js", ".ts", ".tsx", ".js"]
+        },
+
+        module: {
+            rules: [
+                { enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
+                { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
+                { test: /\.scss$/i, loaders: ['style-loader', 'css-loader', 'sass-loader']},
+                { test: /\.css$/, loaders: ['style-loader', 'css-loader']},
+                { test: /\.(png|woff|woff2|eot|ttf|svg)$/, loader: 'url-loader' }
+            ]
+        },
+
+        plugins: [
+            new webpack.optimize.CommonsChunkPlugin({
+                name: "drawing-tool-v2-globals",
+                filename: jsFilename
+            }),
+            new HtmlWebpackPlugin({
+                filename: '../drawing-tool-v2.html',
+                template: 'src/drawing-tool-v2.template.html'
+            })
+        ]
+    },
+    {
+        entry: {
             "dashboard": "./src/dashboard.tsx",
             "dashboard-styles": "./src/styles/app.scss",
             "dashboard-globals": globalsList

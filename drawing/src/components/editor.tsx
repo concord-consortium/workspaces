@@ -16,6 +16,7 @@ export interface EditorViewProps {
   firebaseRef: firebase.database.Reference
   enabled: boolean
   events: EventEmitter
+  readonly?: boolean
 }
 
 export interface EditorViewState {
@@ -42,7 +43,7 @@ export class EditorView extends React.Component<EditorViewProps, EditorViewState
     this.codeMirror = CodeMirror.fromTextArea(this.refs.editor)
     this.firepad = Firepad.fromCodeMirror(this.editorRef, this.codeMirror, { richTextToolbar: true, richTextShortcuts: true });
 
-    if (this.props.enabled) {
+    if (this.props.enabled && !this.props.readonly) {
       this.codeMirror.focus()
     }
 

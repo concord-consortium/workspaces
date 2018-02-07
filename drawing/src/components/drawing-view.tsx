@@ -12,6 +12,8 @@ export type DrawingMode = "drawing" | "editing"
 export interface DrawingViewProps {
   firebaseRef: firebase.database.Reference
   imageSetUrl: string|null
+  readonly?: boolean
+  captureScreenCallback?: Function|null
 }
 
 export interface DrawingViewState {
@@ -45,6 +47,13 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
 
   componentDidMount() {
     this.toolbarElement = document.getElementsByClassName("firepad-toolbar")[0] as HTMLDivElement
+  }
+
+  componentWillReceiveProps(nextProps:DrawingViewProps) {
+    if (nextProps.captureScreenCallback && (nextProps.captureScreenCallback !== this.props.captureScreenCallback)) {
+      debugger
+      this.captureScreen(nextProps.captureScreenCallback)
+    }
   }
 
   loadImageSet(imageSetUrl:string) {
@@ -92,7 +101,7 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     this.setState({mode: editing ? "editing" : "drawing"})
   }
 
-  captureScreen(callback:(err: any|null, canvas?:HTMLCanvasElement) => void) {
+  captureScreen(callback:Function) {
     const restoreToolbarOpacity = () => this.setToolbarOpacity(this.state.mode === "editing" ? "1" : "0.5")
     this.setToolbarOpacity("0.01") // 0 screws up the font rendering somehow
     html2canvas(this.refs.workspace, {allowTaint: true})
@@ -111,7 +120,6 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     this.events.listen(Events.LineDrawingToolSelected, () => this.setEditingMode(false))
     this.events.listen(Events.SelectionToolSelected, () => this.setEditingMode(false))
     this.events.listen(Events.ImageToolSelected, () => this.setEditingMode(false))
-    this.events.listen(Events.ScreenCapturePressed, ({callback: callback}) => this.captureScreen(callback))
   }
 
   render() {
@@ -120,9 +128,10 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
       <div>
         <ToolbarView mode={this.state.mode} events={this.events} imageSetItems={this.state.imageSetItems} />
         <div className="workspace" ref="workspace" style={{left: TOOLBAR_WIDTH}}>
-          <EditorView firebaseRef={this.props.firebaseRef} events={this.events} enabled={editing} />
+          <EditorView firebaseRef={this.props.firebaseRef} events={this.events} enabled={editing} readonly={this.props.readonly} />
           <DrawingLayerView firebaseRef={this.props.firebaseRef} events={this.events} enabled={!editing} imageSetItems={this.state.imageSetItems} />
         </div>
+        {this.props.readonly ? <div className="read-only-blocker" /> : null}
       </div>
     )
   }

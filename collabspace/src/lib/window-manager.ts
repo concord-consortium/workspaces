@@ -305,8 +305,8 @@ export class WindowManager {
     const attrs = {
       top: this.randInRange(50, 200),
       left: this.randInRange(50, 200),
-      width: 400,
-      height: 400,
+      width: 700,
+      height: 500,
       minimized: false,
       maximized: false,
       url,
