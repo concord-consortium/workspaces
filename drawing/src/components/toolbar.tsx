@@ -17,12 +17,6 @@ export const lineColors:LineColor[] = [
   {name: "Blue", hex: "#00f"},
 ]
 
-export interface ToolbarViewProps {
-  mode: DrawingMode
-  events: EventEmitter
-  imageSetItems: ImageSetItem[]
-}
-
 export interface ImageButtonData {
   imageSetItem: ImageSetItem
 }
@@ -32,6 +26,76 @@ export interface LineButtonData {
 }
 
 export type ToolbarModalButton = "edit" | "line" | "image" | "select"
+
+export interface ToolbarFlyoutMenuViewProps {
+}
+
+export interface ToolbarFlyoutMenuViewState {
+}
+
+export class ToolbarFlyoutMenuView extends React.Component<ToolbarFlyoutMenuViewProps, ToolbarFlyoutMenuViewState> {
+  constructor(props:ToolbarFlyoutMenuViewProps){
+    super(props)
+
+    this.state = {
+      open: false
+    }
+  }
+}
+
+export interface ToolbarFlyoutViewProps {
+}
+
+export interface ToolbarFlyoutViewState {
+  open: boolean,
+  selectedIndex: number
+}
+
+export interface FlyoutMenuItem {
+  title: string
+  icon: string
+}
+
+export class ToolbarFlyoutView extends React.Component<ToolbarFlyoutViewProps, ToolbarFlyoutViewState> {
+  constructor(props:ToolbarFlyoutViewProps){
+    super(props)
+
+    this.state = {
+      open: false,
+      selectedIndex: 0
+    }
+  }
+
+  handleToggleOpen = () => {
+    this.setState({open: !this.state.open})
+  }
+
+  renderOpen() {
+    return (
+      <div className="flyout-menu">{this.props.children}</div>
+    )
+  }
+
+  render() {
+    const children = this.props.children as any
+    const selected = children ? children[this.state.selectedIndex] : null
+    if (!selected) {
+      return null
+    }
+    return (
+      <div>
+        <div className="button" title={selected.props.title} onClick={this.handleToggleOpen}>{selected.props.children}</div>
+        {this.state.open ? this.renderOpen() : null}
+      </div>
+    )
+  }
+}
+
+export interface ToolbarViewProps {
+  mode: DrawingMode
+  events: EventEmitter
+  imageSetItems: ImageSetItem[]
+}
 
 export interface ToolbarViewState {
   selectedButton: ToolbarModalButton
@@ -107,6 +171,13 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   }
 
   render() {
+    /*
+              <ToolbarFlyoutView>
+            <div className="button" title="first">1</div>
+            <div className="button" title="second">2</div>
+            <div className="button" title="third">3</div>
+          </ToolbarFlyoutView>
+    */
     return (
       <div className="toolbar" style={{width: TOOLBAR_WIDTH}}>
         <div className="buttons">

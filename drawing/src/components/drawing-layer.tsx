@@ -225,9 +225,9 @@ export class ImageObject implements DrawingObject {
   }
 
   render(options:DrawingObjectOptions) : JSX.Element|null {
-    const {key, handleClick, handleHover} = options
+    const {key, handleClick, handleHover, drawingLayer} = options
     const {imageSetItem} = this
-    const src = options.drawingLayer && options.drawingLayer.state.imageDataUriCache[imageSetItem.src]
+    const src = drawingLayer && drawingLayer.state.imageDataUriCache[imageSetItem.src]
     if (!src) {
       return null
     }
