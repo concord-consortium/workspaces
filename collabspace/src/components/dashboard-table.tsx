@@ -113,7 +113,7 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
           return member ? member.fullName : "Unknown Student"
         }).join(", ")
         const params:AuthQueryParams = {
-          jwtToken: this.props.portalTokens.rawPortalJWT,
+          portalJWT: this.props.portalTokens.rawPortalJWT,
           publication: publicationId,
           offeringId: publication.offeringId,
           classInfoUrl: this.props.portalOffering.classInfoUrl
