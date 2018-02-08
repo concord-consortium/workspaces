@@ -427,7 +427,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       const templateUrl = `${window.location.origin}${window.location.pathname}#template=${templateId}`
       superagent
         .get(apiUrl)
-        .query({name: documentInfo.name, url: templateUrl, append_auth_token: 1})
+        .query({name: documentInfo.name, url: templateUrl, append_auth_token: 1, external_report_url: "https://workspaces.concord.org/collabspace/dashboard.html"})
         .set("Authorization", `Bearer/JWT ${portalTokens.rawPortalJWT}`)
         .end((err, res) => {
           if (err) {
