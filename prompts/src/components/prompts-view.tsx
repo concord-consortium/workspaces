@@ -80,8 +80,9 @@ export class EmbeddableView extends React.Component<EmbeddableProps, EmbeddableS
 
   render() {
     const {embeddable} = this.props
-    if ((embeddable.type === "Embeddable::Xhtml") && (embeddable.name.trim().toLowerCase() === "hint")) {
-      return this.renderHint(embeddable.content);
+    const {type, name, content} = embeddable
+    if (type && name && (type === "Embeddable::Xhtml") && (name.trim().toLowerCase() === "hint")) {
+      return this.renderHint(content);
     }
     return this.renderEmbeddable(embeddable);
   }
