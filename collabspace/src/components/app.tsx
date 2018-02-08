@@ -9,6 +9,7 @@ import { FirebaseConfig } from "../lib/firebase-config"
 import { DemoComponent } from "./demo"
 import { PortalUser, PortalOffering, collabSpaceAuth, firebaseAuth, PortalTokens } from "../lib/auth"
 import { getUserTemplatePath } from "../lib/refs"
+import {v4 as uuidV4} from "uuid"
 
 export interface AppComponentProps {}
 
@@ -16,6 +17,7 @@ export interface AppComponentState {
   firebaseUser: firebase.User|null
   authError: any|null
   documentError: any|null
+  actionError: any|null
   documentId: string|null
   document: Document|null
   templateId: string|null
@@ -29,6 +31,8 @@ export interface AppComponentState {
   groupRef: firebase.database.Reference|null
 }
 
+export type HashActionParam = "create-template"
+
 export interface AppHashParams {
   template: string|null
   demo?: string
@@ -39,6 +43,7 @@ export interface AppQueryParams {
   token?: string|number
   domain?: string
   domain_uid?: string|number
+  portalAction?: string
 }
 
 export class AppComponent extends React.Component<AppComponentProps, AppComponentState> {
@@ -49,6 +54,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
     this.state = {
       authError: null,
       documentError: null,
+      actionError: null,
       firebaseUser: null,
       documentId: null,
       document: null,
@@ -60,7 +66,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       group: 0,
       groupRef: null,
       templateId: null,
-      template: null
+      template: null,
     }
     this.startingTitle = document.title
   }
@@ -80,6 +86,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
 
         this.handleParseHash()
         window.addEventListener("hashchange", this.handleParseHash)
+
+        this.handleParseQuery();
       })
     })
     .catch((error) => {
@@ -90,6 +98,24 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   handleSetTitle = (documentName?:string|null) => {
     const suffix = documentName ? `: ${documentName}` : ""
     document.title = this.startingTitle + suffix
+  }
+
+  handleParseQuery = () => {
+    const params:AppQueryParams = queryString.parse(window.location.search)
+    if (params.portalAction) {
+      switch (params.portalAction) {
+        case "authoring_launch":
+          const {firebaseUser, portalTokens} = this.state
+          if (firebaseUser && portalTokens) {
+            const {uid} = firebaseUser
+            const documentId = uuidV4()
+            Document.CreateTemplateInFirebase(uid, documentId, portalTokens.domain)
+              .then((document) => window.location.href = `?portalJWT=${portalTokens.rawPortalJWT}#template=${Document.StringifyTemplateHashParam(uid, documentId)}`)
+              .catch((error) => this.setState({actionError: error}))
+          }
+          break
+      }
+    }
   }
 
   handleParseHash = () => {
@@ -173,9 +199,9 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   }
 
   render() {
-    const error = this.state.authError || this.state.documentError
+    const error = this.state.authError || this.state.documentError || this.state.actionError
     if (error) {
-      const errorType = error === this.state.authError ? "Authorization" : "Document"
+      const errorType = error === this.state.authError ? "Authorization" : (error == this.state.documentError ? "Document" : "Action")
       return this.renderFatalError(error.toString(), errorType)
     }
 
@@ -214,9 +240,9 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
 
           return <WorkspaceComponent
                     isTemplate={true}
-                    portalUser={null}
+                    portalUser={this.state.portalUser}
                     portalOffering={null}
-                    portalTokens={null}
+                    portalTokens={this.state.portalTokens}
                     group={null}
                     groupRef={null}
                     firebaseUser={this.state.firebaseUser}

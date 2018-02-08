@@ -102,7 +102,7 @@ a {
       .buttons {
         padding: 5px 20px;
 
-        button {
+        button, .button {
           border: 1px solid #313131;
           padding: 3px 8px;
           margin-top: 2px;
@@ -269,12 +269,17 @@ a {
       .buttons {
         padding: 5px 20px;
 
-        button {
+        button, .button {
           border: 1px solid #313131;
           padding: 3px 8px;
           margin-top: 2px;
           font-size: 14px;
           margin-right: 10px;
+          background-color: #dddddd;
+        }
+
+        a.button {
+          padding: 4px 10px;
         }
 
         .left-buttons {
