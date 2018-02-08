@@ -147,7 +147,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
   renderLineButtons() {
     return lineColors.map((lineColor, index) => {
-      return <div key={index} className="button" title={`${lineColor.name} Line Drawing Mode`} onClick={this.handleLineDrawingToolButton(lineColor)} style={{color: lineColor.hex}}>🖉</div>
+      return <div key={index} className="button" title={`${lineColor.name} Line Drawing Mode`} onClick={this.handleLineDrawingToolButton(lineColor)} style={{color: lineColor.hex}}><span className="icon icon-pencil" /></div>
     })
   }
 
@@ -185,10 +185,10 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
           <ToolbarFlyoutView selected={"image" === this.state.selectedButton}>
             {this.renderImageSetItems()}
           </ToolbarFlyoutView>
-          <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}>⬚</div>
-          <div className="button" title="Undo" onClick={this.handleUndoButton}>↶</div>
-          <div className="button" title="Redo" onClick={this.handleRedoButton}>↷</div>
-          <div className="button" title="Delete" onClick={this.handleDeleteButton}>🗑</div>
+          <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}><span className="icon icon-magic-wand" /></div>
+          <div className="button" title="Undo" onClick={this.handleUndoButton}><span className="icon icon-undo" /></div>
+          <div className="button" title="Redo" onClick={this.handleRedoButton}><span className="icon icon-redo" /></div>
+          <div className="button" title="Delete" onClick={this.handleDeleteButton}><span className="icon icon-bin" /></div>
         </div>
       </div>
     )
