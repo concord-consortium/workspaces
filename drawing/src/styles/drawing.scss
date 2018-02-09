@@ -116,6 +116,14 @@ body {
     position: absolute;
   }
 
+  .text-editor-resizer {
+    position: absolute;
+    top: 0;
+    width: 5px;
+    background-color: #ccc;
+    cursor: ew-resize;
+  }
+
   .drawing-layer {
     position: absolute;
     top: 0;

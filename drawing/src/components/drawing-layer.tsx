@@ -480,16 +480,30 @@ export interface TextEditorWrapperViewProps {
 }
 
 export interface TextEditorWrapperViewState {
+  width: number
   height: number
+  resizing: boolean
 }
 
 export class TextEditorWrapperView extends React.Component<TextEditorWrapperViewProps, TextEditorWrapperViewState> {
+  codeMirror: CodeMirror.EditorFromTextArea
+
   constructor(props:TextEditorWrapperViewProps){
     super(props)
 
     this.state = {
-      height: 0 // this is updated dyanmically be the TextEditorView after the render
+      width: this.props.textObject.width,
+      height: 0, // this is updated dyanmically be the TextEditorView after the render
+      resizing: false
     }
+  }
+
+  componentDidUpdate() {
+    const {width} = this.props.textObject
+    if (this.state.width !== width) {
+      this.setState({width})
+    }
+    this.codeMirror.refresh()
   }
 
   handleSetHeight = (height:number) => {
@@ -499,6 +513,10 @@ export class TextEditorWrapperView extends React.Component<TextEditorWrapperView
     }
   }
 
+  handleSetCodeMirror = (codeMirror:CodeMirror.EditorFromTextArea) => {
+    this.codeMirror = codeMirror
+  }
+
   handleMouseDown = (e:React.MouseEvent<HTMLDivElement>) => {
     const {textObject, drawingLayer} = this.props
     if (drawingLayer.state.selectedObjects.indexOf(textObject) !== -1) {
@@ -506,9 +524,64 @@ export class TextEditorWrapperView extends React.Component<TextEditorWrapperView
     }
   }
 
+  handleResize = (e:React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    this.setState({resizing: true})
+
+    const start = getWorkspacePoint(e)
+    const {textObject} = this.props
+    const startWidth = textObject.width
+
+    const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const end = getWorkspacePoint(e)
+      const width = Math.max(30, startWidth + (end.x - start.x))
+      if (this.state.width !== width) {
+        textObject.width = width
+        this.setState({width})
+        this.codeMirror.refresh()
+      }
+    }
+    const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (textObject.width !== startWidth) {
+        this.props.drawingLayer.updateObject(textObject)
+      }
+
+      this.setState({resizing: false})
+
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+  }
+
+  killClick = (e:React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  renderResizer() {
+    const {width, height} = this.state
+    const {x} = this.props.textObject
+    const style = {left: width + 1, height: this.state.height}
+    const lineStyle = {height: this.state.height}
+    return (
+      <div className="text-editor-resizer" style={style} onMouseDown={this.handleResize} onClick={this.killClick} />
+    )
+  }
+
   render() {
     const {textObject, onMouseEnter, onMouseLeave, drawingLayer} = this.props
-    const {height} = this.state
+    const {height, resizing} = this.state
     const {x, y, width} = textObject
     const enabled = !drawingLayer.currentTool || (drawingLayer.currentTool === drawingLayer.tools.text)
     const pointerEvents = enabled ? "all" : "none"
@@ -521,7 +594,8 @@ export class TextEditorWrapperView extends React.Component<TextEditorWrapperView
            onMouseLeave={onMouseLeave}
       >
         <div style={{pointerEvents: pointerEvents}} >
-          <TextEditorView textObject={textObject} drawingLayer={drawingLayer} enabled={enabled} setHeight={this.handleSetHeight} />
+          <TextEditorView textObject={textObject} drawingLayer={drawingLayer} enabled={enabled} setHeight={this.handleSetHeight} setCodeMirror={this.handleSetCodeMirror} resizing={resizing} />
+          {enabled ? this.renderResizer() : null}
         </div>
       </div>
     )
@@ -531,8 +605,10 @@ export class TextEditorWrapperView extends React.Component<TextEditorWrapperView
 export interface TextEditorViewProps {
   textObject: TextObject
   drawingLayer: DrawingLayerView
+  resizing: boolean
   enabled: boolean
   setHeight: (height:number) => void
+  setCodeMirror: (codeMirror:CodeMirror.EditorFromTextArea) => void
 }
 
 export interface TextEditorViewState {
@@ -558,9 +634,9 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
     textEditor: HTMLTextAreaElement
   }
 
-  styleWrapper(add:boolean) {
+  styleWrapper(addBorder:boolean) {
     const {color} = this.props.textObject
-    const style = add ? `color: ${color}; border: 1px solid #aaa; padding: 0;` : `color: ${color}; border: none; padding: 1px;`
+    const style = addBorder ? `color: ${color}; border: 1px solid #aaa; padding: 0;` : `color: ${color}; border: none; padding: 1px;`
     this.wrapperElement.setAttribute("style", style)
   }
 
@@ -573,13 +649,13 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   }
 
   handleMouseOver = () => {
-    if (this.props.enabled) {
+    if (this.props.enabled && !this.props.resizing) {
       this.styleWrapper(true)
     }
   }
 
   handleMouseOut = () => {
-    if (this.props.enabled && !this.codeMirror.hasFocus()) {
+    if (this.props.enabled && !this.props.resizing && !this.codeMirror.hasFocus()) {
       this.styleWrapper(false)
     }
   }
@@ -597,6 +673,8 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
       lineWrapping: true,
       scrollbarStyle: "null"
     })
+    this.props.setCodeMirror(this.codeMirror)
+
     this.sizer = (this.codeMirror as any).display.sizer
     this.wrapperElement = this.codeMirror.getWrapperElement()
     this.styleWrapper(false)
@@ -626,7 +704,9 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   }
 
   componentWillReceiveProps(nextProps:TextEditorViewProps) {
-
+    if (nextProps.resizing !== this.props.resizing) {
+      this.styleWrapper(nextProps.resizing)
+    }
   }
 
   shouldComponentUpdate() {
