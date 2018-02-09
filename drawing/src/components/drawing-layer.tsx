@@ -1148,7 +1148,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       ellipse: new EllipseDrawingTool(this),
       text: new TextDrawingTool(this)
     }
-    this.currentTool = this.tools.line
+    this.currentTool = this.tools.selection
 
     this.updateImageDataUriCache(this.props.imageSetItems)
 
