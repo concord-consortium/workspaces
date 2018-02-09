@@ -506,10 +506,11 @@ export class TextEditorWrapperView extends React.Component<TextEditorWrapperView
     this.codeMirror.refresh()
   }
 
-  handleSetHeight = (height:number) => {
-    if (this.state.height !== height) {
+  handleSetDimensions = (width: number, height:number) => {
+    if ((this.state.width !== width) || (this.state.height !== height)) {
+      this.props.textObject.width = width
       this.props.textObject.height = height
-      this.setState({height})
+      this.setState({width, height})
     }
   }
 
@@ -522,61 +523,6 @@ export class TextEditorWrapperView extends React.Component<TextEditorWrapperView
     if (drawingLayer.state.selectedObjects.indexOf(textObject) !== -1) {
       drawingLayer.handleSelectedObjectMouseDown(e, textObject)
     }
-  }
-
-  handleResize = (e:React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    this.setState({resizing: true})
-
-    const start = getWorkspacePoint(e)
-    const {textObject} = this.props
-    const startWidth = textObject.width
-
-    const handleMouseMove = (e:MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-
-      const end = getWorkspacePoint(e)
-      const width = Math.max(30, startWidth + (end.x - start.x))
-      if (this.state.width !== width) {
-        textObject.width = width
-        this.setState({width})
-        this.codeMirror.refresh()
-      }
-    }
-    const handleMouseUp = (e:MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-
-      if (textObject.width !== startWidth) {
-        this.props.drawingLayer.updateObject(textObject)
-      }
-
-      this.setState({resizing: false})
-
-      window.removeEventListener("mousemove", handleMouseMove)
-      window.removeEventListener("mouseup", handleMouseUp)
-    }
-
-    window.addEventListener("mousemove", handleMouseMove)
-    window.addEventListener("mouseup", handleMouseUp)
-  }
-
-  killClick = (e:React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }
-
-  renderResizer() {
-    const {width, height} = this.state
-    const {x} = this.props.textObject
-    const style = {left: width + 1, height: this.state.height}
-    const lineStyle = {height: this.state.height}
-    return (
-      <div className="text-editor-resizer" style={style} onMouseDown={this.handleResize} onClick={this.killClick} />
-    )
   }
 
   render() {
@@ -594,8 +540,7 @@ export class TextEditorWrapperView extends React.Component<TextEditorWrapperView
            onMouseLeave={onMouseLeave}
       >
         <div style={{pointerEvents: pointerEvents}} >
-          <TextEditorView textObject={textObject} drawingLayer={drawingLayer} enabled={enabled} setHeight={this.handleSetHeight} setCodeMirror={this.handleSetCodeMirror} resizing={resizing} />
-          {enabled ? this.renderResizer() : null}
+          <TextEditorView textObject={textObject} drawingLayer={drawingLayer} enabled={enabled} setDimensions={this.handleSetDimensions} setCodeMirror={this.handleSetCodeMirror} resizing={resizing} />
         </div>
       </div>
     )
@@ -607,7 +552,7 @@ export interface TextEditorViewProps {
   drawingLayer: DrawingLayerView
   resizing: boolean
   enabled: boolean
-  setHeight: (height:number) => void
+  setDimensions: (width:number, height:number) => void
   setCodeMirror: (codeMirror:CodeMirror.EditorFromTextArea) => void
 }
 
@@ -661,7 +606,7 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   }
 
   updateHeight = () => {
-    this.props.setHeight(this.sizer.clientHeight)
+    this.props.setDimensions(this.sizer.clientWidth, this.sizer.clientHeight)
   }
 
   componentDidMount() {
@@ -670,7 +615,6 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
     const {readonly} = drawingLayer.props
 
     this.codeMirror = CodeMirror.fromTextArea(this.refs.textEditor, {
-      lineWrapping: true,
       scrollbarStyle: "null"
     })
     this.props.setCodeMirror(this.codeMirror)
