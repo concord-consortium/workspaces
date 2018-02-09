@@ -175,6 +175,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.icon-mouse-pointer:before {
+  content: "\e900";
+}
 .icon-pencil:before {
   content: "\e905";
 }
@@ -183,9 +186,6 @@ body {
 }
 .icon-redo:before {
   content: "\e966";
-}
-.icon-magic-wand:before {
-  content: "\e997";
 }
 .icon-bin:before {
   content: "\e9ac";

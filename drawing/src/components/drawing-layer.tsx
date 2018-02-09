@@ -699,8 +699,12 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
     }
     else {
       // remove focus (the color and fontSize calls above set focus)
-      this.codeMirror.getInputField().blur()
+      //this.codeMirror.getInputField().blur()
     }
+  }
+
+  componentWillUnmount() {
+    this.firepad.dispose()
   }
 
   componentWillReceiveProps(nextProps:TextEditorViewProps) {
