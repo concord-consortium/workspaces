@@ -93,7 +93,6 @@ body {
   left: 0; /* set in code */
   bottom: 0;
 
-  $firepad-toolbar-height: 40px;
   .firepad {
     position: absolute;
     top: 0;
@@ -102,21 +101,19 @@ body {
     left: 0;
     cursor: text;
 
-    .firepad-toolbar {
-      height: $firepad-toolbar-height;
-      line-height: initial;
-      border-bottom: none;
-
-      a.firepad-btn {
-        color: #000;
-      }
-    }
     a.powered-by-firepad {
       display: none;
     }
   }
-  .firepad-with-toolbar .CodeMirror {
-    top: $firepad-toolbar-height;
+  .CodeMirror {
+    background-color: initial;
+    font-size: 16px;
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 1px;
+  }
+
+  .text-editor-wrapper {
+    position: absolute;
   }
 
   .drawing-layer {

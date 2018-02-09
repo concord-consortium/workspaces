@@ -17,7 +17,6 @@ export interface DrawingViewProps {
 }
 
 export interface DrawingViewState {
-  mode: DrawingMode
   imageSetItems: ImageSetItem[]
 }
 
@@ -29,7 +28,6 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     super(props)
 
     this.state = {
-      mode: "editing",
       imageSetItems: []
     }
 
@@ -38,7 +36,6 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     }
 
     this.events = new EventEmitter()
-    this.addEventListeners()
   }
 
   refs: {
@@ -51,7 +48,6 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
 
   componentWillReceiveProps(nextProps:DrawingViewProps) {
     if (nextProps.captureScreenCallback && (nextProps.captureScreenCallback !== this.props.captureScreenCallback)) {
-      debugger
       this.captureScreen(nextProps.captureScreenCallback)
     }
   }
@@ -90,48 +86,22 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     xhr.send()
   }
 
-  setToolbarOpacity(opacity:string) {
-    if (this.toolbarElement) {
-      this.toolbarElement.style.opacity = opacity
-    }
-  }
-
-  setEditingMode(editing:boolean) {
-    this.setToolbarOpacity(editing ? "1" : "0.5")
-    this.setState({mode: editing ? "editing" : "drawing"})
-  }
-
   captureScreen(callback:Function) {
-    const restoreToolbarOpacity = () => this.setToolbarOpacity(this.state.mode === "editing" ? "1" : "0.5")
-    this.setToolbarOpacity("0.01") // 0 screws up the font rendering somehow
     html2canvas(this.refs.workspace, {allowTaint: true})
       .then((canvas) => {
-        restoreToolbarOpacity()
         callback(null, canvas)
       })
       .catch((e) => {
-        restoreToolbarOpacity()
         callback(e)
       })
   }
 
-  addEventListeners() {
-    this.events.listen(Events.EditModeSelected, () => this.setEditingMode(true))
-    this.events.listen(Events.LineDrawingToolSelected, () => this.setEditingMode(false))
-    this.events.listen(Events.SelectionToolSelected, () => this.setEditingMode(false))
-    this.events.listen(Events.ImageToolSelected, () => this.setEditingMode(false))
-    this.events.listen(Events.RectangleToolSelected, () => this.setEditingMode(false))
-    this.events.listen(Events.EllipseToolSelected, () => this.setEditingMode(false))
-  }
-
   render() {
-    const editing = this.state.mode === "editing"
     return (
       <div>
-        <ToolbarView mode={this.state.mode} events={this.events} imageSetItems={this.state.imageSetItems} />
+        <ToolbarView events={this.events} imageSetItems={this.state.imageSetItems} />
         <div className="workspace" ref="workspace" style={{left: TOOLBAR_WIDTH}}>
-          <EditorView firebaseRef={this.props.firebaseRef} events={this.events} enabled={editing} readonly={this.props.readonly} />
-          <DrawingLayerView firebaseRef={this.props.firebaseRef} events={this.events} enabled={!editing} imageSetItems={this.state.imageSetItems} />
+          <DrawingLayerView firebaseRef={this.props.firebaseRef} readonly={this.props.readonly} events={this.events} imageSetItems={this.state.imageSetItems} />
         </div>
         {this.props.readonly ? <div className="read-only-blocker" /> : null}
       </div>
