@@ -682,6 +682,7 @@ export class LineDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
     const start = getWorkspacePoint(e)
     const line:LineObject = new LineObject({x: start.x, y: start.y, color: this.color})
 
@@ -696,9 +697,11 @@ export class LineDrawingTool implements DrawingTool {
     }
 
     const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
       addPoint(e)
     }
     const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
       if (line.deltaPoints.length > 0) {
         addPoint(e)
         this.drawingLayer.commandManager.execute(new ToggleObjectCommand(line))
@@ -730,18 +733,42 @@ export class RectangleDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
     const start = getWorkspacePoint(e)
     const rectangle:RectangleObject = new RectangleObject({x: start.x, y: start.y, width: 0, height: 0, stroke: this.stroke, fill: this.fill})
 
     const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
       const end = getWorkspacePoint(e)
       rectangle.x = Math.min(start.x, end.x)
       rectangle.y = Math.min(start.y, end.y)
       rectangle.width = Math.max(start.x, end.x) - rectangle.x
       rectangle.height = Math.max(start.y, end.y) - rectangle.y
+      if (e.ctrlKey || e.altKey) {
+        let {x, y} = rectangle
+        const {width, height} = rectangle
+        const squareSize = Math.max(width, height)
+
+        if (x === start.x) {
+          if (y !== start.y) {
+            y = start.y - squareSize
+          }
+        }
+        else {
+          x = start.x - squareSize
+          if (y !== start.y) {
+            y = start.y - squareSize
+          }
+        }
+
+        rectangle.x = x
+        rectangle.y = y
+        rectangle.width = rectangle.height = squareSize
+      }
       this.drawingLayer.setState({currentDrawingObject: rectangle})
     }
     const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
       if ((rectangle.width > 0) && (rectangle.height > 0)) {
         this.drawingLayer.commandManager.execute(new ToggleObjectCommand(rectangle))
       }
@@ -772,18 +799,22 @@ export class EllipseDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
     const start = getWorkspacePoint(e)
     const ellipse:EllipseObject = new EllipseObject({x: start.x, y: start.y, rx: 0, ry: 0, stroke: this.stroke, fill: this.fill})
 
     const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
       const end = getWorkspacePoint(e)
-      ellipse.x = Math.min(start.x, end.x)
-      ellipse.y = Math.min(start.y, end.y)
-      ellipse.rx = Math.max(start.x, end.x) - ellipse.x
-      ellipse.ry = Math.max(start.y, end.y) - ellipse.y
+      ellipse.rx = Math.abs(start.x - end.x)
+      ellipse.ry = Math.abs(start.y - end.y)
+      if (e.ctrlKey || e.altKey) {
+        ellipse.rx = ellipse.ry = Math.max(ellipse.rx, ellipse.ry)
+      }
       this.drawingLayer.setState({currentDrawingObject: ellipse})
     }
     const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
       if ((ellipse.rx > 0) && (ellipse.ry > 0)) {
         this.drawingLayer.commandManager.execute(new ToggleObjectCommand(ellipse))
       }
