@@ -422,18 +422,17 @@ export class TextObject implements DrawingObject {
     this.x = json ? json.x : 0
     this.y = json ? json.y : 0
     this.width = json ? (json.width || 300) : 300
-    this.height = json ? (json.height || 100) : 100
     this.color = json ? (json.color || "#000") : "#000"
     this.uuid = json ? (json.uuid || uuid()) : uuid()
   }
 
   serialize() {
+    // NOTE: height is not serialized as it is calculated dynamically in the text editor view
     return JSON.stringify({
       type: this.type,
       x: this.x,
       y: this.y,
       width: this.width,
-      height: this.height,
       color: this.color,
       uuid: this.uuid
     })
@@ -443,7 +442,6 @@ export class TextObject implements DrawingObject {
     this.x = json.x || this.x
     this.y = json.y || this.y
     this.width = json.width || this.width
-    this.height = json.height || this.height
     this.color = json.color || this.color
     this.uuid = json.uuid || this.uuid
   }
@@ -482,28 +480,49 @@ export interface TextEditorWrapperViewProps {
 }
 
 export interface TextEditorWrapperViewState {
+  height: number
 }
 
 export class TextEditorWrapperView extends React.Component<TextEditorWrapperViewProps, TextEditorWrapperViewState> {
   constructor(props:TextEditorWrapperViewProps){
     super(props)
 
-    this.state = {}
+    this.state = {
+      height: 0 // this is updated dyanmically be the TextEditorView after the render
+    }
+  }
+
+  handleSetHeight = (height:number) => {
+    if (this.state.height !== height) {
+      this.props.textObject.height = height
+      this.setState({height})
+    }
+  }
+
+  handleMouseDown = (e:React.MouseEvent<HTMLDivElement>) => {
+    const {textObject, drawingLayer} = this.props
+    if (drawingLayer.state.selectedObjects.indexOf(textObject) !== -1) {
+      drawingLayer.handleSelectedObjectMouseDown(e, textObject)
+    }
   }
 
   render() {
     const {textObject, onMouseEnter, onMouseLeave, drawingLayer} = this.props
-    const {x, y, width, height} = textObject
+    const {height} = this.state
+    const {x, y, width} = textObject
     const enabled = !drawingLayer.currentTool || (drawingLayer.currentTool === drawingLayer.tools.text)
     const pointerEvents = enabled ? "all" : "none"
-    const style = {left: x, top: y, width: width, height: height, pointerEvents}
+    const style = {left: x, top: y, width: width, height: height}
     return (
       <div className="text-editor-wrapper"
            style={style}
+           onMouseDown={this.handleMouseDown}
            onMouseEnter={onMouseEnter}
            onMouseLeave={onMouseLeave}
       >
-        <TextEditorView textObject={textObject} drawingLayer={drawingLayer} enabled={enabled} />
+        <div style={{pointerEvents: pointerEvents}} >
+          <TextEditorView textObject={textObject} drawingLayer={drawingLayer} enabled={enabled} setHeight={this.handleSetHeight} />
+        </div>
       </div>
     )
   }
@@ -513,6 +532,7 @@ export interface TextEditorViewProps {
   textObject: TextObject
   drawingLayer: DrawingLayerView
   enabled: boolean
+  setHeight: (height:number) => void
 }
 
 export interface TextEditorViewState {
@@ -523,6 +543,7 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   firepad: any
   codeMirror: CodeMirror.EditorFromTextArea
   wrapperElement: HTMLElement
+  sizer: HTMLElement
 
   constructor(props:TextEditorViewProps){
     super(props)
@@ -537,50 +558,61 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
     textEditor: HTMLTextAreaElement
   }
 
-  addBorder(add:boolean) {
-    this.wrapperElement.setAttribute("style", add ? "border: 1px solid #aaa; padding: 0;" : "border: none; padding: 1px;")
+  styleWrapper(add:boolean) {
+    const {color} = this.props.textObject
+    const style = add ? `color: ${color}; border: 1px solid #aaa; padding: 0;` : `color: ${color}; border: none; padding: 1px;`
+    this.wrapperElement.setAttribute("style", style)
   }
 
   handleFocused = () => {
-    this.addBorder(true)
+    this.styleWrapper(true)
   }
 
   handleBlur = () => {
-    this.addBorder(false)
+    this.styleWrapper(false)
   }
 
   handleMouseOver = () => {
     if (this.props.enabled) {
-      this.addBorder(true)
+      this.styleWrapper(true)
     }
   }
 
   handleMouseOut = () => {
     if (this.props.enabled && !this.codeMirror.hasFocus()) {
-      this.addBorder(false)
+      this.styleWrapper(false)
     }
+  }
+
+  updateHeight = () => {
+    this.props.setHeight(this.sizer.clientHeight)
   }
 
   componentDidMount() {
     const {textObject, drawingLayer} = this.props
     const {autoFocusTextObject} = drawingLayer
-    const {color} = textObject
     const {readonly} = drawingLayer.props
 
     this.codeMirror = CodeMirror.fromTextArea(this.refs.textEditor, {
-      lineWrapping: true
+      lineWrapping: true,
+      scrollbarStyle: "null"
     })
-
+    this.sizer = (this.codeMirror as any).display.sizer
     this.wrapperElement = this.codeMirror.getWrapperElement()
-    this.wrapperElement.setAttribute("style", `color: ${color}`)
+    this.styleWrapper(false)
 
     this.codeMirror.on("focus", this.handleFocused)
     this.codeMirror.on("blur", this.handleBlur)
+    this.codeMirror.on("update", () => {
+      this.updateHeight()
+    })
 
     this.wrapperElement.addEventListener("mouseover", this.handleMouseOver)
     this.wrapperElement.addEventListener("mouseout", this.handleMouseOut)
 
     this.firepad = Firepad.fromCodeMirror(this.editorRef, this.codeMirror, { richTextToolbar: false, richTextShortcuts: false });
+
+    this.updateHeight()
 
     if (autoFocusTextObject && (autoFocusTextObject.uuid === textObject.uuid)) {
       // keep focus for this one mount
@@ -853,7 +885,7 @@ export class TextDrawingTool implements DrawingTool {
     }
 
     const p = getWorkspacePoint(e)
-    const text:TextObject = new TextObject({x: p.x, y: p.y, color: this.color, focused: true})
+    const text:TextObject = new TextObject({x: p.x, y: p.y - 26 /* to move it above cursor */, color: this.color, focused: true})
     this.drawingLayer.autoFocusTextObject = text
     this.drawingLayer.commandManager.execute(new ToggleObjectCommand(text))
   }
@@ -1001,7 +1033,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       ellipse: new EllipseDrawingTool(this),
       text: new TextDrawingTool(this)
     }
-    this.currentTool = null
+    this.currentTool = this.tools.line
 
     this.updateImageDataUriCache(this.props.imageSetItems)
 

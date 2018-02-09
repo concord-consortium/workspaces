@@ -118,7 +118,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     super(props)
 
     this.state = {
-      selectedButton: null
+      selectedButton: "line"
     }
 
     this.addEventListeners()
@@ -181,9 +181,6 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     return (
       <div className="toolbar" style={{width: TOOLBAR_WIDTH}}>
         <div className="buttons">
-          <ToolbarFlyoutView selected={"text" === this.state.selectedButton}>
-            {this.renderTextButtons()}
-          </ToolbarFlyoutView>
           <ToolbarFlyoutView selected={"line" === this.state.selectedButton}>
             {this.renderLineButtons()}
           </ToolbarFlyoutView>
@@ -195,6 +192,9 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
           </ToolbarFlyoutView>
           <ToolbarFlyoutView selected={"image" === this.state.selectedButton}>
             {this.renderImageSetItems()}
+          </ToolbarFlyoutView>
+          <ToolbarFlyoutView selected={"text" === this.state.selectedButton}>
+            {this.renderTextButtons()}
           </ToolbarFlyoutView>
           <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}><span className="icon icon-magic-wand" /></div>
           <div className="button" title="Undo" onClick={this.handleUndoButton}><span className="icon icon-undo" /></div>
