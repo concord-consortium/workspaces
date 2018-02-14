@@ -1,11 +1,23 @@
 import * as React from "react"
 import * as firebase from "firebase"
+import * as CodeMirror from "codemirror"
 import { EventEmitter, Events } from "../lib/events"
-import { TOOLBAR_WIDTH, ImageButtonData, LineButtonData, PolygonButtonData } from "./toolbar"
+import { TOOLBAR_WIDTH, ImageButtonData, LineButtonData, PolygonButtonData, TextButtonData } from "./toolbar"
+import { v4 as uuid } from "uuid"
 
 const SELECTION_COLOR = "#777"
 const HOVER_COLOR = "#ccff00"
 const SELECTION_BOX_PADDING = 10
+
+// Firepad tries to require the node version of firebase if it isn't defined on the window and expects CodeMirror defined on window
+const win = window as any
+win.CodeMirror = CodeMirror
+win.firebase = firebase
+const Firepad = require("firepad/dist/firepad.js")
+
+import "codemirror/lib/codemirror.css"
+import "firepad/dist/firepad.css"
+import { text } from "d3";
 
 export const getWorkspacePoint = (e:MouseEvent|React.MouseEvent<any>):Point => {
   return {x: e.clientX - TOOLBAR_WIDTH, y: e.clientY}
@@ -69,7 +81,7 @@ export interface ImageDataUriMap {
 }
 
 export interface DrawingLayerViewProps {
-  enabled: boolean
+  readonly?: boolean
   firebaseRef: firebase.database.Reference
   events: EventEmitter
   imageSetItems: ImageSetItem[]
@@ -94,9 +106,10 @@ export interface DrawingObjectOptions {
   key:any
   handleClick?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => void
   handleHover?:(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject, hovering: boolean) => void
-  drawingLayer?: DrawingLayerView
+  drawingLayer: DrawingLayerView
 }
 export interface DrawingObject {
+  type: string
   key: string|null
   x: number
   y: number
@@ -113,6 +126,7 @@ export interface Point {x: number, y: number}
 export interface DeltaPoint {dx: number, dy: number}
 
 export class LineObject implements DrawingObject {
+  type: string
   key: string|null
   x: number
   y: number
@@ -120,6 +134,7 @@ export class LineObject implements DrawingObject {
   color: string
 
   constructor (json?:any) {
+    this.type = "line"
     this.x = json ? (json.x || 0) : 0
     this.y = json ? (json.y || 0) : 0
     this.deltaPoints = json ? (json.deltaPoints || []) : []
@@ -128,7 +143,7 @@ export class LineObject implements DrawingObject {
 
   serialize() {
     return JSON.stringify({
-      type: "line",
+      type: this.type,
       color: this.color,
       x: this.x,
       y: this.y,
@@ -187,6 +202,7 @@ export class LineObject implements DrawingObject {
 }
 
 export class RectangleObject implements DrawingObject {
+  type: string
   key: string|null
   x: number
   y: number
@@ -196,6 +212,7 @@ export class RectangleObject implements DrawingObject {
   fill: string
 
   constructor (json?:any) {
+    this.type = "rectangle"
     this.x = json ? (json.x || 0) : 0
     this.y = json ? (json.y || 0) : 0
     this.width = json ? (json.width || 0) : 0
@@ -206,7 +223,7 @@ export class RectangleObject implements DrawingObject {
 
   serialize() {
     return JSON.stringify({
-      type: "rectangle",
+      type: this.type,
       x: this.x,
       y: this.y,
       width: this.width,
@@ -248,7 +265,7 @@ export class RectangleObject implements DrawingObject {
               stroke={this.stroke}
               fill={this.fill}
               strokeWidth="3"
-              onClick={(e) => handleClick ? handleClick(e, this) : null}
+              onClick={(e) => handleClick ? handleClick(e, this) : null }
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
              />
@@ -256,6 +273,7 @@ export class RectangleObject implements DrawingObject {
 }
 
 export class EllipseObject implements DrawingObject {
+  type: string
   key: string|null
   x: number
   y: number
@@ -265,6 +283,7 @@ export class EllipseObject implements DrawingObject {
   fill: string
 
   constructor (json?:any) {
+    this.type = "ellipse"
     this.x = json ? (json.x || 0) : 0
     this.y = json ? (json.y || 0) : 0
     this.rx = json ? (json.rx || 0) : 0
@@ -275,7 +294,7 @@ export class EllipseObject implements DrawingObject {
 
   serialize() {
     return JSON.stringify({
-      type: "ellipse",
+      type: this.type,
       x: this.x,
       y: this.y,
       rx: this.rx,
@@ -325,12 +344,14 @@ export class EllipseObject implements DrawingObject {
 }
 
 export class ImageObject implements DrawingObject {
+  type: string
   key: string|null
   x: number
   y: number
   imageSetItem: ImageSetItem
 
   constructor (json?:any) {
+    this.type = "image"
     this.imageSetItem = json ? json.imageSetItem : {src: "", width: 0, height: 0, title: ""}
     this.x = json ? json.x : 0
     this.y = json ? json.y : 0
@@ -338,7 +359,7 @@ export class ImageObject implements DrawingObject {
 
   serialize() {
     return JSON.stringify({
-      type: "image",
+      type: this.type,
       imageSetItem: this.imageSetItem,
       x: this.x,
       y: this.y
@@ -352,8 +373,8 @@ export class ImageObject implements DrawingObject {
   }
 
   inSelection(selectionBox:SelectionBox) {
-    const {x, y} = this
-    return selectionBox.contains({x, y})
+    const {nw, se} = this.getBoundingBox()
+    return selectionBox.overlaps(nw, se)
   }
 
   getBoundingBox() {
@@ -386,14 +407,278 @@ export class ImageObject implements DrawingObject {
   }
 }
 
+export class TextObject implements DrawingObject {
+  type: string
+  key: string|null
+  x: number
+  y: number
+  width: number
+  height: number
+  color: string
+  uuid: string
+
+  constructor (json?:any) {
+    this.type = "text"
+    this.x = json ? json.x : 0
+    this.y = json ? json.y : 0
+    this.width = json ? (json.width || 300) : 300
+    this.color = json ? (json.color || "#000") : "#000"
+    this.uuid = json ? (json.uuid || uuid()) : uuid()
+  }
+
+  serialize() {
+    // NOTE: height is not serialized as it is calculated dynamically in the text editor view
+    return JSON.stringify({
+      type: this.type,
+      x: this.x,
+      y: this.y,
+      width: this.width,
+      color: this.color,
+      uuid: this.uuid
+    })
+  }
+
+  update(json:any) {
+    this.x = json.x || this.x
+    this.y = json.y || this.y
+    this.width = json.width || this.width
+    this.color = json.color || this.color
+    this.uuid = json.uuid || this.uuid
+  }
+
+  inSelection(selectionBox:SelectionBox) {
+    const {nw, se} = this.getBoundingBox()
+    return selectionBox.overlaps(nw, se)
+  }
+
+  getBoundingBox() {
+    const {x, y, width, height} = this
+    const nw:Point = {x, y}
+    const se:Point = {x: x + width, y: y + height}
+    return {nw, se}
+  }
+
+  render(options:DrawingObjectOptions) : JSX.Element|null {
+    const {key, handleHover, drawingLayer} = options
+    const {x, y, width, height, color, uuid} = this
+
+    return <TextEditorWrapperView
+              key={key}
+              textObject={this}
+              onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
+              onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
+              drawingLayer={drawingLayer}
+            />
+  }
+}
+
+export interface TextEditorWrapperViewProps {
+  textObject: TextObject
+  onMouseEnter: ((e:any) => void)|undefined
+  onMouseLeave: ((e:any) => void)|undefined
+  drawingLayer: DrawingLayerView
+}
+
+export interface TextEditorWrapperViewState {
+  width: number
+  height: number
+  resizing: boolean
+}
+
+export class TextEditorWrapperView extends React.Component<TextEditorWrapperViewProps, TextEditorWrapperViewState> {
+  codeMirror: CodeMirror.EditorFromTextArea
+
+  constructor(props:TextEditorWrapperViewProps){
+    super(props)
+
+    this.state = {
+      width: this.props.textObject.width,
+      height: 0, // this is updated dyanmically be the TextEditorView after the render
+      resizing: false
+    }
+  }
+
+  componentDidUpdate() {
+    const {width} = this.props.textObject
+    if (this.state.width !== width) {
+      this.setState({width})
+    }
+    this.codeMirror.refresh()
+  }
+
+  handleSetDimensions = (width: number, height:number) => {
+    if ((this.state.width !== width) || (this.state.height !== height)) {
+      this.props.textObject.width = width
+      this.props.textObject.height = height
+      this.setState({width, height})
+    }
+  }
+
+  handleSetCodeMirror = (codeMirror:CodeMirror.EditorFromTextArea) => {
+    this.codeMirror = codeMirror
+  }
+
+  handleMouseDown = (e:React.MouseEvent<HTMLDivElement>) => {
+    const {textObject, drawingLayer} = this.props
+    if (drawingLayer.state.selectedObjects.indexOf(textObject) !== -1) {
+      drawingLayer.handleSelectedObjectMouseDown(e, textObject)
+    }
+  }
+
+  render() {
+    const {textObject, onMouseEnter, onMouseLeave, drawingLayer} = this.props
+    const {height, resizing} = this.state
+    const {x, y, width} = textObject
+    const enabled = !drawingLayer.currentTool || (drawingLayer.currentTool === drawingLayer.tools.text)
+    const pointerEvents = enabled ? "all" : "none"
+    const style = {left: x, top: y, width: width, height: height}
+    return (
+      <div className="text-editor-wrapper"
+           style={style}
+           onMouseDown={this.handleMouseDown}
+           onMouseEnter={onMouseEnter}
+           onMouseLeave={onMouseLeave}
+      >
+        <div style={{pointerEvents: pointerEvents}} >
+          <TextEditorView textObject={textObject} drawingLayer={drawingLayer} enabled={enabled} setDimensions={this.handleSetDimensions} setCodeMirror={this.handleSetCodeMirror} resizing={resizing} />
+        </div>
+      </div>
+    )
+  }
+}
+
+export interface TextEditorViewProps {
+  textObject: TextObject
+  drawingLayer: DrawingLayerView
+  resizing: boolean
+  enabled: boolean
+  setDimensions: (width:number, height:number) => void
+  setCodeMirror: (codeMirror:CodeMirror.EditorFromTextArea) => void
+}
+
+export interface TextEditorViewState {
+}
+
+export class TextEditorView extends React.Component<TextEditorViewProps, TextEditorViewState> {
+  editorRef: firebase.database.Reference
+  firepad: any
+  codeMirror: CodeMirror.EditorFromTextArea
+  wrapperElement: HTMLElement
+  sizer: HTMLElement
+
+  constructor(props:TextEditorViewProps){
+    super(props)
+
+    this.state = {}
+
+    // yeah, this is a little weird...
+    this.editorRef = this.props.drawingLayer.props.firebaseRef.child("editor").child(this.props.textObject.uuid)
+  }
+
+  refs: {
+    textEditor: HTMLTextAreaElement
+  }
+
+  styleWrapper(addBorder:boolean) {
+    const {color} = this.props.textObject
+    const style = addBorder ? `color: ${color}; border: 1px solid #aaa; padding: 0;` : `color: ${color}; border: none; padding: 1px;`
+    this.wrapperElement.setAttribute("style", style)
+  }
+
+  handleFocused = () => {
+    this.styleWrapper(true)
+  }
+
+  handleBlur = () => {
+    this.styleWrapper(false)
+  }
+
+  handleMouseOver = () => {
+    if (this.props.enabled && !this.props.resizing) {
+      this.styleWrapper(true)
+    }
+  }
+
+  handleMouseOut = () => {
+    if (this.props.enabled && !this.props.resizing && !this.codeMirror.hasFocus()) {
+      this.styleWrapper(false)
+    }
+  }
+
+  updateHeight = () => {
+    this.props.setDimensions(this.sizer.clientWidth, this.sizer.clientHeight)
+  }
+
+  componentDidMount() {
+    const {textObject, drawingLayer} = this.props
+    const {autoFocusTextObject} = drawingLayer
+    const {readonly} = drawingLayer.props
+
+    this.codeMirror = CodeMirror.fromTextArea(this.refs.textEditor, {
+      scrollbarStyle: "null"
+    })
+    this.props.setCodeMirror(this.codeMirror)
+
+    this.sizer = (this.codeMirror as any).display.sizer
+    this.wrapperElement = this.codeMirror.getWrapperElement()
+    this.styleWrapper(false)
+
+    this.codeMirror.on("focus", this.handleFocused)
+    this.codeMirror.on("blur", this.handleBlur)
+    this.codeMirror.on("update", () => {
+      this.updateHeight()
+    })
+
+    this.wrapperElement.addEventListener("mouseover", this.handleMouseOver)
+    this.wrapperElement.addEventListener("mouseout", this.handleMouseOut)
+
+    this.firepad = Firepad.fromCodeMirror(this.editorRef, this.codeMirror, { richTextToolbar: false, richTextShortcuts: false });
+
+    this.updateHeight()
+
+    if (autoFocusTextObject && (autoFocusTextObject.uuid === textObject.uuid)) {
+      // keep focus for this one mount
+      this.codeMirror.focus()
+      drawingLayer.autoFocusTextObject = null
+    }
+    else {
+      // remove focus (the color and fontSize calls above set focus)
+      //this.codeMirror.getInputField().blur()
+    }
+  }
+
+  componentWillUnmount() {
+    this.firepad.dispose()
+  }
+
+  componentWillReceiveProps(nextProps:TextEditorViewProps) {
+    if (nextProps.resizing !== this.props.resizing) {
+      this.styleWrapper(nextProps.resizing)
+    }
+  }
+
+  shouldComponentUpdate() {
+    return false
+  }
+
+  render() {
+    return (
+      <div className="text-editor">
+        <textarea ref="textEditor" />
+      </div>
+    )
+  }
+}
+
 interface ObjectConstructorMap {
-  [key: string]: (typeof LineObject)|(typeof ImageObject)|(typeof RectangleObject)|(typeof EllipseObject)|null
+  [key: string]: (typeof LineObject)|(typeof ImageObject)|(typeof RectangleObject)|(typeof EllipseObject)|(typeof TextObject)|null
 }
 const objectConstructors:ObjectConstructorMap = {
   "line": LineObject,
   "rectangle": RectangleObject,
   "ellipse": EllipseObject,
-  "image": ImageObject
+  "image": ImageObject,
+  "text": TextObject
 }
 
 interface ObjectMap {
@@ -425,6 +710,7 @@ export class LineDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
     const start = getWorkspacePoint(e)
     const line:LineObject = new LineObject({x: start.x, y: start.y, color: this.color})
 
@@ -439,9 +725,11 @@ export class LineDrawingTool implements DrawingTool {
     }
 
     const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
       addPoint(e)
     }
     const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
       if (line.deltaPoints.length > 0) {
         addPoint(e)
         this.drawingLayer.commandManager.execute(new ToggleObjectCommand(line))
@@ -473,18 +761,42 @@ export class RectangleDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
     const start = getWorkspacePoint(e)
     const rectangle:RectangleObject = new RectangleObject({x: start.x, y: start.y, width: 0, height: 0, stroke: this.stroke, fill: this.fill})
 
     const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
       const end = getWorkspacePoint(e)
       rectangle.x = Math.min(start.x, end.x)
       rectangle.y = Math.min(start.y, end.y)
       rectangle.width = Math.max(start.x, end.x) - rectangle.x
       rectangle.height = Math.max(start.y, end.y) - rectangle.y
+      if (e.ctrlKey || e.altKey) {
+        let {x, y} = rectangle
+        const {width, height} = rectangle
+        const squareSize = Math.max(width, height)
+
+        if (x === start.x) {
+          if (y !== start.y) {
+            y = start.y - squareSize
+          }
+        }
+        else {
+          x = start.x - squareSize
+          if (y !== start.y) {
+            y = start.y - squareSize
+          }
+        }
+
+        rectangle.x = x
+        rectangle.y = y
+        rectangle.width = rectangle.height = squareSize
+      }
       this.drawingLayer.setState({currentDrawingObject: rectangle})
     }
     const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
       if ((rectangle.width > 0) && (rectangle.height > 0)) {
         this.drawingLayer.commandManager.execute(new ToggleObjectCommand(rectangle))
       }
@@ -515,18 +827,22 @@ export class EllipseDrawingTool implements DrawingTool {
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
     const start = getWorkspacePoint(e)
     const ellipse:EllipseObject = new EllipseObject({x: start.x, y: start.y, rx: 0, ry: 0, stroke: this.stroke, fill: this.fill})
 
     const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
       const end = getWorkspacePoint(e)
-      ellipse.x = Math.min(start.x, end.x)
-      ellipse.y = Math.min(start.y, end.y)
-      ellipse.rx = Math.max(start.x, end.x) - ellipse.x
-      ellipse.ry = Math.max(start.y, end.y) - ellipse.y
+      ellipse.rx = Math.abs(start.x - end.x)
+      ellipse.ry = Math.abs(start.y - end.y)
+      if (e.ctrlKey || e.altKey) {
+        ellipse.rx = ellipse.ry = Math.max(ellipse.rx, ellipse.ry)
+      }
       this.drawingLayer.setState({currentDrawingObject: ellipse})
     }
     const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
       if ((ellipse.rx > 0) && (ellipse.ry > 0)) {
         this.drawingLayer.commandManager.execute(new ToggleObjectCommand(ellipse))
       }
@@ -553,7 +869,6 @@ export class SelectionDrawingTool implements DrawingTool {
     const addToSelectedObjects = e.ctrlKey || e.metaKey
     const start = getWorkspacePoint(e)
     this.drawingLayer.startSelectionBox(start)
-
 
     const handleMouseMove = (e:MouseEvent) => {
       e.preventDefault()
@@ -602,6 +917,36 @@ export class ImageDrawingTool implements DrawingTool {
     const {width, height} = this.imageSetItem
     const image:ImageObject = new ImageObject({x: p.x - (width / 2), y: p.y - (height / 2), imageSetItem: this.imageSetItem})
     this.drawingLayer.commandManager.execute(new ToggleObjectCommand(image))
+  }
+}
+
+export class TextDrawingTool implements DrawingTool {
+  drawingLayer:DrawingLayerView
+  color: string
+
+  constructor(drawingLayer:DrawingLayerView) {
+    this.drawingLayer = drawingLayer
+  }
+
+  setColor(color:string) {
+    this.color = color
+    return this
+  }
+
+  handleClick(e:React.MouseEvent<HTMLDivElement>) {
+    // ignore clicks over existing text editors
+    let node:HTMLElement|null = e.target as HTMLElement
+    while (node) {
+      if (node.className === "text-editor") {
+        return
+      }
+      node = node.parentElement
+    }
+
+    const p = getWorkspacePoint(e)
+    const text:TextObject = new TextObject({x: p.x, y: p.y - 26 /* to move it above cursor */, color: this.color, focused: true})
+    this.drawingLayer.autoFocusTextObject = text
+    this.drawingLayer.commandManager.execute(new ToggleObjectCommand(text))
   }
 }
 
@@ -721,6 +1066,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   currentTool: DrawingTool|null
   tools: DrawingToolMap
   commandManager: CommandManager
+  autoFocusTextObject: TextObject|null
 
   constructor(props:DrawingLayerViewProps){
     super(props)
@@ -743,9 +1089,10 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       selection: new SelectionDrawingTool(this),
       image: new ImageDrawingTool(this),
       rectangle: new RectangleDrawingTool(this),
-      ellipse: new EllipseDrawingTool(this)
+      ellipse: new EllipseDrawingTool(this),
+      text: new TextDrawingTool(this)
     }
-    this.currentTool = null
+    this.currentTool = this.tools.selection
 
     this.updateImageDataUriCache(this.props.imageSetItems)
 
@@ -788,7 +1135,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   addListeners() {
     window.addEventListener("keyup", (e) => {
-      if (this.props.enabled) {
+      if (!this.props.readonly) {
         switch (e.keyCode) {
           case 8:
           case 46:
@@ -807,7 +1154,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         }
       }
     })
-    this.props.events.listen(Events.EditModeSelected, () => this.setCurrentTool(null))
+    this.props.events.listen(Events.TextToolSelected, (data:TextButtonData) => this.setCurrentTool((this.tools.text as TextDrawingTool).setColor(data.color)))
     this.props.events.listen(Events.LineDrawingToolSelected, (data:LineButtonData) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.lineColor.hex)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
     this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setImageSetItem(data.imageSetItem)))
@@ -897,11 +1244,9 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   }
 
   handleDelete = () => {
-    if (this.props.enabled) {
-      const {selectedObjects} = this.state
-      if (selectedObjects.length > 0) {
-        this.commandManager.execute(new DeleteObjectsCommand(selectedObjects))
-      }
+    const {selectedObjects} = this.state
+    if (selectedObjects.length > 0) {
+      this.commandManager.execute(new DeleteObjectsCommand(selectedObjects))
     }
   }
 
@@ -999,9 +1344,14 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     }
   }
 
-  renderObject = (key:string) => {
-    const object = this.state.objects[key]
-    return object ? object.render({key, handleClick: this.handleObjectClick, handleHover: this.handleObjectHover, drawingLayer: this}) : null
+  renderObjects(filter:(object:DrawingObject) => boolean) {
+    return Object.keys(this.state.objects).map((key) => {
+      const object = this.state.objects[key]
+      if (!object || !filter(object)) {
+        return null
+      }
+      return object.render({key, handleClick: this.handleObjectClick, handleHover: this.handleObjectHover, drawingLayer: this})
+    })
   }
 
   renderSelectedObjects(selectedObjects:DrawingObject[], color:string) {
@@ -1034,20 +1384,20 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     const hoveringOverAlreadySelectedObject = this.state.hoverObject ? this.state.selectedObjects.indexOf(this.state.hoverObject) !== -1 : false
     return (
       <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={svgWidth} height={svgHeight}>
-        {Object.keys(this.state.objects).map(this.renderObject)}
+        {this.renderObjects((object) => object.type !== "text")}
         {this.renderSelectedObjects(this.state.selectedObjects, SELECTION_COLOR)}
         {this.state.hoverObject ? this.renderSelectedObjects([this.state.hoverObject], hoveringOverAlreadySelectedObject ? SELECTION_COLOR : HOVER_COLOR) : null}
-        {this.state.currentDrawingObject ? this.state.currentDrawingObject.render({key: "current"}) : null}
+        {this.state.currentDrawingObject ? this.state.currentDrawingObject.render({key: "current", drawingLayer: this}) : null}
         {this.state.selectionBox ? this.state.selectionBox.render() : null}
       </svg>
     )
   }
 
   render() {
-    const style = this.props.enabled ? {} : {pointerEvents: "none"};
     return (
-      <div className="drawing-layer" style={style} onMouseDown={this.handleMouseDown} onClick={this.handleClick}>
+      <div className="drawing-layer" onMouseDown={this.handleMouseDown} onClick={this.handleClick}>
         {this.renderSVG()}
+        {this.renderObjects((object) => object.type === "text")}
       </div>
     )
   }
