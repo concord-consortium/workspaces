@@ -1,5 +1,5 @@
 export enum Events {
-  EditModeSelected,
+  TextToolSelected,
   LineDrawingToolSelected,
   SelectionToolSelected,
   ImageToolSelected,

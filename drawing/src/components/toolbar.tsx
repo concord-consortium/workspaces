@@ -17,6 +17,10 @@ export const lineColors:LineColor[] = [
   {name: "Blue", hex: "#00f"},
 ]
 
+export interface TextButtonData {
+  color: string
+}
+
 export interface PolygonButtonData {
   type: string
   stroke?: string
@@ -31,7 +35,7 @@ export interface LineButtonData {
   lineColor: LineColor
 }
 
-export type ToolbarModalButton = "edit" | "line" | "rectangle" | "ellipse" | "image" | "select"
+export type ToolbarModalButton = "text" | "line" | "rectangle" | "ellipse" | "image" | "select"
 
 export interface ToolbarFlyoutViewProps {
   selected: boolean
@@ -101,13 +105,12 @@ export class ToolbarFlyoutView extends React.Component<ToolbarFlyoutViewProps, T
 }
 
 export interface ToolbarViewProps {
-  mode: DrawingMode
   events: EventEmitter
   imageSetItems: ImageSetItem[]
 }
 
 export interface ToolbarViewState {
-  selectedButton: ToolbarModalButton
+  selectedButton: ToolbarModalButton|null
 }
 
 export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewState> {
@@ -115,14 +118,14 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     super(props)
 
     this.state = {
-      selectedButton: "edit",
+      selectedButton: "select"
     }
 
     this.addEventListeners()
   }
 
   addEventListeners() {
-    this.props.events.listen(Events.EditModeSelected, () => this.setState({selectedButton: "edit"}))
+    this.props.events.listen(Events.TextToolSelected, () => this.setState({selectedButton: "text"}))
     this.props.events.listen(Events.LineDrawingToolSelected, (data:LineButtonData) => this.setState({selectedButton: "line"}))
     this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setState({selectedButton: "image"}))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setState({selectedButton: "select"}))
@@ -130,7 +133,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     this.props.events.listen(Events.EllipseToolSelected, () => this.setState({selectedButton: "ellipse"}))
   }
 
-  handleEditModeButton = () => this.props.events.emit(Events.EditModeSelected)
+  handleTextToolButton = (color:string) => () => this.props.events.emit(Events.TextToolSelected, {color})
   handleLineDrawingToolButton = (lineColor:LineColor) => () => this.props.events.emit(Events.LineDrawingToolSelected, {lineColor})
   handleSelectionToolButton = () => this.props.events.emit(Events.SelectionToolSelected)
   handleImageToolButton = (data:ImageButtonData) => () => this.props.events.emit(Events.ImageToolSelected, {imageSetItem: data.imageSetItem})
@@ -143,6 +146,12 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   modalButtonClass(type:ToolbarModalButton) {
     const selected = type === this.state.selectedButton
     return `button ${selected ? "selected" : ""}`
+  }
+
+  renderTextButtons() {
+    return lineColors.map((lineColor, index) => {
+      return <div key={index} className="button" title={`${lineColor.name} Text Drawing Mode`} onClick={this.handleTextToolButton(lineColor.hex)} style={{color: lineColor.hex}}>A</div>
+    })
   }
 
   renderLineButtons() {
@@ -172,7 +181,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     return (
       <div className="toolbar" style={{width: TOOLBAR_WIDTH}}>
         <div className="buttons">
-          <div className={this.modalButtonClass("edit")} title="Edit Mode" onClick={this.handleEditModeButton}>A</div>
+          <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}><span className="icon icon-mouse-pointer" /></div>
           <ToolbarFlyoutView selected={"line" === this.state.selectedButton}>
             {this.renderLineButtons()}
           </ToolbarFlyoutView>
@@ -185,7 +194,9 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
           <ToolbarFlyoutView selected={"image" === this.state.selectedButton}>
             {this.renderImageSetItems()}
           </ToolbarFlyoutView>
-          <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}><span className="icon icon-magic-wand" /></div>
+          <ToolbarFlyoutView selected={"text" === this.state.selectedButton}>
+            {this.renderTextButtons()}
+          </ToolbarFlyoutView>
           <div className="button" title="Undo" onClick={this.handleUndoButton}><span className="icon icon-undo" /></div>
           <div className="button" title="Redo" onClick={this.handleRedoButton}><span className="icon icon-redo" /></div>
           <div className="button" title="Delete" onClick={this.handleDeleteButton}><span className="icon icon-bin" /></div>
