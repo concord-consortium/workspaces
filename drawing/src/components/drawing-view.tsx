@@ -1,6 +1,5 @@
 import * as React from "react"
 import * as firebase from "firebase"
-import { EditorView } from "./editor"
 import { DrawingLayerView, ImageSetItem } from "./drawing-layer"
 import { ToolbarView } from "./toolbar"
 import { EventEmitter, Events } from "../lib/events"
