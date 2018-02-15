@@ -5,7 +5,7 @@ import sizeMe from 'react-sizeme';
 import { IAttribute, IValueType } from '../data-manager/attribute';
 import { ICase, IDataSet, IDerivationSpec } from '../data-manager/data-manager';
 import { Menu, MenuItem, Popover, Position } from '@blueprintjs/core';
-import { assign, find, map, uniq } from 'lodash';
+import { assign, find, map, uniq, range } from 'lodash';
 import './graph.css';
 
 interface ISizeMeSize {
@@ -464,14 +464,39 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
     }
 
-    getCategoricalLegendColor(index: number) {
+    getLegendColors() {
         // from CODAP apps/dg/utilities/color_utilities.js#L61
-        const colors = [
+        return [
                 '#FFB300', '#803E75', '#FF6800', '#A6BDD7', '#C10020', '#CEA262', '#817066', '#007D34',
                 '#00538A', '#F13A13', '#53377A', '#FF8E00', '#B32851', '#F4C800', '#7F180D', '#93AA00', '#593315',
                 '#232C16', '#FF7A5C', '#F6768E'
             ];
+    }
+
+    getCategoricalLegendColor(index: number) {
+        const colors = this.getLegendColors();
         return colors[index % colors.length];
+    }
+
+    getNumericLegendColors(legendAttrType: ILegendAttrType) {
+        const ranges = legendAttrType.ranges;
+        const numRanges = ranges.length;
+
+        let numericColors = this.getLegendColors(); // as a fallback
+        if (numRanges > 1) {
+            const leftHSL  = {h: 40, s: 31, l: 85};
+            const rightHSL = {h: 40, s: 100, l: 23};
+            const lerp = (v0: number, v1: number, t: number) => v0 * (1 - t) + v1 * t;
+            const lerpColor = (weight: number) => {
+                const h = lerp(leftHSL.h, rightHSL.h, weight);
+                const s = lerp(leftHSL.s, rightHSL.s, weight);
+                const l = lerp(leftHSL.l, rightHSL.l, weight);
+                return `hsl(${h},${s}%,${l}%)`;
+            };
+            numericColors = range(0, numRanges).map((value) => lerpColor(value / (numRanges - 1)));
+        }
+
+        return numericColors;
     }
 
     renderCategoricalLegend(legendValues: IValueType[]) {
@@ -487,28 +512,31 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         return (
             <div>
                 {legends}
-                {this.renderLegendPopover()}
+                {this.state.legendMenuIsOpen ? this.renderLegendPopover() : null}
             </div>
         );
     }
 
     renderNumericLegend(legendAttrType: ILegendAttrType, legendValues: IValueType[]) {
-        const rangePercentageWidth = 100 / legendAttrType.ranges.length;
+        const ranges = legendAttrType.ranges;
+        const numRanges = ranges.length;
+        const rangePercentageWidth = 100 / numRanges;
+        const numericColors = this.getNumericLegendColors(legendAttrType);
 
         const rangeElements = legendValues.map((value, index) => {
             const style = {
                 minWidth: `${rangePercentageWidth}%`,
-                backgroundColor: this.getCategoricalLegendColor(index)
+                backgroundColor: numericColors[index % numericColors.length]
             };
-            const range = legendAttrType.ranges[index];
-            const title = `${range.min} - ${range.max}`;
+            const legendRange = ranges[index];
+            const title = `${legendRange.min} - ${legendRange.max}`;
             return (
                 <div className="legend-numeric-range" key={`range-${index}`} style={style} title={title} />
             );
         });
 
         return (
-            <div onClick={() => this.setState({legendMenuIsOpen: !this.state.legendMenuIsOpen})}>
+            <div>
                 <div className="legend-numeric">
                     <div className="legend-numeric-ranges">{rangeElements}</div>
                     <div className="legend-numeric-min">{legendAttrType.min}</div>
@@ -521,8 +549,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
     renderLegend(legendAttr: IAttribute, legendAttrType: ILegendAttrType|undefined, legendValues: IValueType[]) {
         const isNumeric = legendAttrType && legendAttrType.isNumeric;
+        const togglePopover = () => this.setState({legendMenuIsOpen: !this.state.legendMenuIsOpen});
         return (
-            <div className="legend" ref={(legend) => this.legend = legend}>
+            <div className="legend" ref={(legend) => this.legend = legend} onClick={togglePopover}>
                 <div className="legend-title">{legendAttr.name}</div>
                 {isNumeric && legendAttrType
                     ? this.renderNumericLegend(legendAttrType, legendValues)
@@ -593,6 +622,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 .domain([yMin, yMax || 1]).nice(),
 
             coordinates: IGraphCoordinate[][] = [],
+            colors = legendAttrType ? this.getNumericLegendColors(legendAttrType) : this.getLegendColors(),
 
             xAxis = d3.axisBottom(x),
 
@@ -607,14 +637,14 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
         uniqueLegendValues.forEach((uniqueLegendValue, index) => {
             const values: IGraphCoordinate[] = [];
-            const range = legendAttrType && isNumeric ? legendAttrType.ranges[index] : undefined;
+            const legendRange = legendAttrType && isNumeric ? legendAttrType.ranges[index] : undefined;
             xValues.forEach((iX: number, i: number) => {
                 let addPoint = false;
-                if (range) {
+                if (legendRange) {
                     const legendValue = legendValues[i];
                     addPoint = (legendValue !== undefined) &&
-                               (legendValue >= range.min ) &&
-                               (legendValue <= range.max);
+                               (legendValue >= legendRange.min ) &&
+                               (legendValue <= legendRange.max);
                 }
                 else {
                     addPoint = uniqueLegendValue === legendValues[i];
@@ -663,7 +693,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .attr('cy', function (coords: { x: number, y: number }) {
                 return coords.y;
             })
-            .attr('fill', this.getCategoricalLegendColor(index))
+            .attr('fill', colors[index % colors.length])
             .attr('r', kPointRadius)
             .attr('className', 'nc-point');
         });
