@@ -2,17 +2,17 @@ import * as React from 'react';
 import * as ReactFauxDOM from 'react-faux-dom';
 import * as d3 from 'd3';
 import sizeMe from 'react-sizeme';
-import { IAttribute } from '../data-manager/attribute';
+import { IAttribute, IValueType } from '../data-manager/attribute';
 import { ICase, IDataSet, IDerivationSpec } from '../data-manager/data-manager';
 import { Menu, MenuItem, Popover, Position } from '@blueprintjs/core';
-import { assign, find } from 'lodash';
+import { assign, find, map, uniq } from 'lodash';
 import './graph.css';
 
 interface ISizeMeSize {
     width: number|null;
     height: number|null;
 }
-  
+
 interface IGraphProps {
     size: ISizeMeSize;
     dataSet: IDataSet;
@@ -22,11 +22,27 @@ interface IGraphData {
     dataSet?: IDataSet;
     xAttrID?: string;
     yAttrID?: string;
+    legendAttrID?: string;
 }
 
 interface IGraphState extends IGraphData {
     xMenuIsOpen: boolean;
     yMenuIsOpen: boolean;
+    graphMenuIsOpen: boolean;
+}
+
+interface IAttributeLegendScore {
+    id: string;
+    score: number;
+}
+
+interface IAttributeUniqueValueMap {
+    [key: string]: boolean;
+}
+
+interface IGraphCoordinate {
+    x: number;
+    y: number;
 }
 
 export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
@@ -39,7 +55,8 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
         this.state = assign(this.createGraphData(props.dataSet), {
                                 xMenuIsOpen: false,
-                                yMenuIsOpen: false
+                                yMenuIsOpen: false,
+                                graphMenuIsOpen: false
                             });
 
         this.attachHandlers(this.props.dataSet);
@@ -64,13 +81,45 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         return found ? (found as {} as IAttribute).id : undefined;
     }
 
+    findLegendAttribute(srcDataSet: IDataSet) {
+        const scores: IAttributeLegendScore[] = map(srcDataSet.attributes, (attr: IAttribute) => {
+            const uniqueValues: IAttributeUniqueValueMap = {};
+            let nonNumericCount = 0,
+                nonEmptyCount = 0;
+            attr.values.forEach((value: string|number|undefined) => {
+                if ((value != null) && (value !== '')) {
+                    ++nonEmptyCount;
+                    if (!isFinite(Number(value))) {
+                        ++nonNumericCount;
+                        uniqueValues[value] = true;
+                    }
+                }
+            });
+
+            // attribute score is based on the ratio of non-numeric values to non-empty values
+            // with a boost based on the inverse of the number of unique values
+            // (so that attributes with fewer unique values score higher)
+            let score = nonEmptyCount > 0 ? nonNumericCount / nonEmptyCount : 0;
+            const numUniqueValues = Object.keys(uniqueValues).length;
+            score += numUniqueValues > 0 ? (1 / numUniqueValues) : 0;
+
+            return {id: attr.id, score};
+        });
+        if (scores.length > 0) {
+            scores.sort((a, b) => b.score - a.score);
+            const highestScore = scores[0];
+            return highestScore.score > 0 ? highestScore.id : undefined;
+        }
+        return undefined;
+    }
+
     createGraphData(srcDataSet?: IDataSet, attrs?: IGraphData): IGraphData {
         if (!srcDataSet) { return {}; }
 
         // client-specified attributes override state attributes
         const graphData = assign({}, this.state ? this.state : {} as IGraphData, attrs);
-        let { xAttrID, yAttrID } = graphData,
-            xAttr: IAttribute, yAttr: IAttribute,
+        let { xAttrID, yAttrID, legendAttrID } = graphData,
+            xAttr: IAttribute, yAttr: IAttribute, legendAttr: IAttribute,
             attrIDs: string[] = [];
         if (!xAttrID) {
             xAttrID = this.findPlottableAttribute(srcDataSet);
@@ -86,14 +135,23 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             attrIDs.push(yAttrID);
             yAttr = srcDataSet.attrFromID(yAttrID);
         }
-    
+        if (!legendAttrID) {
+            legendAttrID = this.findLegendAttribute(srcDataSet);
+        }
+        if (legendAttrID && (legendAttrID !== 'none')) {
+            attrIDs.push(legendAttrID);
+            legendAttr = srcDataSet.attrFromID(legendAttrID);
+        }
+
+        const isEmpty = (value: string|number|undefined) => (value == null) || (value === '');
         const derivationSpec: IDerivationSpec = {
                 attributeIDs: attrIDs,
                 filter: (aCase: ICase) => {
                     let x = aCase[xAttr ? xAttr.name : ''],
-                        y = aCase[yAttr ? yAttr.name : ''];
+                        y = aCase[yAttr ? yAttr.name : ''],
+                        legend = legendAttr ? aCase[legendAttr.name] : '';
                     // exclude missing values
-                    if ((x == null) || (x === '') || (y == null) || (y === '')) {
+                    if (isEmpty(x) || isEmpty(y) || (legendAttr && isEmpty(legend))) {
                         return undefined;
                     }
                     // convert to numeric
@@ -106,6 +164,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                     // return the filtered case
                     aCase[xAttr ? xAttr.name : ''] = x;
                     aCase[yAttr ? yAttr.name : ''] = y;
+                    aCase[legendAttr ? legendAttr.name : ''] = legend;
                     return aCase;
                 },
                 synchronize: true
@@ -113,7 +172,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             dataSet = srcDataSet && srcDataSet.derive('graphData', derivationSpec);
 
         this.attachHandlers(undefined, dataSet);
-        return { dataSet, xAttrID, yAttrID };
+        return { dataSet, xAttrID, yAttrID, legendAttrID };
     }
 
     attachHandlers(srcData?: IDataSet, graphData?: IDataSet) {
@@ -169,7 +228,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             graphData.removeActionListener('graph');
         }
     }
-    
+
     componentWillReceiveProps(nextProps: IGraphProps) {
         const { dataSet } = nextProps;
         if (dataSet !== this.props.dataSet) {
@@ -187,7 +246,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     handleSelectAttribute = (evt: React.MouseEvent<HTMLElement>) => {
         const elt: HTMLElement = evt.target as HTMLElement,
               classes = elt.className,
-              axisMatch = /data-axis-([xy])/.exec(classes),
+              axisMatch = /data-axis-(x|y|legend)/.exec(classes),
               axis = axisMatch && axisMatch[1],
               idMatch = /data-id-([-\w]*)/.exec(classes),
               attrID = idMatch && idMatch[1];
@@ -198,18 +257,21 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                     attrs.xAttrID = attrID;
                     break;
                 case 'y':
-                default:
                     attrs.yAttrID = attrID;
+                    break;
+                case 'legend':
+                default:
+                    attrs.legendAttrID = attrID;
                     break;
             }
             this.setState(this.createGraphData(this.props.dataSet, attrs));
         }
     }
 
-    renderAttributeMenu(axisLabel: string) {
+    renderAttributeMenu(axisLabel: string, menuLabel: string, addNoneOption?: boolean) {
         const renderAttributeItems = () => {
             if (!this.props.dataSet) { return null; }
-            return this.props.dataSet.attributes.map((attr) => {
+            const items: JSX.Element[] = this.props.dataSet.attributes.map((attr) => {
                 return (
                     <MenuItem
                       className={`data-axis-${axisLabel} data-id-${attr.id}`}
@@ -219,11 +281,25 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                     />
                 );
             });
+            if (addNoneOption) {
+                items.unshift(
+                    <MenuItem
+                        className={`data-axis-${axisLabel} data-id-none`}
+                        text="(None)"
+                        key="none"
+                        onClick={this.handleSelectAttribute}
+                    />
+                );
+            }
+            return items;
         };
         return (
-            <Menu>
-                {renderAttributeItems()}
-            </Menu>
+            <div>
+                <div className="attribute-menu-label">{menuLabel}</div>
+                <Menu>
+                    {renderAttributeItems()}
+                </Menu>
+            </div>
         );
     }
 
@@ -235,7 +311,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             <div className="nc-popover-container nc-x-popover-container">
                 <Popover
                     popoverClassName="nc-popover-menu nc-x-popover-menu"
-                    content={this.renderAttributeMenu('x')}
+                    content={this.renderAttributeMenu('x', 'X Axis')}
                     position={Position.TOP}
                     isOpen={this.state.xMenuIsOpen}
                     onInteraction={handlePopoverInteraction}
@@ -254,7 +330,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             <div className="nc-popover-container nc-y-popover-container">
                 <Popover
                     popoverClassName="nc-popover-menu nc-y-popover-menu"
-                    content={this.renderAttributeMenu('y')}
+                    content={this.renderAttributeMenu('y', 'Y Axis')}
                     position={Position.RIGHT}
                     isOpen={this.state.yMenuIsOpen}
                     onInteraction={handlePopoverInteraction}
@@ -265,6 +341,40 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         );
     }
 
+    handleBackgroundClicked = () => {
+        this.setState({ graphMenuIsOpen: !this.state.graphMenuIsOpen });
+    }
+
+    renderGraphPopover() {
+        const handlePopoverInteraction = (nextOpenState: boolean) => {
+            this.setState({ graphMenuIsOpen: nextOpenState });
+        };
+        return (
+            <div className="nc-popover-container nc-graph-popover-container">
+                <Popover
+                    popoverClassName="nc-popover-menu nc-graph-popover-menu"
+                    content={this.renderAttributeMenu('legend', 'Legend', true)}
+                    position={Position.LEFT}
+                    isOpen={this.state.graphMenuIsOpen}
+                    onInteraction={handlePopoverInteraction}
+                    tetherOptions={{targetOffset: '0 50%'}}
+                >
+                    <div/>
+                </Popover>
+            </div>
+        );
+    }
+
+    getLegendColor(index: number) {
+        // from CODAP apps/dg/utilities/color_utilities.js#L61
+        const colors = [
+                '#FFB300', '#803E75', '#FF6800', '#A6BDD7', '#C10020', '#CEA262', '#817066', '#007D34',
+                '#00538A', '#F13A13', '#53377A', '#FF8E00', '#B32851', '#F4C800', '#7F180D', '#93AA00', '#593315',
+                '#232C16', '#FF7A5C', '#F6768E'
+            ];
+        return colors[index % colors.length];
+    }
+
     render() {
         if (!this.props.size.width || !this.props.size.height || !this.state.dataSet) {
             return null;
@@ -273,13 +383,15 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         const kPointRadius: number = 6;
 
         const
-            { dataSet, xAttrID, yAttrID } = this.state,
+            { dataSet, xAttrID, yAttrID, legendAttrID } = this.state,
             graphCaseCount = dataSet && dataSet.cases.length;
         if (!dataSet) { return null; }
         let xAttr = dataSet.attrFromID(xAttrID || ''),
-            yAttr = dataSet.attrFromID(yAttrID || '');
+            yAttr = dataSet.attrFromID(yAttrID || ''),
+            legendAttr = legendAttrID ? dataSet.attrFromID(legendAttrID) : undefined;
         let xValues: number[] = xAttr ? xAttr.values as number[] : [],
-            yValues: number[] = yAttr ? yAttr.values as number[] : [];
+            yValues: number[] = yAttr ? yAttr.values as number[] : [],
+            legendValues: IValueType[] = legendAttr ? legendAttr.values : [undefined];
         let xMin = graphCaseCount ? Math.min(0, d3.min(xValues) || 0) : 0,
             yMin = graphCaseCount ? Math.min(0, d3.min(yValues) || 0) : 0,
             xMax = graphCaseCount ? d3.max(xValues) : 10,
@@ -308,9 +420,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 .range([height, 0])
                 .domain([yMin, yMax || 1]).nice(),
 
-            coordinates = xValues.map(function (iX: number, i: number) {
-                return {x: x(iX), y: y(yValues[i])};
-            }),
+            coordinates: IGraphCoordinate[][] = [],
 
             xAxis = d3.axisBottom(x),
 
@@ -322,6 +432,22 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 .attr('height', height + margin.top + margin.bottom)
                 .append('g')
                 .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+        uniq(legendValues).forEach((legendValue, index) => {
+            const values: IGraphCoordinate[] = [];
+            xValues.forEach((iX: number, i: number) => {
+                if (legendValue === legendValues[i]) {
+                    values.push({x: x(iX), y: y(yValues[i])});
+                }
+            });
+            coordinates[index] = values;
+        });
+
+        svg.append('rect')
+            .attr('class', 'background')
+            .attr('width', '100%')
+            .attr('height', '100%')
+            .on('click', () => this.handleBackgroundClicked());
 
         svg.append('g')
             .attr('class', 'x axis')
@@ -344,8 +470,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .text(yAttr ? yAttr.name : '')
             .on('click', () => this.setState({ yMenuIsOpen: true }));
 
-        svg.selectAll('circle')
-            .data(coordinates)
+        coordinates.forEach((coordArray, index) => {
+            svg.selectAll('circle' + index)
+            .data(coordArray)
             .enter().append('circle')
             .attr('cx', function (coords: { x: number, y: number }) {
                 return coords.x;
@@ -353,8 +480,10 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .attr('cy', function (coords: { x: number, y: number }) {
                 return coords.y;
             })
+            .attr('fill', this.getLegendColor(index))
             .attr('r', kPointRadius)
             .attr('className', 'nc-point');
+        });
 
         // const {divWidth, divHeight} = this.props.size;
         return (
@@ -362,6 +491,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 {node.toReact()}
                 {this.renderXAxisPopover()}
                 {this.renderYAxisPopover()}
+                {this.state.graphMenuIsOpen ? this.renderGraphPopover() : null}
             </div>
         );
     }
