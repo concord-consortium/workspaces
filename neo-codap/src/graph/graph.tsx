@@ -29,6 +29,8 @@ interface IGraphState extends IGraphData {
     xMenuIsOpen: boolean;
     yMenuIsOpen: boolean;
     graphMenuIsOpen: boolean;
+    legendMenuIsOpen: boolean;
+    legendHeight: number;
 }
 
 interface IAttributeLegendScore {
@@ -49,6 +51,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
     srcAttributesChanged: boolean = false;
     srcValuesChanged: boolean = false;
+    legend: HTMLDivElement|null = null;
 
     constructor(props: IGraphProps) {
         super(props);
@@ -56,7 +59,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         this.state = assign(this.createGraphData(props.dataSet), {
                                 xMenuIsOpen: false,
                                 yMenuIsOpen: false,
-                                graphMenuIsOpen: false
+                                graphMenuIsOpen: false,
+                                legendMenuIsOpen: false,
+                                legendHeight: 0
                             });
 
         this.attachHandlers(this.props.dataSet);
@@ -285,7 +290,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 items.unshift(
                     <MenuItem
                         className={`data-axis-${axisLabel} data-id-none`}
-                        text="(None)"
+                        text="None"
                         key="none"
                         onClick={this.handleSelectAttribute}
                     />
@@ -307,8 +312,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         const handlePopoverInteraction = (nextOpenState: boolean) => {
             this.setState({ xMenuIsOpen: nextOpenState });
         };
+        const style = {bottom: this.state.legendHeight};
         return (
-            <div className="nc-popover-container nc-x-popover-container">
+            <div className="nc-popover-container nc-x-popover-container" style={style}>
                 <Popover
                     popoverClassName="nc-popover-menu nc-x-popover-menu"
                     content={this.renderAttributeMenu('x', 'X Axis')}
@@ -365,6 +371,38 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         );
     }
 
+    renderLegendPopover() {
+        const handlePopoverInteraction = (nextOpenState: boolean) => {
+            this.setState({ legendMenuIsOpen: nextOpenState });
+        };
+        return (
+            <div className="nc-popover-container nc-legend-popover-container">
+                <Popover
+                    popoverClassName="nc-popover-menu nc-graph-popover-menu"
+                    content={this.renderAttributeMenu('legend', 'Legend', true)}
+                    position={Position.TOP}
+                    isOpen={this.state.legendMenuIsOpen}
+                    onInteraction={handlePopoverInteraction}
+                >
+                    <div/>
+                </Popover>
+            </div>
+        );
+    }
+
+    componentDidUpdate() {
+        if (this.legend) {
+            const { legendHeight } = this.state;
+            const currentLegendHeight = this.legend.clientHeight;
+            if (currentLegendHeight !== legendHeight) {
+                this.setState({legendHeight: currentLegendHeight});
+            }
+        }
+        else if (this.state.legendHeight > 0) {
+            this.setState({legendHeight: 0});
+        }
+    }
+
     getLegendColor(index: number) {
         // from CODAP apps/dg/utilities/color_utilities.js#L61
         const colors = [
@@ -375,23 +413,55 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         return colors[index % colors.length];
     }
 
+    renderLegend(legendAttr: IAttribute, legendValues: IValueType[]) {
+        return (
+            <div className="legend" ref={(legend) => this.legend = legend}>
+                <div className="legend-title">{legendAttr.name}</div>
+                {legendValues.map((value, index) => {
+                    const style = {backgroundColor: this.getLegendColor(index)};
+                    return (
+                        <div className="legend-item" key={`item-${index}`} >
+                            <div className="legend-color" key={`color-${index}`} style={style} />
+                            {value}
+                        </div>
+                    );
+                })}
+                {this.renderLegendPopover()}
+            </div>
+        );
+    }
+
     render() {
         if (!this.props.size.width || !this.props.size.height || !this.state.dataSet) {
             return null;
         }
 
+        let { legendHeight } = this.state;
+        const { dataSet, legendAttrID } = this.state;
+        const legendAttr: IAttribute|undefined = legendAttrID ? dataSet.attrFromID(legendAttrID) : undefined;
+        const legendValues: IValueType[] = legendAttr ? legendAttr.values : [undefined];
+        const uniqueLegendValues = uniq(legendValues);
+
+        if (legendAttr && !legendHeight) {
+            // render only the legend so we can calculate the height and re-render with the
+            // svg height set to not overlap the legend
+            return (
+                <div className="neo-codap-graph">
+                    {this.renderLegend(legendAttr, uniqueLegendValues)}
+                </div>
+            );
+        }
+
         const kPointRadius: number = 6;
 
         const
-            { dataSet, xAttrID, yAttrID, legendAttrID } = this.state,
+            { xAttrID, yAttrID } = this.state,
             graphCaseCount = dataSet && dataSet.cases.length;
         if (!dataSet) { return null; }
         let xAttr = dataSet.attrFromID(xAttrID || ''),
-            yAttr = dataSet.attrFromID(yAttrID || ''),
-            legendAttr = legendAttrID ? dataSet.attrFromID(legendAttrID) : undefined;
+            yAttr = dataSet.attrFromID(yAttrID || '');
         let xValues: number[] = xAttr ? xAttr.values as number[] : [],
-            yValues: number[] = yAttr ? yAttr.values as number[] : [],
-            legendValues: IValueType[] = legendAttr ? legendAttr.values : [undefined];
+            yValues: number[] = yAttr ? yAttr.values as number[] : [];
         let xMin = graphCaseCount ? Math.min(0, d3.min(xValues) || 0) : 0,
             yMin = graphCaseCount ? Math.min(0, d3.min(yValues) || 0) : 0,
             xMax = graphCaseCount ? d3.max(xValues) : 10,
@@ -409,9 +479,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }) as number[];
 */
 
-        let margin = {top: 20, right: 20, bottom: 30, left: 50},
+        let margin = {top: 20, right: 20, bottom: 35, left: 50},
             width: number = this.props.size.width - margin.left - margin.right,
-            height: number = this.props.size.height - margin.top - margin.bottom,
+            height: number = this.props.size.height - margin.top - margin.bottom - legendHeight,
             x = d3.scaleLinear()
                 .range([0, width])
                 .domain([xMin, xMax || 1]).nice(),
@@ -433,7 +503,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 .append('g')
                 .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-        uniq(legendValues).forEach((legendValue, index) => {
+        uniqueLegendValues.forEach((legendValue, index) => {
             const values: IGraphCoordinate[] = [];
             xValues.forEach((iX: number, i: number) => {
                 if (legendValue === legendValues[i]) {
@@ -492,6 +562,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 {this.renderXAxisPopover()}
                 {this.renderYAxisPopover()}
                 {this.state.graphMenuIsOpen ? this.renderGraphPopover() : null}
+                {legendAttr ? this.renderLegend(legendAttr, uniqueLegendValues) : null}
             </div>
         );
     }
