@@ -23,6 +23,7 @@ interface IGraphData {
     xAttrID?: string;
     yAttrID?: string;
     legendAttrID?: string;
+    legendAttrType?: ILegendAttrType;
 }
 
 interface IGraphState extends IGraphData {
@@ -36,6 +37,7 @@ interface IGraphState extends IGraphData {
 interface IAttributeLegendScore {
     id: string;
     score: number;
+    index: number;
 }
 
 interface IAttributeUniqueValueMap {
@@ -45,6 +47,18 @@ interface IAttributeUniqueValueMap {
 interface IGraphCoordinate {
     x: number;
     y: number;
+}
+
+interface ILegendNumericRange {
+    min: number;
+    max: number;
+}
+interface ILegendAttrType {
+    isNumeric: boolean;
+    min: number;
+    max: number;
+    ranges: ILegendNumericRange[];
+    values: IValueType[];
 }
 
 export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
@@ -87,7 +101,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     }
 
     findLegendAttribute(srcDataSet: IDataSet) {
-        const scores: IAttributeLegendScore[] = map(srcDataSet.attributes, (attr: IAttribute) => {
+        const scores: IAttributeLegendScore[] = map(srcDataSet.attributes, (attr: IAttribute, index) => {
             const uniqueValues: IAttributeUniqueValueMap = {};
             let nonNumericCount = 0,
                 nonEmptyCount = 0;
@@ -108,14 +122,60 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             const numUniqueValues = Object.keys(uniqueValues).length;
             score += numUniqueValues > 0 ? (1 / numUniqueValues) : 0;
 
-            return {id: attr.id, score};
+            return {id: attr.id, score, index};
         });
         if (scores.length > 0) {
-            scores.sort((a, b) => b.score - a.score);
+            scores.sort((a, b) => {
+                // in case of a tying score pick the left most one
+                if (a.score === b.score) {
+                    return a.index - b.index;
+                }
+                // otherwise, sort by descending score
+                return b.score - a.score;
+            });
             const highestScore = scores[0];
             return highestScore.score > 0 ? highestScore.id : undefined;
         }
         return undefined;
+    }
+
+    getLegendAttrType(srcDataSet: IDataSet, legendAttr: IAttribute) {
+        let nonEmptyCount = 0;
+        let numericCount = 0;
+        let min = 0;
+        let max = 0;
+        legendAttr.values.forEach((value: string|number|undefined) => {
+            if ((value != null) && (value !== '')) {
+                ++nonEmptyCount;
+                const numberValue = Number(value);
+                if (isFinite(numberValue)) {
+                    if (numericCount === 0) {
+                        min = max = numberValue;
+                    }
+                    else {
+                        min = Math.min(min, numberValue);
+                        max = Math.max(max, numberValue);
+                    }
+                    ++numericCount;
+                }
+            }
+        });
+        const isNumeric = (nonEmptyCount > 0) && ((numericCount / nonEmptyCount) >= 0.5);
+        const ranges: ILegendNumericRange[] = [];
+        const values: IValueType[] = [];
+        if (isNumeric) {
+            const numRanges = Math.min(5, (max - min) + 1);
+            const rangeSize = (max - min) / numRanges;
+            for (let i = 0; i < numRanges; i++) {
+                const rangeMin = min + (i * rangeSize);
+                ranges.push({
+                    min: rangeMin,
+                    max: Math.min(max, rangeMin + rangeSize)
+                });
+                values.push(i);
+            }
+        }
+        return {isNumeric, min, max, ranges, values};
     }
 
     createGraphData(srcDataSet?: IDataSet, attrs?: IGraphData): IGraphData {
@@ -123,7 +183,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
         // client-specified attributes override state attributes
         const graphData = assign({}, this.state ? this.state : {} as IGraphData, attrs);
-        let { xAttrID, yAttrID, legendAttrID } = graphData,
+        let { xAttrID, yAttrID, legendAttrID, legendAttrType } = graphData,
             xAttr: IAttribute, yAttr: IAttribute, legendAttr: IAttribute,
             attrIDs: string[] = [];
         if (!xAttrID) {
@@ -146,6 +206,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         if (legendAttrID && (legendAttrID !== 'none')) {
             attrIDs.push(legendAttrID);
             legendAttr = srcDataSet.attrFromID(legendAttrID);
+            legendAttrType = this.getLegendAttrType(srcDataSet, legendAttr);
         }
 
         const isEmpty = (value: string|number|undefined) => (value == null) || (value === '');
@@ -177,7 +238,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             dataSet = srcDataSet && srcDataSet.derive('graphData', derivationSpec);
 
         this.attachHandlers(undefined, dataSet);
-        return { dataSet, xAttrID, yAttrID, legendAttrID };
+        return { dataSet, xAttrID, yAttrID, legendAttrID, legendAttrType };
     }
 
     attachHandlers(srcData?: IDataSet, graphData?: IDataSet) {
@@ -403,7 +464,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
     }
 
-    getLegendColor(index: number) {
+    getCategoricalLegendColor(index: number) {
         // from CODAP apps/dg/utilities/color_utilities.js#L61
         const colors = [
                 '#FFB300', '#803E75', '#FF6800', '#A6BDD7', '#C10020', '#CEA262', '#817066', '#007D34',
@@ -413,20 +474,60 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         return colors[index % colors.length];
     }
 
-    renderLegend(legendAttr: IAttribute, legendValues: IValueType[]) {
+    renderCategoricalLegend(legendValues: IValueType[]) {
+        const legends = legendValues.map((value, index) => {
+            const style = {backgroundColor: this.getCategoricalLegendColor(index)};
+            return (
+                <div className="legend-item" key={`item-${index}`} >
+                    <div className="legend-color" key={`color-${index}`} style={style} />
+                    {value}
+                </div>
+            );
+        });
+        return (
+            <div>
+                {legends}
+                {this.renderLegendPopover()}
+            </div>
+        );
+    }
+
+    renderNumericLegend(legendAttrType: ILegendAttrType, legendValues: IValueType[]) {
+        const rangePercentageWidth = 100 / legendAttrType.ranges.length;
+
+        const rangeElements = legendValues.map((value, index) => {
+            const style = {
+                minWidth: `${rangePercentageWidth}%`,
+                backgroundColor: this.getCategoricalLegendColor(index)
+            };
+            const range = legendAttrType.ranges[index];
+            const title = `${range.min} - ${range.max}`;
+            return (
+                <div className="legend-numeric-range" key={`range-${index}`} style={style} title={title} />
+            );
+        });
+
+        return (
+            <div onClick={() => this.setState({legendMenuIsOpen: !this.state.legendMenuIsOpen})}>
+                <div className="legend-numeric">
+                    <div className="legend-numeric-ranges">{rangeElements}</div>
+                    <div className="legend-numeric-min">{legendAttrType.min}</div>
+                    <div className="legend-numeric-max">{legendAttrType.max}</div>
+                </div>
+                {this.state.legendMenuIsOpen ? this.renderLegendPopover() : null}
+            </div>
+        );
+    }
+
+    renderLegend(legendAttr: IAttribute, legendAttrType: ILegendAttrType|undefined, legendValues: IValueType[]) {
+        const isNumeric = legendAttrType && legendAttrType.isNumeric;
         return (
             <div className="legend" ref={(legend) => this.legend = legend}>
                 <div className="legend-title">{legendAttr.name}</div>
-                {legendValues.map((value, index) => {
-                    const style = {backgroundColor: this.getLegendColor(index)};
-                    return (
-                        <div className="legend-item" key={`item-${index}`} >
-                            <div className="legend-color" key={`color-${index}`} style={style} />
-                            {value}
-                        </div>
-                    );
-                })}
-                {this.renderLegendPopover()}
+                {isNumeric && legendAttrType
+                    ? this.renderNumericLegend(legendAttrType, legendValues)
+                    : this.renderCategoricalLegend(legendValues)
+                }
             </div>
         );
     }
@@ -437,17 +538,18 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
 
         let { legendHeight } = this.state;
-        const { dataSet, legendAttrID } = this.state;
+        const { dataSet, legendAttrID, legendAttrType } = this.state;
         const legendAttr: IAttribute|undefined = legendAttrID ? dataSet.attrFromID(legendAttrID) : undefined;
         const legendValues: IValueType[] = legendAttr ? legendAttr.values : [undefined];
-        const uniqueLegendValues = uniq(legendValues);
+        const isNumeric = legendAttrType && legendAttrType.isNumeric;
+        const uniqueLegendValues = uniq(legendAttrType && isNumeric ? legendAttrType.values : legendValues);
 
         if (legendAttr && !legendHeight) {
             // render only the legend so we can calculate the height and re-render with the
             // svg height set to not overlap the legend
             return (
                 <div className="neo-codap-graph">
-                    {this.renderLegend(legendAttr, uniqueLegendValues)}
+                    {this.renderLegend(legendAttr, legendAttrType, uniqueLegendValues)}
                 </div>
             );
         }
@@ -503,10 +605,21 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 .append('g')
                 .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-        uniqueLegendValues.forEach((legendValue, index) => {
+        uniqueLegendValues.forEach((uniqueLegendValue, index) => {
             const values: IGraphCoordinate[] = [];
+            const range = legendAttrType && isNumeric ? legendAttrType.ranges[index] : undefined;
             xValues.forEach((iX: number, i: number) => {
-                if (legendValue === legendValues[i]) {
+                let addPoint = false;
+                if (range) {
+                    const legendValue = legendValues[i];
+                    addPoint = (legendValue !== undefined) &&
+                               (legendValue >= range.min ) &&
+                               (legendValue <= range.max);
+                }
+                else {
+                    addPoint = uniqueLegendValue === legendValues[i];
+                }
+                if (addPoint) {
                     values.push({x: x(iX), y: y(yValues[i])});
                 }
             });
@@ -550,7 +663,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .attr('cy', function (coords: { x: number, y: number }) {
                 return coords.y;
             })
-            .attr('fill', this.getLegendColor(index))
+            .attr('fill', this.getCategoricalLegendColor(index))
             .attr('r', kPointRadius)
             .attr('className', 'nc-point');
         });
@@ -562,7 +675,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 {this.renderXAxisPopover()}
                 {this.renderYAxisPopover()}
                 {this.state.graphMenuIsOpen ? this.renderGraphPopover() : null}
-                {legendAttr ? this.renderLegend(legendAttr, uniqueLegendValues) : null}
+                {legendAttr ? this.renderLegend(legendAttr, legendAttrType, uniqueLegendValues) : null}
             </div>
         );
     }

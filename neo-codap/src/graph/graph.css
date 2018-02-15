@@ -139,3 +139,21 @@ svg {
     display: inline-block;
     padding: 5px 10px;
 }
+
+.legend-numeric {
+    width: 80%;
+    margin: 5px 10%;
+}
+.legend-numeric-ranges {
+    width: 100%;
+}
+.legend-numeric-range {
+    display: inline-block;
+    height: 12px;
+}
+.legend-numeric-min {
+    float: left;
+}
+.legend-numeric-max {
+    float: right;
+}
