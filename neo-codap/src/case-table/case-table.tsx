@@ -196,7 +196,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
     return rows;
   }
-  
+
   updateGridState(dataSet?: IDataSet) {
     this.gridColumnDefs = dataSet ? this.getColumnDefs(dataSet) : [];
     this.gridRowData = dataSet ? this.getRowData(dataSet) : [];
@@ -281,6 +281,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           rowData={this.gridRowData}
           deltaRowDataMode={false}
           onGridReady={this.onGridReady}
+          suppressDragLeaveHidesColumns={true}
         />
       </div>
     );
