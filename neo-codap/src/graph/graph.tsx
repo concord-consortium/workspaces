@@ -49,7 +49,7 @@ interface IGraphCoordinate {
     y: number;
 }
 
-interface ILegendNumericRange {
+interface ILegendQuantile {
     min: number;
     max: number;
 }
@@ -57,7 +57,7 @@ interface ILegendAttrType {
     isNumeric: boolean;
     min: number;
     max: number;
-    ranges: ILegendNumericRange[];
+    quantiles: ILegendQuantile[];
     values: IValueType[];
 }
 
@@ -95,7 +95,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                     }
                 });
                 // attribute is plottable if at least half of its non-empty values are numeric
-                return ((nonEmptyCount > 0) && (numericCount / nonEmptyCount >= 0.5));
+                return ((nonEmptyCount > 0) && (numericCount > 0) && (numericCount / nonEmptyCount >= 0.5));
               }, afterAttrIndex != null ? afterAttrIndex + 1 : undefined);
         return found ? (found as {} as IAttribute).id : undefined;
     }
@@ -140,42 +140,65 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     }
 
     getLegendAttrType(srcDataSet: IDataSet, legendAttr: IAttribute) {
+
         let nonEmptyCount = 0;
-        let numericCount = 0;
         let min = 0;
         let max = 0;
-        legendAttr.values.forEach((value: string|number|undefined) => {
-            if ((value != null) && (value !== '')) {
-                ++nonEmptyCount;
-                const numberValue = Number(value);
-                if (isFinite(numberValue)) {
-                    if (numericCount === 0) {
-                        min = max = numberValue;
+        const numericValues: number[] = [];
+
+        legendAttr.values.forEach((value: IValueType) => {
+            if ((value !== undefined) && (value !== null) && (value !== '')) {
+                nonEmptyCount++;
+                const numericValue = Number(value);
+                if (isFinite(numericValue)) {
+                    if (numericValues.length === 0) {
+                        min = max = numericValue;
                     }
                     else {
-                        min = Math.min(min, numberValue);
-                        max = Math.max(max, numberValue);
+                        min = Math.min(min, numericValue);
+                        max = Math.max(max, numericValue);
                     }
-                    ++numericCount;
+                    numericValues.push(numericValue);
                 }
             }
         });
-        const isNumeric = (nonEmptyCount > 0) && ((numericCount / nonEmptyCount) >= 0.5);
-        const ranges: ILegendNumericRange[] = [];
+
+        const isNumeric = (nonEmptyCount > 0) &&
+                          (numericValues.length > 0) &&
+                          ((numericValues.length / nonEmptyCount) >= 0.5);
+        const quantiles: ILegendQuantile[] = [];
         const values: IValueType[] = [];
+
         if (isNumeric) {
-            const numRanges = Math.min(5, (max - min) + 1);
-            const rangeSize = (max - min) / numRanges;
-            for (let i = 0; i < numRanges; i++) {
-                const rangeMin = min + (i * rangeSize);
-                ranges.push({
-                    min: rangeMin,
-                    max: Math.min(max, rangeMin + rangeSize)
-                });
-                values.push(i);
+            numericValues.sort((a, b) => a - b);
+            const numQuantiles = Math.min(5, numericValues.length);
+            const lastIndex = numericValues.length - 1;
+
+            // adapted from CODAP's DG.MathUtilities.nQuantileValues()
+            for (let quantileIndex = 0; quantileIndex < numQuantiles; quantileIndex++) {
+                let numericIndex = lastIndex * (quantileIndex / numQuantiles),
+                    numericIndexFloor = Math.floor(numericIndex),
+                    numericIndexCeil = Math.ceil(numericIndex),
+                    fraction = numericIndex - numericIndexFloor,
+                    quantileMin;
+
+                if (numericIndex >= lastIndex) {
+                    quantileMin = numericValues[lastIndex];
+                } else if (numericIndex === numericIndexFloor) {
+                    quantileMin = numericValues[numericIndexFloor];
+                } else {
+                    quantileMin = (numericValues[numericIndexCeil] * fraction) +
+                                  (numericValues[numericIndexFloor] * (1.0 - fraction));
+                }
+
+                quantiles.push({min: quantileMin, max: max});
+                if (quantileIndex > 0) {
+                    quantiles[quantileIndex - 1].max = quantileMin;
+                }
+                values.push(quantileIndex);
             }
         }
-        return {isNumeric, min, max, ranges, values};
+        return {isNumeric, min, max, quantiles, values};
     }
 
     createGraphData(srcDataSet?: IDataSet, attrs?: IGraphData): IGraphData {
@@ -479,7 +502,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     }
 
     getNumericLegendColors(legendAttrType: ILegendAttrType) {
-        const ranges = legendAttrType.ranges;
+        const ranges = legendAttrType.quantiles;
         const numRanges = ranges.length;
 
         let numericColors = this.getLegendColors(); // as a fallback
@@ -517,8 +540,12 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         );
     }
 
+    renderTrailingDecimals(num: number) {
+        return `${num.toFixed(2)}`.replace(/0+$/, '').replace(/\.+$/, '');
+    }
+
     renderNumericLegend(legendAttrType: ILegendAttrType, legendValues: IValueType[]) {
-        const ranges = legendAttrType.ranges;
+        const ranges = legendAttrType.quantiles;
         const numRanges = ranges.length;
         const rangePercentageWidth = 100 / numRanges;
         const numericColors = this.getNumericLegendColors(legendAttrType);
@@ -529,7 +556,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 backgroundColor: numericColors[index % numericColors.length]
             };
             const legendRange = ranges[index];
-            const title = `${legendRange.min} - ${legendRange.max}`;
+            const min = this.renderTrailingDecimals(legendRange.min);
+            const max = this.renderTrailingDecimals(legendRange.max);
+            const title = `${min} - ${max}`;
             return (
                 <div className="legend-numeric-range" key={`range-${index}`} style={style} title={title} />
             );
@@ -637,7 +666,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
         uniqueLegendValues.forEach((uniqueLegendValue, index) => {
             const values: IGraphCoordinate[] = [];
-            const legendRange = legendAttrType && isNumeric ? legendAttrType.ranges[index] : undefined;
+            const legendRange = legendAttrType && isNumeric ? legendAttrType.quantiles[index] : undefined;
             xValues.forEach((iX: number, i: number) => {
                 let addPoint = false;
                 if (legendRange) {
