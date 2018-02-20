@@ -10,6 +10,7 @@ import { assign, cloneDeep, findIndex, isEqual } from 'lodash';
 import 'ag-grid/dist/styles/ag-grid.css';
 import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
+import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemoryRowModel';
 
 interface ICaseTableProps {
   dataSet?: IDataSet;
@@ -230,14 +231,52 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
+  handleAction = (action: ISerializedActionCall) => {
+    if (!this.isIgnorableChange(action)) {
+      let columnDefs = null,
+          rowTransaction: RowDataTransaction | null = null;
+      switch (action.name) {
+        case 'addAttributeWithID':
+        case 'removeAttribute':
+          if (this.props.dataSet) {
+            columnDefs = this.getColumnDefs(this.props.dataSet);
+          }
+          break;
+        case 'addCasesWithIDs':
+        case 'addCanonicalCasesWithIDs':
+        case 'setCaseValues':
+        case 'setCanonicalCaseValues':
+          if (action.args && action.args.length) {
+            const cases = action.args[0].map((aCase: ICase) => ({ id: aCase.__id__ }));
+            if (action.name.substr(0, 3) === 'add') {
+              rowTransaction = { add: cases };
+            }
+            else {
+              rowTransaction = { update: cases };
+            }
+          }
+          break;
+        case 'removeCases':
+          if (action.args && action.args.length) {
+            const casesToRemove = action.args[0].map((id: string) => ({ id }));
+            rowTransaction = { remove: casesToRemove };
+          }
+          break;
+        default:
+      }
+      if (columnDefs) {
+        this.gridApi.setColumnDefs(columnDefs);
+      }
+      if (rowTransaction) {
+        this.gridApi.updateRowData(rowTransaction);
+      }
+      this.forceUpdate();
+    }
+  }
+
   attachDataSet(dataSet?: IDataSet) {
     if (dataSet) {
-      dataSet.addActionListener('case-table', (action) => {
-        if (!this.isIgnorableChange(action)) {
-          this.updateGridState(dataSet);
-          this.forceUpdate();
-        }
-      });
+      dataSet.addActionListener('case-table', this.handleAction);
     }
   }
 
