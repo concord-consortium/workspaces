@@ -104,9 +104,11 @@ export class Document {
           version: "1.0.0",
           ownerId,
           createdAt: firebase.database.ServerValue.TIMESTAMP,
-          name: "Untitled",
-          portalUrl
+          name: "Untitled"
         }
+      }
+      if (portalUrl) {
+        firebaseDocument.info.portalUrl = portalUrl  // firebase does not like sets of undefined (the set below was not returning because of it)
       }
       const firebasePath = getUserTemplatePath(ownerId, documentId)
       const documentRef = firebase.database().ref(firebasePath)
