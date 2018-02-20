@@ -232,7 +232,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             legendAttrType = this.getLegendAttrType(srcDataSet, legendAttr);
         }
 
-        const isEmpty = (value: string|number|undefined) => (value == null) || (value === '');
+        const isEmpty = (value: IValueType) => (value == null) || (value === '');
         const derivationSpec: IDerivationSpec = {
                 attributeIDs: attrIDs,
                 filter: (aCase: ICase) => {
@@ -330,6 +330,23 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
     componentWillUnmount() {
         this.detachHandlers(this.props.dataSet, this.state.dataSet);
+    }
+
+    componentDidUpdate() {
+        if (this.legend) {
+            const { legendHeight } = this.state;
+            const currentLegendHeight = this.legend.clientHeight;
+            if (currentLegendHeight !== legendHeight) {
+                this.setState({legendHeight: currentLegendHeight});
+            }
+        }
+        else if (this.state.legendHeight > 0) {
+            this.setState({legendHeight: 0});
+        }
+    }
+
+    handleBackgroundClicked = () => {
+        this.setState({ graphMenuIsOpen: !this.state.graphMenuIsOpen });
     }
 
     handleSelectAttribute = (evt: React.MouseEvent<HTMLElement>) => {
@@ -431,10 +448,6 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         );
     }
 
-    handleBackgroundClicked = () => {
-        this.setState({ graphMenuIsOpen: !this.state.graphMenuIsOpen });
-    }
-
     renderGraphPopover() {
         const handlePopoverInteraction = (nextOpenState: boolean) => {
             this.setState({ graphMenuIsOpen: nextOpenState });
@@ -474,19 +487,6 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         );
     }
 
-    componentDidUpdate() {
-        if (this.legend) {
-            const { legendHeight } = this.state;
-            const currentLegendHeight = this.legend.clientHeight;
-            if (currentLegendHeight !== legendHeight) {
-                this.setState({legendHeight: currentLegendHeight});
-            }
-        }
-        else if (this.state.legendHeight > 0) {
-            this.setState({legendHeight: 0});
-        }
-    }
-
     getLegendColors() {
         // from CODAP apps/dg/utilities/color_utilities.js#L61
         return [
@@ -494,11 +494,6 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                 '#00538A', '#F13A13', '#53377A', '#FF8E00', '#B32851', '#F4C800', '#7F180D', '#93AA00', '#593315',
                 '#232C16', '#FF7A5C', '#F6768E'
             ];
-    }
-
-    getCategoricalLegendColor(index: number) {
-        const colors = this.getLegendColors();
-        return colors[index % colors.length];
     }
 
     getNumericLegendColors(legendAttrType: ILegendAttrType) {
@@ -523,8 +518,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     }
 
     renderCategoricalLegend(legendValues: IValueType[]) {
+        const colors = this.getLegendColors();
         const legends = legendValues.map((value, index) => {
-            const style = {backgroundColor: this.getCategoricalLegendColor(index)};
+            const style = {backgroundColor: colors[index % colors.length]};
             return (
                 <div className="legend-item" key={`item-${index}`} >
                     <div className="legend-color" key={`color-${index}`} style={style} />
@@ -689,7 +685,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .attr('class', 'background')
             .attr('width', '100%')
             .attr('height', '100%')
-            .on('click', () => this.handleBackgroundClicked());
+            .on('click', this.handleBackgroundClicked);
 
         svg.append('g')
             .attr('class', 'x axis')
@@ -727,7 +723,8 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .attr('className', 'nc-point');
         });
 
-        // const {divWidth, divHeight} = this.props.size;
+        // Note: the graph popover is conditionally rendered so that the SVG element can get all mouse
+        // events for data point mouseovers and clicks.
         return (
             <div className="neo-codap-graph">
                 {node.toReact()}
