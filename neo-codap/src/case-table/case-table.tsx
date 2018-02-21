@@ -225,20 +225,22 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     return cols;
   }
 
-  getRowData(dataSet: IDataSet) {
+  getRowData(dataSet?: IDataSet) {
     const rows = [];
-    for (let i = 0; i < dataSet.cases.length; ++i) {
-      // just need the ID; everything else comes from valueGetter
-      rows.push({ id: dataSet.cases[i].__id__ });
+    if (dataSet) {
+      for (let i = 0; i < dataSet.cases.length; ++i) {
+        // just need the ID; everything else comes from valueGetter
+        rows.push({ id: dataSet.cases[i].__id__ });
+      }
     }
+    rows.push({id: LOCAL_CASE_ID});
     return rows;
   }
 
   updateGridState(dataSet?: IDataSet) {
     this.gridColumnDefs = dataSet ? this.getColumnDefs(dataSet) : [];
-    this.gridRowData = dataSet ? this.getRowData(dataSet) : [];
+    this.gridRowData = this.getRowData(dataSet);
     if (this.gridApi) {
-      this.gridRowData.push({id: LOCAL_CASE_ID});
       this.gridApi.setRowData(this.gridRowData);
       setTimeout(() => this.ensureFocus(dataSet));
     }
@@ -293,14 +295,15 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   }
 
   handleAction = (action: ISerializedActionCall) => {
+    const { dataSet } = this.props;
     if (!this.isIgnorableChange(action)) {
       let columnDefs = null,
           rowTransaction: RowDataTransaction | null = null;
       switch (action.name) {
         case 'addAttributeWithID':
         case 'removeAttribute':
-          if (this.props.dataSet) {
-            columnDefs = this.getColumnDefs(this.props.dataSet);
+          if (dataSet) {
+            columnDefs = this.getColumnDefs(dataSet);
           }
           break;
         case 'addCasesWithIDs':
@@ -310,7 +313,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           if (action.args && action.args.length) {
             const cases = action.args[0].map((aCase: ICase) => ({ id: aCase.__id__ }));
             if (action.name.substr(0, 3) === 'add') {
-              rowTransaction = { add: cases };
+              rowTransaction = { add: cases, addIndex: this.gridRowData.length - 1 };
             }
             else {
               rowTransaction = { update: cases };
@@ -330,6 +333,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       }
       if (rowTransaction) {
         this.gridApi.updateRowData(rowTransaction);
+        this.gridRowData = this.getRowData(dataSet);
       }
       this.forceUpdate();
     }
