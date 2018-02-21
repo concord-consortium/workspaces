@@ -66,6 +66,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     srcAttributesChanged: boolean = false;
     srcValuesChanged: boolean = false;
     legend: HTMLDivElement|null = null;
+    idleTimer: number | null = null;
 
     constructor(props: IGraphProps) {
         super(props);
@@ -264,6 +265,17 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         return { dataSet, xAttrID, yAttrID, legendAttrID, legendAttrType };
     }
 
+    // wait for asynchronous changes to quiet down before configuring graph
+    createGraphDataWhenIdle(srcData?: IDataSet) {
+        if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+        }
+        this.idleTimer = window.setTimeout(() => {
+            this.setState(this.createGraphData(srcData));
+            this.idleTimer = null;
+        }, 100);
+    }
+
     attachHandlers(srcData?: IDataSet, graphData?: IDataSet) {
         const graphAttributeCount = graphData && graphData.attributes.length,
               graphDataIncomplete = !graphAttributeCount || (graphAttributeCount < 2);
@@ -271,27 +283,30 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             srcData.addActionListener('graphSrc', (action) => {
                 switch (action.name) {
                 case 'addAttributeWithID':
+                case 'removeAttribute':
                     if (srcData.isInTransaction) {
                         this.srcAttributesChanged = true;
                     }
                     else if (graphDataIncomplete) {
-                        this.setState(this.createGraphData(srcData));
+                        this.createGraphDataWhenIdle(srcData);
                     }
                     break;
+                case 'addCasesWithIDs':
+                case 'addCanonicalCasesWithIDs':
                 case 'setCaseValues':
                 case 'setCanonicalCaseValues':
                     if (srcData.isInTransaction) {
                         this.srcValuesChanged = true;
                     }
                     else if (graphDataIncomplete) {
-                        this.setState(this.createGraphData(srcData));
+                        this.createGraphDataWhenIdle(srcData);
                     }
                     break;
                 case 'endTransaction':
                     if (!srcData.isInTransaction) {
                         if (graphDataIncomplete &&
                             (this.srcAttributesChanged || this.srcValuesChanged)) {
-                                this.setState(this.createGraphData(srcData));
+                                this.createGraphDataWhenIdle(srcData);
                             }
                         this.srcAttributesChanged = false;
                         this.srcValuesChanged = false;
