@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { ISerializedActionCall } from 'mobx-state-tree/dist/middlewares/on-action';
 import TableHeaderMenu from './table-header-menu';
-import { addAttributeToDataSet, addCasesToDataSet, ICase, IInputCase, IDataSet } from '../data-manager/data-manager';
+import { addAttributeToDataSet, addCanonicalCasesToDataSet,
+         ICase, IInputCase, IDataSet } from '../data-manager/data-manager';
 import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, CellComp, ColDef, ColumnApi, RowRenderer } from 'ag-grid';
@@ -22,6 +23,13 @@ interface ICaseTableState {
 }
 
 const LOCAL_CASE_ID = '__local__';
+const LOCAL_CASE_ROW_STYLE = {backgroundColor: '#afa'};
+
+interface IRowStyleParams {
+  data: {
+    id: string;
+  };
+}
 
 // default widths for sample data sets
 const widths: { [key: string]: number } = {
@@ -101,7 +109,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         },
         onNewCase: () => {
           if (this.props.dataSet) {
-            addCasesToDataSet(this.props.dataSet, [{}]);
+            addCanonicalCasesToDataSet(this.props.dataSet, [{}]);
           }
         },
         onRemoveAttribute: (id: string) => {
@@ -134,13 +142,11 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       return;
     }
 
-    const newCase: ICase = {};
-    dataSet.attributes.forEach((attr) => {
-      newCase[attr.name] = this.localCase[attr.id];
-    });
-
+    // clear local case before adding so that the update caused by addCanonicalCasesToDataSet()
+    // shows an empty row for the local case
+    const newCase: ICase = cloneDeep(this.localCase);
     this.localCase = {};
-    addCasesToDataSet(dataSet, [newCase]);
+    addCanonicalCasesToDataSet(dataSet, [newCase]);
   }
 
   getAttributeColumnDef(attribute: IAttribute): ColDef {
@@ -156,7 +162,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
               caseID = params.node.id,
               attrID = params.colDef.colId;
         if (params.data.id === LOCAL_CASE_ID) {
-          return params.colDef.colId ? this.localCase[params.colDef.colId] : undefined;
+          return attrID ? this.localCase[attrID] : undefined;
         }
         let value = dataSet && attrID ? dataSet.getValue(caseID, attrID) : undefined;
         // valueGetter includes in-flight changes
@@ -253,10 +259,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
-  // tslint:disable-next-line:no-any
-  getRowStyle(params: any) {
+  getRowStyle(params: IRowStyleParams) {
     if (params.data.id === LOCAL_CASE_ID) {
-      return { backgroundColor: '#afa' };
+      return LOCAL_CASE_ROW_STYLE;
     }
     return undefined;
   }
