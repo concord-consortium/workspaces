@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { ISerializedActionCall } from 'mobx-state-tree/dist/middlewares/on-action';
 import TableHeaderMenu from './table-header-menu';
-import { addAttributeToDataSet, addCasesToDataSet, ICase, IInputCase, IDataSet } from '../data-manager/data-manager';
+import { addAttributeToDataSet, addCanonicalCasesToDataSet,
+         ICase, IInputCase, IDataSet } from '../data-manager/data-manager';
 import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, CellComp, ColDef, ColumnApi, RowRenderer } from 'ag-grid';
@@ -20,6 +21,15 @@ interface ICaseTableProps {
 interface ICaseTableState {
   rowSelection: string;
   rowModelType: string;
+}
+
+const LOCAL_CASE_ID = '__local__';
+const LOCAL_CASE_ROW_STYLE = {backgroundColor: '#afa'};
+
+interface IRowStyleParams {
+  data: {
+    id: string;
+  };
 }
 
 // default widths for sample data sets
@@ -57,6 +67,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
 
   gridColumnDefs: ColDef[] = [];
   gridRowData: (ICase | undefined)[] = [];
+  localCase: ICase = {};
+  checkForEnterAfterCellEditingStopped = false;
+  checkForEnterAfterLocalDataEntry = false;
 
   // we don't need to refresh for changes the table already knows about
   localChanges: IInputCase[] = [];
@@ -97,7 +110,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         },
         onNewCase: () => {
           if (this.props.dataSet) {
-            addCasesToDataSet(this.props.dataSet, [{}]);
+            addCanonicalCasesToDataSet(this.props.dataSet, [{}]);
           }
         },
         onRemoveAttribute: (id: string) => {
@@ -124,6 +137,19 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     });
   }
 
+  addLocalCaseToTable() {
+    const {dataSet} = this.props;
+    if (!dataSet) {
+      return;
+    }
+
+    // clear local case before adding so that the update caused by addCanonicalCasesToDataSet()
+    // shows an empty row for the local case
+    const newCase: ICase = cloneDeep(this.localCase);
+    this.localCase = {};
+    addCanonicalCasesToDataSet(dataSet, [newCase]);
+  }
+
   getAttributeColumnDef(attribute: IAttribute): ColDef {
     return ({
       headerName: attribute.name,
@@ -136,6 +162,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         const { dataSet } = this.props,
               caseID = params.node.id,
               attrID = params.colDef.colId;
+        if (params.data.id === LOCAL_CASE_ID) {
+          return attrID ? this.localCase[attrID] : undefined;
+        }
         let value = dataSet && attrID ? dataSet.getValue(caseID, attrID) : undefined;
         // valueGetter includes in-flight changes
         this.localChanges.forEach((change) => {
@@ -162,6 +191,13 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       valueSetter: (params: ValueSetterParams) => {
         const { dataSet } = this.props;
         if (!dataSet || (params.newValue === params.oldValue)) { return false; }
+        if (params.data.id === LOCAL_CASE_ID) {
+          if (params.colDef.colId) {
+            this.localCase[params.colDef.colId] = params.newValue;
+            this.checkForEnterAfterLocalDataEntry = true;
+          }
+          return !!params.colDef.colId;
+        }
         const str = params.newValue && (typeof params.newValue === 'string')
                       ? params.newValue.trim() : undefined,
               num = str ? Number(str) : undefined,
@@ -202,8 +238,33 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     this.gridColumnDefs = dataSet ? this.getColumnDefs(dataSet) : [];
     this.gridRowData = dataSet ? this.getRowData(dataSet) : [];
     if (this.gridApi) {
+      this.gridRowData.push({id: LOCAL_CASE_ID});
       this.gridApi.setRowData(this.gridRowData);
+      setTimeout(() => this.ensureFocus(dataSet));
     }
+  }
+
+  ensureFocus = (dataSet?: IDataSet) => {
+    const currentCell = this.gridApi.getFocusedCell();
+    const lastRowIndex = this.gridApi.paginationGetRowCount() - 1;
+    if (!currentCell && (lastRowIndex >= 0) && dataSet && (dataSet.attributes.length > 0)) {
+      const firstColId = dataSet.attributes[0].id;
+      this.gridApi.setFocusedCell(lastRowIndex, firstColId);
+    }
+  }
+
+  focusOnNextRow = () => {
+    const currentCell = this.gridApi.getFocusedCell();
+    if (currentCell) {
+      this.gridApi.setFocusedCell(currentCell.rowIndex + 1, currentCell.column.getColId());
+    }
+  }
+
+  getRowStyle(params: IRowStyleParams) {
+    if (params.data.id === LOCAL_CASE_ID) {
+      return LOCAL_CASE_ROW_STYLE;
+    }
+    return undefined;
   }
 
   isIgnorableChange(action: ISerializedActionCall) {
@@ -292,6 +353,33 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
+  handleCellEditingStopped = () => {
+    this.checkForEnterAfterCellEditingStopped = true;
+  }
+
+  handleKeyUp = (e: KeyboardEvent) => {
+    if (e.keyCode === 13) {
+      if (this.checkForEnterAfterLocalDataEntry) {
+        this.addLocalCaseToTable();
+        setTimeout(this.focusOnNextRow);
+      }
+      else if (this.checkForEnterAfterCellEditingStopped) {
+        setTimeout(this.focusOnNextRow);
+      }
+    }
+
+    this.checkForEnterAfterLocalDataEntry = false;
+    this.checkForEnterAfterCellEditingStopped = false;
+  }
+
+  componentWillMount() {
+    window.addEventListener('keyup', this.handleKeyUp);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('keyup', this.handleKeyUp);
+  }
+
   componentWillReceiveProps(nextProps: ICaseTableProps) {
     const { dataSet } = nextProps;
     if (dataSet !== this.props.dataSet) {
@@ -321,6 +409,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           deltaRowDataMode={false}
           onGridReady={this.onGridReady}
           suppressDragLeaveHidesColumns={true}
+          getRowStyle={this.getRowStyle}
+          onCellEditingStopped={this.handleCellEditingStopped}
         />
       </div>
     );
