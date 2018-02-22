@@ -1,17 +1,20 @@
 import { addMiddleware, applyAction, getEnv, onAction, types, getSnapshot } from 'mobx-state-tree';
-import * as uuid from 'uuid/v4';
 import { ISerializedActionCall } from 'mobx-state-tree/dist/middlewares/on-action';
 import { Attribute, IAttribute, IAttributeSnapshot, IValueType } from './attribute';
 // see https://medium.com/@martin_hotell/tree-shake-lodash-with-webpack-jest-and-typescript-2734fa13b5cd
 // for more efficient ways of importing lodash functions
 import { cloneDeep, findIndex } from 'lodash';
 
+export const localId = () => {
+  return Date.now().toString();
+};
+
 export const CaseID = types.model('CaseID', {
   __id__: types.identifier(types.string)
   // __index__: types.number
 }).preProcessSnapshot((snapshot) => {
   const { __id__, ...others } = snapshot;
-  return { __id__: __id__ || uuid(), ...others };
+  return { __id__: __id__ || localId(), ...others };
 });
 export type ICaseID = typeof CaseID.Type;
 
@@ -45,7 +48,7 @@ export const DataSet = types.model('DataSet', {
   cases: types.optional(types.array(CaseID), [])
 }).preProcessSnapshot((snapshot) => {
   const { id, ...others } = snapshot;
-  return { id: id || uuid(), ...others };
+  return { id: id || localId(), ...others };
 }).volatile(self => ({
   transactionCount: 0
 })).extend(self => {
@@ -56,7 +59,7 @@ export const DataSet = types.model('DataSet', {
       caseIDMap: { [index: string]: number } = {},
       inFlightActions = 0,
       disposers: { [index: string]: () => void } = {};
-      
+
   function derive(name?: string) {
     return { sourceID: self.id, name: name || self.name, attributes: [], cases: [] };
   }
@@ -552,16 +555,16 @@ export type IDataSetSnapshot = typeof DataSet.SnapshotType;
 
 export function addAttributeToDataSet(dataset: IDataSet, snapshot: IAttributeSnapshot, beforeID?: string) {
   if (!snapshot.id) {
-    snapshot.id = uuid();
+    snapshot.id = localId();
   }
-  dataset.addAttributeWithID(snapshot, beforeID);    
+  dataset.addAttributeWithID(snapshot, beforeID);
 }
 
 export function addCasesToDataSet(dataset: IDataSet, cases: ICase[], beforeID?: string | string[]) {
   const newCases = cloneDeep(cases);
   newCases.forEach((aCase) => {
     if (!aCase.__id__) {
-      aCase.__id__ = uuid();
+      aCase.__id__ = localId();
     }
   });
   dataset.addCasesWithIDs(newCases, beforeID);
@@ -571,7 +574,7 @@ export function addCanonicalCasesToDataSet(dataset: IDataSet, cases: ICase[], be
   const newCases = cloneDeep(cases);
   newCases.forEach((aCase) => {
     if (!aCase.__id__) {
-      aCase.__id__ = uuid();
+      aCase.__id__ = localId();
     }
   });
   dataset.addCanonicalCasesWithIDs(newCases, beforeID);
