@@ -152,6 +152,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       colId: '__CASE_INDEX__',
       width: 50,
       pinned: 'left',
+      lockPosition: true,
       valueGetter: 'String(node.rowIndex + 1)',
       suppressMovable: true,
       suppressResize: true,
@@ -515,6 +516,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           onGridReady={this.onGridReady}
           suppressDragLeaveHidesColumns={true}
           getRowStyle={this.getRowStyle}
+          enableCellChangeFlash={true}
           onCellEditingStarted={this.handleCellEditingStarted}
           onCellEditingStopped={this.handleCellEditingStopped}
         />
