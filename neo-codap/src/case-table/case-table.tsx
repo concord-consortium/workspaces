@@ -7,7 +7,7 @@ import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
 import { GridReadyEvent, GridApi, CellComp, ColDef, ColumnApi, RowRenderer } from 'ag-grid';
 import { ValueGetterParams, ValueFormatterParams, ValueSetterParams } from 'ag-grid/dist/lib/entities/colDef';
-import { assign, cloneDeep, findIndex, isEqual } from 'lodash';
+import { assign, cloneDeep, findIndex, isEqual, sortedIndexBy } from 'lodash';
 import 'ag-grid/dist/styles/ag-grid.css';
 import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
@@ -313,7 +313,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           if (action.args && action.args.length) {
             const cases = action.args[0].map((aCase: ICase) => ({ id: aCase.__id__ }));
             if (action.name.substr(0, 3) === 'add') {
-              rowTransaction = { add: cases, addIndex: this.gridRowData.length - 1 };
+              interface IRowData { id: string };
+              const addIndex = sortedIndexBy(this.gridRowData, cases[0], (value: IRowData) => value.id);
+              rowTransaction = { add: cases, addIndex: Math.min(addIndex, this.gridRowData.length - 1) };
             }
             else {
               rowTransaction = { update: cases };
