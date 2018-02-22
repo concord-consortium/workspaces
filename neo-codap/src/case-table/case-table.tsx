@@ -5,7 +5,8 @@ import { addAttributeToDataSet, addCanonicalCasesToDataSet,
          ICase, IInputCase, IDataSet } from '../data-manager/data-manager';
 import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
-import { GridReadyEvent, GridApi, CellComp, ColDef, ColumnApi, RowRenderer } from 'ag-grid';
+import { CellComp, CellEditingStartedEvent, CellEditingStoppedEvent, ColDef, Column,
+          ColumnApi, GridApi, GridReadyEvent, RowRenderer } from 'ag-grid';
 import { ValueGetterParams, ValueFormatterParams, ValueSetterParams } from 'ag-grid/dist/lib/entities/colDef';
 import { assign, cloneDeep, findIndex, isEqual, sortedIndexBy } from 'lodash';
 import 'ag-grid/dist/styles/ag-grid.css';
@@ -30,6 +31,22 @@ interface IRowStyleParams {
   data: {
     id: string;
   };
+}
+
+interface IGridRow {
+  id: string;
+}
+
+interface IGridCellDef {
+  rowIndex?: number;
+  column?: Column;
+  floating?: string;
+}
+
+interface ICellIDs {
+  attrID?: string;
+  caseID?: string;
+  floating?: string;
 }
 
 // default widths for sample data sets
@@ -66,10 +83,15 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   gridColumnApi: ColumnApi;
 
   gridColumnDefs: ColDef[] = [];
-  gridRowData: (ICase | undefined)[] = [];
+  gridRowData: (IGridRow | undefined)[] = [];
   localCase: ICase = {};
   checkForEnterAfterCellEditingStopped = false;
   checkForEnterAfterLocalDataEntry = false;
+
+  editCellEvent?: CellEditingStartedEvent;
+  savedFocusedCell?: ICellIDs;
+  savedEditCell?: ICellIDs;
+  savedEditContent?: string;
 
   // we don't need to refresh for changes the table already knows about
   localChanges: IInputCase[] = [];
@@ -225,7 +247,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     return cols;
   }
 
-  getRowData(dataSet?: IDataSet) {
+  getRowData(dataSet?: IDataSet): IGridRow[] {
     const rows = [];
     if (dataSet) {
       for (let i = 0; i < dataSet.cases.length; ++i) {
@@ -294,11 +316,76 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
+  getCellIDsFromGridCell(cell: IGridCellDef): ICellIDs | undefined {
+    if (!cell) { return; }
+    const { rowIndex, column, floating } = cell,
+          attrID = column && column.getColId(),
+          aCase = rowIndex != null ? this.gridRowData[rowIndex] : undefined,
+          caseID = aCase && aCase.id;
+    return attrID && caseID ? { attrID, caseID, floating } : undefined;
+  }
+
+  getGridCellFromCellIDs(cellIDs: ICellIDs): IGridCellDef | undefined {
+    if (!cellIDs || !cellIDs.caseID) { return; }
+    const rowNode = this.gridApi.getRowNode(cellIDs.caseID);
+    return {
+      rowIndex: rowNode.rowIndex,
+      column: this.gridColumnApi.getColumn(cellIDs.attrID)
+    };
+  }
+      
+  saveCellEditState() {
+    const focusedCell = this.gridApi.getFocusedCell(),
+          rowIndex = this.editCellEvent && this.editCellEvent.rowIndex,
+          column = this.editCellEvent && this.editCellEvent.column;
+    this.savedFocusedCell = this.getCellIDsFromGridCell(focusedCell);
+    this.savedEditCell = this.getCellIDsFromGridCell({ rowIndex, column });
+    if (this.editCellEvent) {
+      const cellInputElts = document.getElementsByClassName('ag-cell-edit-input'),
+            cellInputElt: HTMLInputElement = cellInputElts && (cellInputElts[0] as HTMLInputElement),
+            editContent = cellInputElt && cellInputElt.value;
+      if (editContent) {
+        this.savedEditContent = editContent;
+      }
+    }
+    this.gridApi.stopEditing(true);
+    this.gridApi.clearFocusedCell();
+  }
+
+  restoreCellEditState() {
+    if (this.savedFocusedCell) {
+      const focusedGridCell = this.getGridCellFromCellIDs(this.savedFocusedCell);
+      if (focusedGridCell) {
+        const { rowIndex, column, floating } = focusedGridCell;
+        if ((rowIndex != null) && column) {
+          this.gridApi.setFocusedCell(rowIndex, column, floating);
+        }
+      }
+    }
+    if (this.savedEditCell) {
+      const editRowColumn = this.getGridCellFromCellIDs(this.savedEditCell);
+      if (editRowColumn) {
+        const { rowIndex, column } = editRowColumn;
+        if ((rowIndex != null) && column) {
+          this.gridApi.startEditingCell({ rowIndex, colKey: column });
+        }
+      }
+    }
+    if (this.savedEditContent) {
+      const cellInputElts = document.getElementsByClassName('ag-cell-edit-input'),
+            cellInputElt: HTMLInputElement = cellInputElts && (cellInputElts[0] as HTMLInputElement);
+      if (cellInputElt) {
+        cellInputElt.value = this.savedEditContent;
+      }
+    }
+  }
+
   handleAction = (action: ISerializedActionCall) => {
     const { dataSet } = this.props;
     if (!this.isIgnorableChange(action)) {
       let columnDefs = null,
-          rowTransaction: RowDataTransaction | null = null;
+          rowTransaction: RowDataTransaction | null = null,
+          shouldSaveEditState = true;
       switch (action.name) {
         case 'addAttributeWithID':
         case 'removeAttribute':
@@ -313,12 +400,14 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           if (action.args && action.args.length) {
             const cases = action.args[0].map((aCase: ICase) => ({ id: aCase.__id__ }));
             if (action.name.substr(0, 3) === 'add') {
-              interface IRowData { id: string };
+              interface IRowData { id: string; }
               const addIndex = sortedIndexBy(this.gridRowData, cases[0], (value: IRowData) => value.id);
               rowTransaction = { add: cases, addIndex: Math.min(addIndex, this.gridRowData.length - 1) };
             }
             else {
               rowTransaction = { update: cases };
+              // don't need to save/restore cell edit if only changing existing values
+              shouldSaveEditState = false;
             }
           }
           break;
@@ -330,6 +419,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           break;
         default:
       }
+      if (shouldSaveEditState) {
+        this.saveCellEditState();
+      }
       if (columnDefs) {
         this.gridApi.setColumnDefs(columnDefs);
       }
@@ -337,7 +429,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         this.gridApi.updateRowData(rowTransaction);
         this.gridRowData = this.getRowData(dataSet);
       }
-      this.forceUpdate();
+      if (shouldSaveEditState) {
+        this.restoreCellEditState();
+      }
     }
   }
 
@@ -359,7 +453,12 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
-  handleCellEditingStopped = () => {
+  handleCellEditingStarted = (event: CellEditingStartedEvent) => {
+    this.editCellEvent = cloneDeep(event);
+  }
+
+  handleCellEditingStopped = (event: CellEditingStoppedEvent) => {
+    this.editCellEvent = undefined;
     this.checkForEnterAfterCellEditingStopped = true;
   }
 
@@ -416,6 +515,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           onGridReady={this.onGridReady}
           suppressDragLeaveHidesColumns={true}
           getRowStyle={this.getRowStyle}
+          onCellEditingStarted={this.handleCellEditingStarted}
           onCellEditingStopped={this.handleCellEditingStopped}
         />
       </div>
