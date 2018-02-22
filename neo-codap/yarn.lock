@@ -297,13 +297,15 @@ address@1.0.3, address@^1.0.1:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/address/-/address-1.0.3.tgz#b5f50631f8d6cec8bd20c963963afb55e06cbce9"
 
-ag-grid-react@^14.2.0:
-  version "14.2.0"
-  resolved "https://registry.yarnpkg.com/ag-grid-react/-/ag-grid-react-14.2.0.tgz#59b7a82c1556140581409b14eec01dbc8525dc63"
+ag-grid-react@^16.0.0:
+  version "16.0.0"
+  resolved "https://registry.yarnpkg.com/ag-grid-react/-/ag-grid-react-16.0.0.tgz#885c89eafb856f2b715576e954af8eaaf036ecc4"
+  dependencies:
+    prop-types "15.6.0"
 
-ag-grid@^14.2.0:
-  version "14.2.0"
-  resolved "https://registry.yarnpkg.com/ag-grid/-/ag-grid-14.2.0.tgz#126a3de777d990dae200e4bded894cce0e18e9e2"
+ag-grid@^16.0.1:
+  version "16.0.1"
+  resolved "https://registry.yarnpkg.com/ag-grid/-/ag-grid-16.0.1.tgz#f9b5562fff6c70b38a20ffb1708800006c902c1a"
 
 ajv-keywords@^2.0.0:
   version "2.1.1"
@@ -4687,7 +4689,7 @@ promise@^7.1.1:
   dependencies:
     asap "~2.0.3"
 
-prop-types@^15.5.6, prop-types@^15.6.0:
+prop-types@15.6.0, prop-types@^15.5.6, prop-types@^15.6.0:
   version "15.6.0"
   resolved "https://registry.yarnpkg.com/prop-types/-/prop-types-15.6.0.tgz#ceaf083022fc46b4a35f69e13ef75aed0d639856"
   dependencies:
