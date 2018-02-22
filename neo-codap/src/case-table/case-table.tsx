@@ -343,11 +343,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     this.savedEditCell = this.getCellIDsFromGridCell({ rowIndex, column });
     if (this.editCellEvent) {
       const cellInputElts = document.getElementsByClassName('ag-cell-edit-input'),
-            cellInputElt: HTMLInputElement = cellInputElts && (cellInputElts[0] as HTMLInputElement),
-            editContent = cellInputElt && cellInputElt.value;
-      if (editContent) {
-        this.savedEditContent = editContent;
-      }
+            cellInputElt: HTMLInputElement = cellInputElts && (cellInputElts[0] as HTMLInputElement);
+      this.savedEditContent = cellInputElt ? cellInputElt.value : undefined;
     }
     this.gridApi.stopEditing(true);
     this.gridApi.clearFocusedCell();
@@ -362,6 +359,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           this.gridApi.setFocusedCell(rowIndex, column, floating);
         }
       }
+      this.savedFocusedCell = undefined;
     }
     if (this.savedEditCell) {
       const editRowColumn = this.getGridCellFromCellIDs(this.savedEditCell);
@@ -371,13 +369,15 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           this.gridApi.startEditingCell({ rowIndex, colKey: column });
         }
       }
+      this.savedEditCell = undefined;
     }
-    if (this.savedEditContent) {
+    if (this.savedEditContent != null) {
       const cellInputElts = document.getElementsByClassName('ag-cell-edit-input'),
             cellInputElt: HTMLInputElement = cellInputElts && (cellInputElts[0] as HTMLInputElement);
       if (cellInputElt) {
         cellInputElt.value = this.savedEditContent;
       }
+      this.savedEditContent = undefined;
     }
   }
 
