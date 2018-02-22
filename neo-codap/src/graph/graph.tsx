@@ -696,10 +696,13 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             coordinates[index] = values;
         });
 
+        const backgroundOffset = 2;
         svg.append('rect')
             .attr('class', 'background')
-            .attr('width', '100%')
-            .attr('height', '100%')
+            .attr('width', width - backgroundOffset)
+            .attr('height', height - backgroundOffset)
+            .attr('fill', '#fff')
+            .attr('transform', `translate(${backgroundOffset},-${backgroundOffset})`)
             .on('click', this.handleBackgroundClicked);
 
         svg.append('g')
