@@ -221,7 +221,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           }
           return !!params.colDef.colId;
         }
-        const str = params.newValue && (typeof params.newValue === 'string')
+        const str = (params.newValue != null) && (typeof params.newValue === 'string')
                       ? params.newValue.trim() : undefined,
               num = str ? Number(str) : undefined,
               attrID = attribute.id,
