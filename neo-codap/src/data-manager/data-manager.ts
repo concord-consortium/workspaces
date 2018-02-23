@@ -3,10 +3,18 @@ import { ISerializedActionCall } from 'mobx-state-tree/dist/middlewares/on-actio
 import { Attribute, IAttribute, IAttributeSnapshot, IValueType } from './attribute';
 // see https://medium.com/@martin_hotell/tree-shake-lodash-with-webpack-jest-and-typescript-2734fa13b5cd
 // for more efficient ways of importing lodash functions
-import { cloneDeep, findIndex } from 'lodash';
+import { cloneDeep, findIndex, padStart } from 'lodash';
+import * as uuid from 'uuid/v4';
 
+let localIDCounter = 0;
+
+// TODO: handle case ordering without requiring sortable IDs.
+// For now, we combine an incrementing counter with a UUID.
 export const localId = () => {
-  return Date.now().toString();
+  const uuidRight = uuid().substr(8),
+        count = ++localIDCounter,
+        uuidLeft = padStart(String(count), 8, '0');
+  return uuidLeft + uuidRight;
 };
 
 export const CaseID = types.model('CaseID', {
