@@ -17,6 +17,8 @@ import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
+import { Support, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
+import { LogManager } from "../../../shared/log-manager"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
@@ -30,9 +32,12 @@ export interface WorkspaceComponentProps {
   setTitle: ((documentName?:string|null) => void)|null
   isTemplate: boolean
   groupRef: firebase.database.Reference|null
+  supportsRef: firebase.database.Reference|null
+  supportsSeenRef: firebase.database.Reference|null
   group: number|null
   leaveGroup?: () => void
   publication: FirebasePublication|null
+  logManager: LogManager|null
 }
 export interface WorkspaceComponentState extends WindowManagerState {
   documentInfo: FirebaseDocumentInfo|null
@@ -41,6 +46,10 @@ export interface WorkspaceComponentState extends WindowManagerState {
   groupUsers: PortalUserConnectionStatusMap|null
   viewArtifact: FirebaseArtifact|null
   publishing: boolean
+  supports: FirebaseSupportMap|null
+  supportsSeen: FirebaseSupportSeenUsersSupportMap|null
+  showSupportsDropdown: boolean
+  visibleSupportIds: string[]
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -68,7 +77,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       debugInfo: portalOffering ? `Class ID: ${portalOffering.classInfo.classHash}` : "",
       groupUsers: null,
       viewArtifact: null,
-      publishing: false
+      publishing: false,
+      supports: null,
+      supportsSeen: null,
+      showSupportsDropdown: false,
+      visibleSupportIds: []
     }
   }
 
@@ -104,6 +117,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         this.connectedRef = firebase.database().ref(".info/connected")
         this.connectedRef.on("value", this.handleConnected)
       }
+    }
+
+    const {supportsRef, supportsSeenRef} = this.props
+    if (supportsRef) {
+      supportsRef.on("value", this.handleSupports)
+    }
+    if (supportsSeenRef) {
+      supportsSeenRef.on("value", this.handleSupportsSeen)
     }
 
     window.addEventListener("mousedown", this.handleWindowMouseDown)
@@ -170,6 +191,41 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       if (this.props.setTitle) {
         this.props.setTitle(documentInfo ? documentInfo.name : null)
       }
+      if (documentInfo && this.props.logManager) {
+        this.props.logManager.setSettings({
+          activityName: documentInfo.name,
+          url: documentInfo.portalUrl
+        })
+      }
+    }
+  }
+
+  handleSupports = (snapshot:firebase.database.DataSnapshot|null) => {
+    const {portalUser, group} = this.props
+    if (portalUser && group && snapshot) {
+      const allSupports:FirebaseSupportMap|null = snapshot.val()
+      const supports:FirebaseSupportMap = {}
+      if (allSupports) {
+        const groupId = `group|${group}`
+        const userId = `user|${portalUser.id}`
+        Object.keys(allSupports).forEach((supportId) => {
+          const support = allSupports[supportId]
+          if (support) {
+            const assignedTo = (support.assignedTo || "").split(",")
+            if ((assignedTo.indexOf("class") !== -1) || (assignedTo.indexOf(groupId) !== -1) || (assignedTo.indexOf(userId) !== -1)) {
+              supports[supportId] = support
+            }
+          }
+        })
+      }
+      this.setState({supports})
+    }
+  }
+
+  handleSupportsSeen = (snapshot:firebase.database.DataSnapshot|null) => {
+    if (snapshot) {
+      const supportsSeen:FirebaseSupportSeenUsersSupportMap|null = snapshot.val()
+      this.setState({supportsSeen})
     }
   }
 
@@ -452,6 +508,49 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleSupportToggle = () => {
+    this.setState({showSupportsDropdown: !this.state.showSupportsDropdown})
+  }
+
+  handleSupportDropdownItemClicked = (supportId:string) => {
+    const {visibleSupportIds, supportsSeen, supports} = this.state
+    const {supportsSeenRef} = this.props
+    const {logManager} = this.props
+    const support = (supports && supports[supportId]) || ({} as Support)
+    if (visibleSupportIds.indexOf(supportId) === -1) {
+      if (logManager) {
+        logManager.logEvent("Opened support item", supportId, {
+          supportId: supportId,
+          text: support.text,
+          createdAt: support.createdAt
+        })
+      }
+      visibleSupportIds.unshift(supportId)
+      if (supportsSeenRef && (!supportsSeen || !supportsSeen[supportId])) {
+        supportsSeenRef.child(supportId).set(firebase.database.ServerValue.TIMESTAMP)
+      }
+      this.setState({visibleSupportIds})
+    }
+  }
+
+  handleCloseVisibleSupportItem = (supportId:string) => {
+    const {visibleSupportIds, supports} = this.state
+    const {logManager} = this.props
+    const index = visibleSupportIds.indexOf(supportId)
+    const support = (supports && supports[supportId]) || ({} as Support)
+    if (index !== -1) {
+      if (logManager) {
+        logManager.logEvent("Closed support item", supportId, {
+          supportId: supportId,
+          text: support.text,
+          createdAt: support.createdAt
+        })
+      }
+      visibleSupportIds.splice(index, 1)
+      this.setState({visibleSupportIds})
+    }
+  }
+
   renderDocumentInfo() {
     const {documentInfo} = this.state
     if (!documentInfo) {
@@ -463,6 +562,76 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           {this.props.setTitle ? <InlineEditorComponent text={documentInfo.name} changeText={this.handleChangeDocumentName} /> : documentInfo.name}
         </div>
         <div className="instance-info" title={this.state.debugInfo}>{this.state.workspaceName}</div>
+      </div>
+    )
+  }
+
+  renderVisibleSupport(supports: FirebaseSupportMap, supportId:string) {
+    const support = supports[supportId]
+    if (!support) {
+      return null
+    }
+    return (
+      <div className="visible-support" key={supportId}>
+        <div className="visible-support-close" onClick={() => this.handleCloseVisibleSupportItem(supportId) }>X</div>
+        <span className="visible-support-icon">?</span>
+        {support.text}
+      </div>
+    )
+  }
+
+  renderVisibleSupports() {
+    const {visibleSupportIds, supports} = this.state
+    if (!supports || (visibleSupportIds.length === 0)) {
+      return null
+    }
+    return (
+      <div className="visible-supports">
+        {visibleSupportIds.map((supportId) => this.renderVisibleSupport(supports, supportId))}
+      </div>
+    )
+  }
+
+  renderSupportDropdownItem(supports: FirebaseSupportMap, supportId:string) {
+    const support = supports[supportId]
+    if (!support) {
+      return null
+    }
+    return (
+      <div className="supports-dropdown-item" key={supportId} onClick={() => this.handleSupportDropdownItemClicked(supportId)}>
+        {support.text}
+      </div>
+    )
+  }
+
+  renderSupportsDropdown(supports: FirebaseSupportMap, supportKeys:string[]) {
+    if (supportKeys.length === 0) {
+      return null
+    }
+    return (
+      <div className="supports-dropdown">
+        {supportKeys.map((supportId) => this.renderSupportDropdownItem(supports, supportId))}
+      </div>
+    )
+  }
+
+  renderSupportsIcon() {
+    const {supports, supportsSeen, showSupportsDropdown} = this.state
+    const supportKeys = supports ? Object.keys(supports) : []
+    if (!supports || supportKeys.length === 0) {
+      return null
+    }
+    let numUnseen = 0;
+    supportKeys.forEach((supportId) => {
+      if (!supportsSeen || !supportsSeen[supportId]) {
+        numUnseen++
+      }
+    })
+    return (
+      <div className="supports" onClick={this.handleSupportToggle}>
+        <div className="supports-icon-large">?</div>
+        {numUnseen > 0 ? <div className="supports-icon-count">{numUnseen}</div> : null}
+        {showSupportsDropdown ? this.renderSupportsDropdown(supports, supportKeys) : null}
       </div>
     )
   }
@@ -500,6 +669,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           <div className="user-name" title={firebaseUser.uid}>{userName}</div>
         </div>
         {this.renderGroupInfo()}
+        {this.renderSupportsIcon()}
       </div>
     )
   }
@@ -656,6 +826,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderHeader()}
         {this.renderToolbar()}
         {this.renderWindowArea()}
+        {this.renderVisibleSupports()}
         {this.renderSidebarComponent()}
         {this.renderArtifact()}
         {this.renderReadonlyBlocker()}

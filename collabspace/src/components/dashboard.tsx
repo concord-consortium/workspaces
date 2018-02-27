@@ -8,6 +8,8 @@ import { getDocumentPath, getPublicationsRef } from "../lib/refs"
 import { FirebaseConfig } from "../lib/firebase-config"
 import { WorkspaceComponent } from "./workspace"
 import { DashboardTableComponent } from "./dashboard-table"
+import { DashboardSuportComponent } from "./dashboard-support"
+import { LogManager } from "../../../shared/log-manager"
 
 export interface DashboardQueryParams extends AuthQueryParams {
   document?: string
@@ -27,9 +29,12 @@ export interface DashboardComponentState {
   portalTokens: PortalTokens|null
   document: Document|null
   publication: FirebasePublication|null
+  view: "publications" | "support" | "poster"
+  isTeacher: boolean
 }
 
 export class DashboardComponent extends React.Component<DashboardComponentProps, DashboardComponentState> {
+  logManager: LogManager
 
   constructor (props:DashboardComponentProps) {
     super(props);
@@ -41,7 +46,9 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
       portalUser: null,
       portalTokens: null,
       document: null,
-      publication: null
+      publication: null,
+      view: "publications",
+      isTeacher: false
     }
   }
 
@@ -56,7 +63,10 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
           throw new Error("Cannot find offering or user")
         }
 
-        this.setState({portalOffering: offering, portalUser: user, portalTokens: tokens})
+        this.logManager = new LogManager({tokens, activity: "CollabSpace:Dashboard"})
+
+        const isTeacher = user.type === "teacher"
+        this.setState({portalOffering: offering, portalUser: user, portalTokens: tokens, isTeacher})
 
         return firebaseAuth().then((firebaseUser) => {
           this.setState({firebaseUser})
@@ -97,6 +107,38 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
     return <div className="progress">{progress || this.state.progress}</div>
   }
 
+  renderHeader(firebaseUser: firebase.User, portalUser: PortalUser, portalOffering: PortalOffering) {
+    const {classInfo} = portalOffering
+    const userName = portalUser ? portalUser.fullName : (firebaseUser.isAnonymous ? "Anonymous User" : firebaseUser.displayName)
+    return (
+      <div className="header">
+        <div className="document-info">
+          <div className="document-name">
+            {classInfo.name}
+          </div>
+          <div className="instance-info" >Dashboard</div>
+        </div>
+        <div className="user-info">
+          <div className="user-name" title={firebaseUser.uid}>{userName}</div>
+        </div>
+      </div>
+    )
+  }
+
+  renderToolbar() {
+    //<button type="button" onClick={() => this.setState({view: "poster"})}>Poster View</button>
+    return (
+      <div className="toolbar">
+        <div className="buttons">
+          <div className="left-buttons">
+            <button type="button" onClick={() => this.setState({view: "publications"})}>Publications</button>
+            {this.state.isTeacher ? <button type="button" onClick={() => this.setState({view: "support"})}>Support</button> : null}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   render() {
     const {error, progress, portalOffering, portalUser, portalTokens, firebaseUser, document, publication} = this.state
 
@@ -118,16 +160,47 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
           setTitle={null}
           group={null}
           groupRef={null}
+          supportsRef={null}
+          supportsSeenRef={null}
           publication={publication}
+          logManager={this.logManager}
         />
       }
 
-      return <DashboardTableComponent
-          firebaseUser={firebaseUser}
-          portalUser={portalUser}
-          portalOffering={portalOffering}
-          portalTokens={portalTokens}
-        />
+      let workspace:JSX.Element|null = null
+
+      switch (this.state.view) {
+        case "publications":
+          workspace = <DashboardTableComponent
+            firebaseUser={firebaseUser}
+            portalUser={portalUser}
+            portalOffering={portalOffering}
+            portalTokens={portalTokens}
+          />
+          break
+
+        case "support":
+          workspace = <DashboardSuportComponent
+            firebaseUser={firebaseUser}
+            portalUser={portalUser}
+            portalOffering={portalOffering}
+            portalTokens={portalTokens}
+          />
+          break
+
+        case "poster":
+          // TODO
+          return null
+      }
+
+      return (
+        <div className="dashboard">
+          {this.renderHeader(firebaseUser, portalUser, portalOffering)}
+          {this.renderToolbar()}
+          {workspace}
+        </div>
+      )
+
     }
     return this.renderProgress("Authenticating...")
   }
