@@ -8,8 +8,9 @@ import { WorkspaceComponent } from "./workspace"
 import { FirebaseConfig } from "../lib/firebase-config"
 import { DemoComponent } from "./demo"
 import { PortalUser, PortalOffering, collabSpaceAuth, firebaseAuth, PortalTokens } from "../lib/auth"
-import { getUserTemplatePath } from "../lib/refs"
-import {v4 as uuidV4} from "uuid"
+import { getUserTemplatePath, getSupportsRef, getSupportsSeenRef } from "../lib/refs"
+import { v4 as uuidV4 } from "uuid"
+import { LogManager } from "../../../shared/log-manager"
 
 export interface AppComponentProps {}
 
@@ -29,6 +30,8 @@ export interface AppComponentState {
   groupChosen: boolean
   group: number
   groupRef: firebase.database.Reference|null
+  supportsRef: firebase.database.Reference|null
+  supportsSeenRef: firebase.database.Reference|null
 }
 
 export type HashActionParam = "create-template"
@@ -48,6 +51,7 @@ export interface AppQueryParams {
 
 export class AppComponent extends React.Component<AppComponentProps, AppComponentState> {
   startingTitle: string
+  logManager: LogManager
 
   constructor (props:AppComponentProps) {
     super(props)
@@ -65,6 +69,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       groupChosen: false,
       group: 0,
       groupRef: null,
+      supportsRef: null,
+      supportsSeenRef: null,
       templateId: null,
       template: null,
     }
@@ -79,7 +85,10 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
     firebase.initializeApp(FirebaseConfig)
 
     collabSpaceAuth().then((portalInfo) => {
-      this.setState({portalUser: portalInfo.user, portalOffering: portalInfo.offering, portalTokens: portalInfo.tokens})
+      const {tokens} = portalInfo
+
+      this.setState({portalUser: portalInfo.user, portalOffering: portalInfo.offering, portalTokens: tokens})
+      this.logManager = new LogManager({tokens, activity: "CollabSpace"})
 
       return firebaseAuth().then((firebaseUser) => {
         this.setState({firebaseUser})
@@ -160,7 +169,9 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
         if (this.state.template && this.state.portalOffering) {
           this.state.template.getGroupOfferingDocument(this.state.portalOffering, group)
             .then(([document, groupRef]) => {
-              this.setState({document, groupRef})
+              const supportsRef = this.state.portalOffering ? getSupportsRef(this.state.portalOffering) : null;
+              const supportsSeenRef = this.state.portalOffering && this.state.portalUser ? getSupportsSeenRef(this.state.portalOffering, this.state.portalUser.id) : null;
+              this.setState({document, groupRef, supportsRef, supportsSeenRef})
             })
             .catch((documentError) => this.setState({documentError}))
           }
@@ -221,8 +232,11 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                   setTitle={null}
                   group={this.state.group}
                   groupRef={this.state.groupRef}
+                  supportsRef={this.state.supportsRef}
+                  supportsSeenRef={this.state.supportsSeenRef}
                   leaveGroup={this.handleLeaveGroup}
                   publication={null}
+                  logManager={this.logManager}
                 />
               }
               return this.renderProgress("Loading collaborative space group document...")
@@ -245,10 +259,13 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                     portalTokens={this.state.portalTokens}
                     group={null}
                     groupRef={null}
+                    supportsRef={null}
+                    supportsSeenRef={null}
                     firebaseUser={this.state.firebaseUser}
                     document={this.state.template}
                     setTitle={this.handleSetTitle}
                     publication={null}
+                    logManager={this.logManager}
                   />
         }
         return this.renderProgress("Loading collaborative space template...")

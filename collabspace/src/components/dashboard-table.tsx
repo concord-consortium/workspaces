@@ -140,26 +140,18 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
     this.setState({createdRows: true, rows})
   }
 
-  renderHeader() {
-    const {firebaseUser, portalUser, portalOffering} = this.props
-    const {classInfo} = portalOffering
-    const userName = portalUser ? portalUser.fullName : (firebaseUser.isAnonymous ? "Anonymous User" : firebaseUser.displayName)
-    return (
-      <div className="header">
-        <div className="document-info">
-          <div className="document-name">
-            {classInfo.name}
-          </div>
-          <div className="instance-info" >Dashboard</div>
-        </div>
-        <div className="user-info">
-          <div className="user-name" title={firebaseUser.uid}>{userName}</div>
-        </div>
-      </div>
-    )
+  renderTable() {
   }
 
-  renderTable() {
+  renderProgress(progress:string) {
+    return <div className="progress">{progress}</div>
+  }
+
+  render() {
+    if (!this.state.createdRows) {
+      return this.renderProgress("Loading dashboard data...")
+    }
+
     if (this.state.rows.length === 0) {
       return (
         <div className="dashboard-table">
@@ -196,23 +188,6 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
             })}
           </tbody>
         </table>
-      </div>
-    )
-  }
-
-  renderProgress(progress:string) {
-    return <div className="progress">{progress}</div>
-  }
-
-  render() {
-    if (!this.state.createdRows) {
-      return this.renderProgress("Loading dashboard data...")
-    }
-
-    return (
-      <div className="dashboard">
-        {this.renderHeader()}
-        {this.renderTable()}
       </div>
     )
   }

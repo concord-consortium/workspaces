@@ -75,3 +75,27 @@ export const getArtifactsRef = (offering:PortalOffering, artifactId?:string) => 
 export const getArtifactsStoragePath = (offering:PortalOffering, publicationId:string) => {
   return `artifacts/${getOfferingPath(offering)}/publications/${publicationId}`
 }
+
+export const getSupportsPath = (offering:PortalOffering, supportId?:string) => {
+  const prefix = `${getClassPath(offering)}/supports`
+  return supportId ? `${prefix}/${supportId}` : prefix
+}
+
+export const getSupportsRef = (offering:PortalOffering, supportId?:string) => {
+  return firebase.database().ref(getSupportsPath(offering, supportId))
+}
+
+export const getSupportsSeenPath = (offering:PortalOffering, userId?:string, supportId?:string) => {
+  let path = `${getClassPath(offering)}/supportsSeen`
+  if (userId) {
+    path = `${path}/users/${escapeFirebaseKey(userId)}`
+    if (supportId) {
+      path = `${path}/supports/${supportId}`
+    }
+  }
+  return path
+}
+
+export const getSupportsSeenRef = (offering:PortalOffering, userId?:string, supportId?:string) => {
+  return firebase.database().ref(getSupportsSeenPath(offering, userId, supportId))
+}

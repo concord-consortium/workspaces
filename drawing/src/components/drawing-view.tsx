@@ -81,7 +81,7 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
         }
       }
     })
-    xhr.open("GET", imageSetUrl)
+    xhr.open("GET", imageSetUrl, true)
     xhr.send()
   }
 

@@ -220,7 +220,7 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
     const {publicationItem, portalTokens} = this.props
     const {publication} = publicationItem
     const params:any = {
-      jwtToken: portalTokens.rawPortalJWT,
+      portalJWT: portalTokens.rawPortalJWT,
       domain: portalTokens.domain,
       document: publication.documentId,
       publication: publicationItem.id
