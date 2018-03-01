@@ -41,7 +41,6 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
       publish: (publication) => {
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
           const captureScreenCallback = (err:any, canvas:HTMLCanvasElement) => {
-            debugger
             this.setState({captureScreenCallback: null})
             if (err) {
               reject(err)
@@ -57,7 +56,6 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
               }, "image/png")
             }
           }
-          debugger
           this.setState({captureScreenCallback})
         })
       }

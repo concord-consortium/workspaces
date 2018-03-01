@@ -177,6 +177,7 @@ a {
       height: $header-height;
       background-color: #3E90AC;
       color: #fff;
+      z-index: 100;
 
       &.template {
         background-color: #ffc320;
@@ -224,6 +225,64 @@ a {
           font-size: 14px;
         }
       }
+      .supports {
+        position: relative;
+        float: right;
+        min-height: $header-height;
+        margin: 0 20px;
+        padding-right: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        .supports-icon-large {
+          background-color: #ffc320;
+          border-radius: 20px;
+          font-size: 20px;
+          padding: 5px 12px;
+          border: 1px solid #fff;
+        }
+
+        .supports-icon-count {
+          position: absolute;
+          top: 7px;
+          right: 0;
+          background-color: #EA6D2F;
+          border-radius: 10px;
+          padding: 2px 5px;
+          font-size: 12px;
+        }
+
+        $dropdown-width: 200px;
+        $dropdown-item-padding: 5px;
+
+        .supports-dropdown {
+          position: absolute;
+          top: $header-height;
+          right: 0;
+          min-width: $dropdown-width;
+          max-width: $dropdown-width;
+          padding: 10px;
+          background-color: #3E90AC;
+          font-size: 14px;
+          border-left: 1px solid #000;
+          border-right: 1px solid #000;
+          border-bottom: 1px solid #000;
+
+          .supports-dropdown-item {
+            padding: $dropdown-item-padding;
+            width: $dropdown-width - (2 * $dropdown-item-padding);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+
+            &:hover {
+              background-color: #6FC6DA;
+            }
+          }
+        }
+      }
+
       .group-info {
         float: right;
         border-left: 1px solid #fff;
@@ -658,18 +717,47 @@ a {
       }
     }
 
-    .dashboard-table {
+    .visible-supports {
+      position: absolute;
+      top: $header-height + $toolbar-height;
+      left: 0;
+      right: $sidebar-width;
+
+      .visible-support {
+        padding: 20px;
+        background-color: #6FC6DA;
+        margin-bottom: 5px;
+
+        .visible-support-close {
+          float: right;
+          background-color: #3E90AC;
+          padding: 5px 7px;
+          color: #fff;
+          margin-top: -5px;
+        }
+
+        .visible-support-icon {
+          background-color: #FFC320;
+          color: #fff;
+          padding: 5px 10px;
+          border-radius: 20px;
+          margin-right: 10px;
+        }
+      }
+    }
+
+    .dashboard-table, .dashboard-support {
       position: fixed;
-      top: $header-height;
+      top: $header-height + $toolbar-height;
       right: 0;
       left: 0;
       bottom: 0;
       overflow: auto;
+      padding: 20px;
 
       table {
         width: 100%;
         border-collapse: collapse;
-        margin: 20px;
 
         th {
           padding-bottom: 5px;
@@ -681,6 +769,72 @@ a {
             background-color: #ddd;
             color: #fff;
           }
+        }
+      }
+
+      h2 {
+        margin: 0 0 10px 0;
+      }
+
+      form {
+        margin-bottom: 20px;
+
+        textarea {
+          width: 100%;
+          height: 50px;
+        }
+
+        label {
+          display: block;
+          margin: 10px 0 5px 0;
+          font-weight: bold;
+        }
+
+        select {
+          display: block;
+          width: 400px;
+          height: 100px;
+        }
+
+        input {
+          margin: 10px 0;
+        }
+      }
+
+      button, .button {
+        border: 1px solid #313131;
+        padding: 3px 8px;
+        font-size: 14px;
+        background-color: #dddddd;
+      }
+
+      .support {
+        background-color: #6FC6DA;
+        margin: 10px 0 20px 0;
+        padding: 10px;
+
+        .support-right {
+          float: right;
+          text-align: right;
+
+          div {
+            margin: 5px 0;
+          }
+
+          button {
+            margin-left: 5px;
+          }
+        }
+        .support-assigned-to {
+          margin: 5px 0;
+          font-size: 0.9em;
+        }
+        .support-text {
+          margin: 5px 0;
+        }
+        .support-seen-by {
+          font-style: italic;
+          font-size: 12px;
         }
       }
     }
