@@ -23,6 +23,8 @@ export interface SupportWithId extends Support {
 export interface DashboardSuportComponentState {
   supports: SupportWithId[]
   supportsSeen: SupportSeenMap
+  assignedTo: string
+  assignedToLabel: string
 }
 
 export interface Support {
@@ -62,13 +64,16 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
   supportsSeenRef: firebase.database.Reference
 
   text: HTMLTextAreaElement|null
-  assignTo: HTMLSelectElement|null
+  assignedToGroup: HTMLSelectElement|null
+  assignedToUser: HTMLSelectElement|null
 
   constructor (props:DashboardSuportComponentProps) {
     super(props);
     this.state = {
       supports: [],
-      supportsSeen: {}
+      supportsSeen: {},
+      assignedTo: "class",
+      assignedToLabel: "Class"
     }
 
     this.userLookup = new UserLookup(this.props.portalOffering.classInfo)
@@ -127,22 +132,40 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
     this.setState({supportsSeen})
   }
 
+  getOptionNames(options:HTMLOptionsCollection) {
+    return [].filter.call(options, (option:HTMLOptionElement) => option.selected).map((option:HTMLOptionElement) => option.innerHTML).join(", ")
+  }
+
+  getOptionValues(options:HTMLOptionsCollection) {
+    return [].filter.call(options, (option:HTMLOptionElement) => option.selected).map((option:HTMLOptionElement) => option.value).join(",")
+  }
+
   handleSubmitSupport = (e:React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     // validate input
-    if (!this.text || !this.assignTo) {
+    if (!this.text || !this.state.assignedTo || !this.assignedToGroup || !this.assignedToUser) {
       return;
     }
 
-    const text = this.text.value.trim()
-    const assignedTo = [].filter.call(this.assignTo.options, (option:HTMLOptionElement) => option.selected).map((option:HTMLOptionElement) => option.value).join(",")
+    let assignedTo
+    switch (this.state.assignedTo) {
+      case "group":
+        assignedTo = this.getOptionValues(this.assignedToGroup.options)
+        break
+      case "user":
+        assignedTo = this.getOptionValues(this.assignedToUser.options)
+        break
+      case "class":
+      default:
+        assignedTo = "class"
+        break
+    }
 
+    const text = this.text.value.trim()
     if ((text.length === 0) || (assignedTo.length === 0)) {
       return
     }
-
-    this.text.value = ""
 
     const support:Support = {
       offeringId: this.props.portalOffering.id,
@@ -152,6 +175,7 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
     }
 
     this.supportsRef.push(support)
+    this.text.value = ""
   }
 
   handleCopySupport = (support:SupportWithId) => {
@@ -166,19 +190,47 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
     }
   }
 
+  setAssignedToLabel(assignedTo:string) {
+    let assignedToLabel
+    switch (assignedTo) {
+      case "group":
+        assignedToLabel = this.assignedToGroup ? this.getOptionNames(this.assignedToGroup.options) : "N/A"
+        break
+      case "user":
+        assignedToLabel = this.assignedToUser ? this.getOptionNames(this.assignedToUser.options) : "N/A"
+        break
+      case "class":
+      default:
+        assignedToLabel = "Class"
+    }
+    this.setState({assignedToLabel})
+  }
+
+  handleAssignedTo = (e:React.ChangeEvent<HTMLInputElement>) => {
+    const assignedTo = e.target.value
+    this.setState({assignedTo})
+    this.setAssignedToLabel(assignedTo)
+  }
+
+  handleSetAssignTo = (assignedTo: string) => {
+    this.setState({assignedTo})
+    this.setAssignedToLabel(assignedTo)
+  }
+
   renderProgress(progress:string) {
     return <div className="progress">{progress}</div>
   }
 
   renderForm() {
-    const options = [
-      <option value="class" key="class">Class</option>
-    ]
+    const {assignedTo, assignedToLabel} = this.state,
+          groupOptions:JSX.Element[] = [],
+          userOptions:JSX.Element[] = [];
+
     for (let i=1; i <= 99; i++) {
-      options.push(<option value={`group|${i}`} key={`group:${i}`}>Group {i}</option>)
+      groupOptions.push(<option value={`group|${i}`} key={`group:${i}`}>Group {i}</option>)
     }
     this.props.portalOffering.classInfo.students.forEach((student) => {
-      options.push(<option value={`user|${student.id}`} key={`user:${student.id}`}>{student.fullName}</option>)
+      userOptions.push(<option value={`user|${student.id}`} key={`user:${student.id}`}>{student.fullName}</option>)
     })
 
     return (
@@ -186,8 +238,20 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
         <h2>New Support</h2>
         <form onSubmit={this.handleSubmitSupport}>
           <textarea name="text" placeholder="Type your support here..."  ref={(text) => this.text = text }/>
-          <label htmlFor="assign_to">Assign To:</label>
-          <select name="assign_to" multiple ref={(assignTo) => this.assignTo = assignTo }>{options}</select>
+          <label htmlFor="assign_to">Assign To: <span className="assigned-to-label">{assignedToLabel}</span></label>
+          <div className="support-assign-to">
+            <div className="support-assign-to-block">
+              <input type="radio" name="assignTo" value="class" checked={assignedTo === "class"} onChange={this.handleAssignedTo}/> Class
+            </div>
+            <div className="support-assign-to-block">
+              <input type="radio" name="assignTo" value="group" checked={assignedTo === "group"} onChange={this.handleAssignedTo}/> Group
+              <select name="assignToGroup" multiple ref={(assignToGroup) => this.assignedToGroup = assignToGroup } onChange={() => this.handleSetAssignTo("group")}>{groupOptions}</select>
+            </div>
+            <div className="support-assign-to-block">
+              <input type="radio" name="assignTo" value="user" checked={assignedTo === "user"} onChange={this.handleAssignedTo} /> User
+              <select name="assignToUser" multiple ref={(assignToUser) => this.assignedToUser = assignToUser } onChange={() => this.handleSetAssignTo("user")}>{userOptions}</select>
+            </div>
+          </div>
           <input type="submit" value="Give Support" className="button" />
         </form>
       </div>
