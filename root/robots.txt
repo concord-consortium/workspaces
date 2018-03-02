@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /collabspace/
+Disallow: /drawing/
+Disallow: /prompts/
+Disallow: /branch/
