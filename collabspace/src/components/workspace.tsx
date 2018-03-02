@@ -597,8 +597,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     if (!support) {
       return null
     }
+    const newSupport = !this.state.supportsSeen || !this.state.supportsSeen[supportId]
     return (
       <div className="supports-dropdown-item" key={supportId} onClick={() => this.handleSupportDropdownItemClicked(supportId)}>
+        {newSupport ? <div className="supports-dropdown-item-new" /> : null}
         {support.text}
       </div>
     )
