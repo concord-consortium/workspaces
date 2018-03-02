@@ -105,7 +105,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       })
     })
     .catch((error) => {
-      this.setState({authError: error})
+      this.setState({authError: `Unable to authenticate: ${error.toString().replace("Signature", "Access token")}`})
     })
   }
 

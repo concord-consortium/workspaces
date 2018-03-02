@@ -99,7 +99,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
           }
         })
       })
-      .catch((error) => this.setState({error}))
+      .catch((error) => this.setState({error: `Unable to authenticate: ${error.toString().replace("Signature", "Access token")}`}))
   }
 
   renderError() {
