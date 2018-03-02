@@ -799,6 +799,16 @@ a {
           font-weight: bold;
         }
 
+        .support-assign-to-block {
+          display: inline-block;
+          vertical-align: top;
+          margin-right: 20px;
+        }
+
+        .assigned-to-label {
+          font-style: italic;
+        }
+
         select {
           display: block;
           width: 400px;
