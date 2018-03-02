@@ -279,6 +279,15 @@ a {
             &:hover {
               background-color: #6FC6DA;
             }
+
+            .supports-dropdown-item-new {
+              min-width: 12px;
+              min-height: 12px;
+              background-color: #EA6D2F;
+              border-radius: 10px;
+              margin-right: 5px;
+              display: inline-block;
+            }
           }
         }
       }
