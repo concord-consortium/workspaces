@@ -27,10 +27,18 @@ export interface DashboardSuportComponentState {
   assignedToLabel: string
 }
 
+export type SupportType = "" | "initial_challenge" | "what_if" | "what_do_you_know"
+export const SupportTypeStrings = {
+  "initial_challenge": "Initial Challenge",
+  "what_if": "What If...?",
+  "what_do_you_know": "Now What Do You Know?"
+}
+
 export interface Support {
   offeringId: number
   text: string
   assignedTo: string
+  type: SupportType
   createdAt: number|object
 }
 
@@ -66,6 +74,7 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
   text: HTMLTextAreaElement|null
   assignedToGroup: HTMLSelectElement|null
   assignedToUser: HTMLSelectElement|null
+  supportType: HTMLSelectElement|null
 
   constructor (props:DashboardSuportComponentProps) {
     super(props);
@@ -144,7 +153,7 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
     e.preventDefault()
 
     // validate input
-    if (!this.text || !this.state.assignedTo || !this.assignedToGroup || !this.assignedToUser) {
+    if (!this.text || !this.supportType || !this.state.assignedTo || !this.assignedToGroup || !this.assignedToUser) {
       return;
     }
 
@@ -167,10 +176,13 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
       return
     }
 
+    const type = this.supportType.value.trim() as SupportType
+
     const support:Support = {
       offeringId: this.props.portalOffering.id,
       text,
       assignedTo,
+      type,
       createdAt: firebase.database.ServerValue.TIMESTAMP
     }
 
@@ -238,6 +250,13 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
         <h2>New Support</h2>
         <form onSubmit={this.handleSubmitSupport}>
           <textarea name="text" placeholder="Type your support here..."  ref={(text) => this.text = text }/>
+          <label htmlFor="support_type" style={{display: "inline-block", marginRight: 5}}>Type:</label>
+          <select name="support_type" ref={(supportType) => this.supportType = supportType}>
+            <option value="">(none)</option>
+            <option value="initial_challenge">{SupportTypeStrings["initial_challenge"]}</option>
+            <option value="what_if">{SupportTypeStrings["what_if"]}</option>
+            <option value="what_do_you_know">{SupportTypeStrings["what_do_you_know"]}</option>
+          </select>
           <label htmlFor="assign_to">Assign To: <span className="assigned-to-label">{assignedToLabel}</span></label>
           <div className="support-assign-to">
             <div className="support-assign-to-block">
@@ -245,11 +264,11 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
             </div>
             <div className="support-assign-to-block">
               <input type="radio" name="assignTo" value="group" checked={assignedTo === "group"} onChange={this.handleAssignedTo}/> Group
-              <select name="assignToGroup" multiple ref={(assignToGroup) => this.assignedToGroup = assignToGroup } onChange={() => this.handleSetAssignTo("group")}>{groupOptions}</select>
+              <select name="assignToGroup" className="multi-select" multiple ref={(assignToGroup) => this.assignedToGroup = assignToGroup } onChange={() => this.handleSetAssignTo("group")}>{groupOptions}</select>
             </div>
             <div className="support-assign-to-block">
               <input type="radio" name="assignTo" value="user" checked={assignedTo === "user"} onChange={this.handleAssignedTo} /> User
-              <select name="assignToUser" multiple ref={(assignToUser) => this.assignedToUser = assignToUser } onChange={() => this.handleSetAssignTo("user")}>{userOptions}</select>
+              <select name="assignToUser" className="multi-select" multiple ref={(assignToUser) => this.assignedToUser = assignToUser } onChange={() => this.handleSetAssignTo("user")}>{userOptions}</select>
             </div>
           </div>
           <input type="submit" value="Give Support" className="button" />
@@ -273,6 +292,11 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
   }
 
   renderSupport = (support:SupportWithId, index:number) => {
+    let text = support.text
+    if (support.type) {
+      text = `${SupportTypeStrings[support.type]}: ${text}`.replace("?:", "?")
+    }
+
     return (
       <div className="support" key={index}>
         <div className="support-right">
@@ -284,7 +308,7 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
         </div>
 
         <div className="support-assigned-to">Assigned to: {this.renderAssignedTo(support.assignedTo)}</div>
-        <div className="support-text">{support.text}</div>
+        <div className="support-text">{text}</div>
         <div className="support-seen-by">Seen by: {this.state.supportsSeen[support.id] || "None"}</div>
       </div>
     )

@@ -17,7 +17,7 @@ import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
-import { Support, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
+import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
 import { LogManager } from "../../../shared/log-manager"
 
 const timeago = require("timeago.js")
@@ -575,7 +575,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="visible-support" key={supportId}>
         <div className="visible-support-close" onClick={() => this.handleCloseVisibleSupportItem(supportId) }>X</div>
         <span className="visible-support-icon">?</span>
-        {support.text}
+        {this.renderSupportText(support)}
       </div>
     )
   }
@@ -592,6 +592,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
+  renderSupportText(support:Support) {
+    let text = support.text
+    if (support.type) {
+      text = `${SupportTypeStrings[support.type]}: ${text}`.replace("?:", "?")
+    }
+    return text
+  }
+
   renderSupportDropdownItem(supports: FirebaseSupportMap, supportId:string) {
     const support = supports[supportId]
     if (!support) {
@@ -601,7 +609,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return (
       <div className="supports-dropdown-item" key={supportId} onClick={() => this.handleSupportDropdownItemClicked(supportId)}>
         {newSupport ? <div className="supports-dropdown-item-new" /> : null}
-        {support.text}
+        {this.renderSupportText(support)}
       </div>
     )
   }
