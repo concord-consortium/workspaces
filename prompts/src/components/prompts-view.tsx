@@ -225,9 +225,9 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
 
   renderPage(page:ActivityPage, index:number) {
     const style = {display: page === this.state.currentPage ? "block" : "none"}
+    //{this.ifNotEmpty(page, "name", () => <h2>{page.name}</h2>)}
     return (
       <div className="page" key={index} style={style}>
-        {this.ifNotEmpty(page, "name", () => <h2>{page.name}</h2>)}
         {this.ifNotEmpty(page, "text", () => <p dangerouslySetInnerHTML={{__html: page.text}}></p>)}
         {this.ifNotEmpty(page, "embeddables", () => page.embeddables.map((embeddable, index) => <EmbeddableView key={index} embeddable={embeddable} ifNotEmpty={this.ifNotEmpty} />))}
       </div>
