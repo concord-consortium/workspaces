@@ -101,7 +101,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       onStateChanged: (newState) => {
         this.setState(newState)
       },
-      syncChanges: this.props.isTemplate
+      syncChanges: this.props.isTemplate,
+      tokens: this.props.portalTokens
     })
 
     this.infoRef = this.props.document.ref.child("info")

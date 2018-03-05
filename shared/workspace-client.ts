@@ -1,6 +1,7 @@
 import { FirebaseArtifact, FirebasePublication } from "../collabspace/src/lib/document"
 import * as firebase from "firebase"
 import { v4 as uuidV4 } from "uuid"
+import { PortalTokens } from "../collabspace/src/lib/auth";
 
 const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
 
@@ -52,7 +53,8 @@ export interface WorkspaceClientCollabSpaceInitRequest {
   firebase: {
     config: any,
     dataPath: string
-  }
+  },
+  tokens?: PortalTokens|null
 }
 export interface WorkspaceClientStandaloneInitRequest {
   type: "standalone"
@@ -74,7 +76,7 @@ export interface WorkspaceClientPublishResponse {
 
 export interface WorkspaceClientConfig {
   init(req: WorkspaceClientInitRequest): WorkspaceClientInitResponse|Promise<WorkspaceClientInitResponse>
-  publish(publication: WorkspaceClientPublication): WorkspaceClientPublishResponse|Promise<WorkspaceClientPublishResponse>
+  publish?(publication: WorkspaceClientPublication): WorkspaceClientPublishResponse|Promise<WorkspaceClientPublishResponse>
 }
 
 export class WorkspaceClient {
@@ -94,7 +96,7 @@ export class WorkspaceClient {
   handleClientInit = (req:WorkspaceClientInitRequest) => {
     this.windowId = req.id
     if (req.type === "collabspace") {
-      firebase.initializeApp(req.firebase.config)
+      firebase.initializeApp(req.firebase.config, "workspace-client")
       this.dataRef = firebase.database().ref(req.firebase.dataPath)
     }
 
@@ -106,10 +108,12 @@ export class WorkspaceClient {
 
   handleClientPublish = (req:WorkspaceClientPublishRequest) => {
     const publication = new WorkspaceClientPublication(this, req)
-    const resp = this.config.publish(publication)
-    Promise.resolve(resp).then((resp) => {
-      this.phone.post(WorkspaceClientPublishResponseMessage, resp)
-    })
+    if (this.config.publish) {
+      const resp = this.config.publish(publication)
+      Promise.resolve(resp).then((resp) => {
+        this.phone.post(WorkspaceClientPublishResponseMessage, resp)
+      })
+    }
   }
 }
 
