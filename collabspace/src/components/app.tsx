@@ -11,6 +11,7 @@ import { PortalUser, PortalOffering, collabSpaceAuth, firebaseAuth, PortalTokens
 import { getUserTemplatePath, getSupportsRef, getSupportsSeenRef } from "../lib/refs"
 import { v4 as uuidV4 } from "uuid"
 import { LogManager } from "../../../shared/log-manager"
+import { JWTKeepalive } from "../lib/jwt-keepalive"
 
 export const MAX_GROUPS = 99;
 
@@ -54,6 +55,7 @@ export interface AppQueryParams {
 export class AppComponent extends React.Component<AppComponentProps, AppComponentState> {
   startingTitle: string
   logManager: LogManager
+  jwtKeepalive: JWTKeepalive
 
   constructor (props:AppComponentProps) {
     super(props)
@@ -94,6 +96,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
 
       this.setState({portalUser: portalInfo.user, portalOffering: portalInfo.offering, portalTokens: tokens})
       this.logManager = new LogManager({tokens, activity: "CollabSpace"})
+      this.jwtKeepalive = new JWTKeepalive(tokens, (portalTokens, expired) => this.setState({portalTokens}))
 
       return firebaseAuth().then((firebaseUser) => {
         this.setState({firebaseUser})
