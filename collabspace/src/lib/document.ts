@@ -21,11 +21,12 @@ export interface FirebaseDocument {
   data?: FirebaseDocumentData
 }
 
+export interface FirebaseOfferingTemplate {
+  userId: string,
+  templateId: string
+}
 export interface FirebaseOffering {
-  template: {
-    userId: string,
-    templateId: string
-  }
+  template: FirebaseOfferingTemplate
   name: string
   groups: FirebaseOfferingGroupMap
 }
@@ -38,7 +39,7 @@ export interface FirebaseOfferingGroupMap {
 }
 export interface FirebaseOfferingGroup {
   documentId: string
-  portalUsers: PortalUserConnectionStatusMap
+  users: PortalUserConnectionStatusMap
 }
 
 export interface FirebaseArtifactMap {
@@ -215,7 +216,7 @@ export class Document {
                   .then((document) => {
                     const firebaseGroup:FirebaseOfferingGroup = {
                       documentId: document.id,
-                      portalUsers: {}
+                      users: {}
                     }
                     groupRef
                       .set(firebaseGroup)
