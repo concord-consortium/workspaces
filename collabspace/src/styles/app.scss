@@ -315,6 +315,10 @@ a {
           &.disconnected {
             background-color: #777;
           }
+
+          &.teacher {
+            background-color: #EA6D2F !important;
+          }
         }
       }
     }

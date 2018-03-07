@@ -73,12 +73,16 @@ export class GroupListComponent extends React.Component<GroupListComponentProps,
     const groups = this.state.groups || {}
     const groupKeys = Object.keys(groups)
 
-    if (this.state.loadingGroups || !template) {
+    if (this.state.loadingGroups) {
       return <div className="progress">Getting group information...</div>
     }
 
-    if (groupKeys.length === 0) {
-      return <div>No users have joined any groups yet</div>
+    if ((groupKeys.length === 0) || !template) {
+      return (
+        <div className="group-table">
+          <div className="no-rows">No groups have been created yet for this class</div>
+        </div>
+      )
     }
 
     return (
