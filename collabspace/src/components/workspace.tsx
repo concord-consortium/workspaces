@@ -659,7 +659,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       const portalUser = this.userLookup.lookup(id)
       if (portalUser) {
         const {connected} = groupUser
-        const className = `group-user ${groupUser.connected ? "connected" : "disconnected"}`
+        const className = `group-user ${groupUser.connected ? `connected ${portalUser.type}` : "disconnected"}`
         const titleSuffix = groupUser.connected ? `connected ${timeagoInstance.format(groupUser.connectedAt)}` : `disconnected ${timeagoInstance.format(groupUser.disconnectedAt)}`
         users.push(<div key={id} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
       }
