@@ -83,7 +83,9 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   }
 
   componentWillMount() {
-    firebase.initializeApp(FirebaseConfig)
+    if (firebase.apps.length === 0) {
+      firebase.initializeApp(FirebaseConfig)
+    }
 
     collabSpaceAuth().then((portalInfo) => {
       const {tokens} = portalInfo

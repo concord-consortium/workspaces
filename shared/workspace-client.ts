@@ -96,7 +96,9 @@ export class WorkspaceClient {
   handleClientInit = (req:WorkspaceClientInitRequest) => {
     this.windowId = req.id
     if (req.type === "collabspace") {
-      firebase.initializeApp(req.firebase.config, "workspace-client")
+      if (firebase.apps.length === 0) {
+        firebase.initializeApp(req.firebase.config)
+      }
       this.dataRef = firebase.database().ref(req.firebase.dataPath)
     }
 
