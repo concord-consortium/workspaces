@@ -598,9 +598,13 @@ a {
 
       .sidebar-header {
         text-align: center;
-        padding: 7px 0;
+        padding: 7px 5px;
         background-color: #3E90AC;
         font-size: 14px;
+
+        .sidebar-header-expand {
+          float: right;
+        }
       }
 
       .filter-selector {
@@ -611,12 +615,27 @@ a {
         border-bottom: 1px solid #fff;
 
         span {
-          padding: 3px 5px;
+          padding: 3px;
           margin: 0 3px;
         }
 
         .selected-filter {
           background-color: #6fc6da;
+        }
+      }
+
+      .filter {
+        text-align: center;
+        padding: 5px;
+        font-size: 12px;
+
+        select {
+          width: $sidebar-width - 10px;
+          padding: 3px 0;
+        }
+        input {
+          width: $sidebar-width - 15px;
+          padding: 3px 0;
         }
       }
 
