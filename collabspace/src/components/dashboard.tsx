@@ -9,6 +9,7 @@ import { FirebaseConfig } from "../lib/firebase-config"
 import { WorkspaceComponent } from "./workspace"
 import { DashboardTableComponent } from "./dashboard-table"
 import { DashboardSuportComponent } from "./dashboard-support"
+import { GroupListComponent } from "./group-list"
 import { LogManager } from "../../../shared/log-manager"
 
 export interface DashboardQueryParams extends AuthQueryParams {
@@ -29,7 +30,7 @@ export interface DashboardComponentState {
   portalTokens: PortalTokens|null
   document: Document|null
   publication: FirebasePublication|null
-  view: "publications" | "support" | "poster"
+  view: "publications" | "support" | "groups" | "poster"
   isTeacher: boolean
 }
 
@@ -132,6 +133,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
         <div className="buttons">
           <div className="left-buttons">
             <button type="button" onClick={() => this.setState({view: "publications"})}>Publications</button>
+            {this.state.isTeacher ? <button type="button" onClick={() => this.setState({view: "groups"})}>Groups</button> : null}
             {this.state.isTeacher ? <button type="button" onClick={() => this.setState({view: "support"})}>Support</button> : null}
           </div>
         </div>
@@ -181,6 +183,15 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
 
         case "support":
           workspace = <DashboardSuportComponent
+            firebaseUser={firebaseUser}
+            portalUser={portalUser}
+            portalOffering={portalOffering}
+            portalTokens={portalTokens}
+          />
+          break
+
+        case "groups":
+          workspace = <GroupListComponent
             firebaseUser={firebaseUser}
             portalUser={portalUser}
             portalOffering={portalOffering}

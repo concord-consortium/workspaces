@@ -20,6 +20,7 @@ export interface AuthQueryParams {
   offering?: string
   classInfoUrl?: string
   offeringId?: number
+  group?: string
 }
 
 export interface PortalAPIClassUser {
@@ -328,9 +329,10 @@ export const collabSpaceAuth = () => {
       if (decodedJWT) {
         const portalUserJWT:PortalUserJWT = decodedJWT
         const {domain, user_id, user_type, first_name, last_name} = portalUserJWT
-        if (user_type === "user") {
-          getFirebaseJWTWithBearerToken(domain, "Bearer/JWT", portalJWT, queryParams.demo)
-            .then(([rawFirebaseJWT, firebaseJWT]) => {
+        return getFirebaseJWTWithBearerToken(domain, "Bearer/JWT", portalJWT, queryParams.demo)
+          .then(([rawFirebaseJWT, firebaseJWT]) => {
+            if (user_type === "user") {
+              // user launching editor from portal
               const fullName = `${first_name} ${last_name}`
               const user:User = {
                 type: "user",
@@ -351,9 +353,49 @@ export const collabSpaceAuth = () => {
                   firebaseJWT
                 }
               })
-            })
-          return
-        }
+            }
+            else if (user_type === "teacher") {
+              // teacher joining group via dashboard
+              const {classInfoUrl , offeringId} = queryParams
+              if (!classInfoUrl || !offeringId) {
+                return reject("Missing parameters when joining group")
+              }
+
+              return getClassInfo(classInfoUrl, portalJWT)
+                .then((classInfo) => {
+                  let user:PortalUser|null = null
+                  classInfo.teachers.forEach((teacher) => {
+                    if (teacher.id === decodedJWT.user_id) {
+                      user = teacher
+                    }
+                  })
+                  if (!user) {
+                    reject("Teaching not found in class roster")
+                  }
+
+                  const domainParser = document.createElement("a")
+                  domainParser.href = decodedJWT.domain
+
+                  resolve({
+                    user: user,
+                    offering: {
+                      id: offeringId,
+                      domain: isDemo(domain) ? "demo" : domainParser.host,
+                      classInfo: classInfo,
+                      isDemo: isDemo(domain),
+                      classInfoUrl
+                    },
+                    tokens: {
+                      domain,
+                      rawPortalJWT: portalJWT,
+                      portalJWT: portalUserJWT,
+                      rawFirebaseJWT,
+                      firebaseJWT
+                    }
+                  })
+                })
+            }
+          })
       }
     }
 

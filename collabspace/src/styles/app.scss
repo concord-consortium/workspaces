@@ -755,7 +755,7 @@ a {
       }
     }
 
-    .dashboard-table, .dashboard-support {
+    .dashboard-table, .dashboard-support, .group-table {
       position: fixed;
       top: $header-height + $toolbar-height;
       right: 0;
@@ -777,6 +777,10 @@ a {
           tr:hover {
             background-color: #ddd;
             color: #fff;
+          }
+
+          td {
+            padding: 5px 0;
           }
         }
       }

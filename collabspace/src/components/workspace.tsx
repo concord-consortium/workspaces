@@ -369,7 +369,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   handlePublishButton = () => {
     const {groupUsers} = this.state
     const {portalOffering, portalUser, groupRef, group} = this.props
-    if (!groupUsers || !portalOffering || !portalUser || (portalUser.type === "teacher") || !groupRef || !group) {
+    if (!groupUsers || !portalOffering || !portalUser || !groupRef || !group) {
       return
     }
 
