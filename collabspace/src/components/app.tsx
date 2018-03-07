@@ -12,6 +12,8 @@ import { getUserTemplatePath, getSupportsRef, getSupportsSeenRef } from "../lib/
 import { v4 as uuidV4 } from "uuid"
 import { LogManager } from "../../../shared/log-manager"
 
+export const MAX_GROUPS = 99;
+
 export interface AppComponentProps {}
 
 export interface AppComponentState {
@@ -83,7 +85,9 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   }
 
   componentWillMount() {
-    firebase.initializeApp(FirebaseConfig)
+    if (firebase.apps.length === 0) {
+      firebase.initializeApp(FirebaseConfig)
+    }
 
     collabSpaceAuth().then((portalInfo) => {
       const {tokens} = portalInfo
@@ -196,7 +200,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   renderChoseGroup() {
     const {portalUser} = this.state
     const items:JSX.Element[] = []
-    for (let i=1; i <= 99; i++) {
+    for (let i=1; i <= MAX_GROUPS; i++) {
       items.push(<option value={i} key={i}>{i}</option>)
     }
     return (

@@ -4,6 +4,7 @@ import { PortalOffering, PortalUser, AuthQueryParams, PortalTokens } from "../li
 import { getSupportsRef, getSupportsSeenRef } from "../lib/refs"
 import { FirebaseOfferingMap, FirebasePublicationMap, FirebasePublication } from "../lib/document"
 import { UserLookup } from "../lib/user-lookup"
+import { MAX_GROUPS } from "./app"
 import * as queryString from "query-string"
 
 const timeago = require("timeago.js")
@@ -238,7 +239,7 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
           groupOptions:JSX.Element[] = [],
           userOptions:JSX.Element[] = [];
 
-    for (let i=1; i <= 99; i++) {
+    for (let i=1; i <= MAX_GROUPS; i++) {
       groupOptions.push(<option value={`group|${i}`} key={`group:${i}`}>Group {i}</option>)
     }
     this.props.portalOffering.classInfo.students.forEach((student) => {

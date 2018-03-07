@@ -54,7 +54,9 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
   }
 
   componentWillMount() {
-    firebase.initializeApp(FirebaseConfig)
+    if (firebase.apps.length === 0) {
+      firebase.initializeApp(FirebaseConfig)
+    }
 
     dashboardAuth()
       .then((portalInfo) => {

@@ -167,7 +167,9 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
   }
 
   componentWillMount() {
-    firebase.initializeApp(FirebaseConfig)
+    if (firebase.apps.length === 0) {
+      firebase.initializeApp(FirebaseConfig)
+    }
     firebase.auth().signInAnonymously()
       .then(() => {
         this.setState({authenticated: true})
