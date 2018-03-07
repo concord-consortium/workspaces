@@ -225,11 +225,15 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
       document: publication.documentId,
       publication: publicationItem.id
     }
+    if (portalTokens.portalJWT.user_type === "teacher") {
+      params.classInfoUrl = this.props.portalOffering.classInfoUrl
+      params.offeringId = this.props.portalOffering.id
+    }
     if (demoId) {
       params.demo = demoId
     }
     const {location} = window
-    const url = `${location.origin}${location.pathname}dashboard.html?${queryString.stringify(params)}`
+    const url = `${location.origin}${location.pathname.replace("index.html", "")}dashboard.html?${queryString.stringify(params)}`
 
     return (
       <div className="expanded-info">
