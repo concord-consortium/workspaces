@@ -20,14 +20,23 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
   constructor (props:DrawingToolComponentProps) {
     super(props)
 
-    const params = queryString.parse(window.location.search)
-
     this.state = {
       readonly: false,
       drawingRef: null,
-      imageSetUrl: params.images || null,
+      imageSetUrl: this.getImageSetUrl(),
       captureScreenCallback: null
     }
+  }
+
+  getImageSetUrl () {
+    // if in an iframe get the image set url from the collaspace parameters
+    let search = window.location.search
+    try {
+      if (window.self !== window.top) {
+        search = window.top.location.search
+      }
+    } catch (e) {}
+    return queryString.parse(search).drawingImageSet
   }
 
   componentDidMount() {
