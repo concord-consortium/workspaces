@@ -97,11 +97,15 @@ body {
     opacity: 0.75;
 
     .title {
-      text-align: center;
       padding: 5px;
       background-color: #999;
       color: #fff;
       font-size: 12px;
+
+      .icon {
+        font-size: 10px;
+        margin: 0 2px 0 10px;
+      }
     }
 
     .form-group {
@@ -222,6 +226,9 @@ body {
 }
 .icon-redo:before {
   content: "\e966";
+}
+.icon-cog:before {
+  content: "\e994";
 }
 .icon-bin:before {
   content: "\e9ac";

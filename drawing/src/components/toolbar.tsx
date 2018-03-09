@@ -240,7 +240,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     const pluralize = (text: string, count: number) => count === 1 ? text : `${text}s`
     return (
       <div className="settings" style={{left: TOOLBAR_WIDTH}}>
-        <div className="title">Settings</div>
+        <div className="title"><span className="icon icon-cog" /> Settings</div>
         <form>
           <div className="form-group">
             <label htmlFor="stroke">Color</label>
@@ -323,7 +323,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     return (
       <div className="toolbar" style={{width: TOOLBAR_WIDTH}}>
         <div className="buttons">
-          <div className="button" title="Settings" onClick={this.handleSettingsButton}>S</div>
+          <div className="button" title="Settings" onClick={this.handleSettingsButton}><span className="icon icon-cog" /></div>
           <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}><span className="icon icon-mouse-pointer" /></div>
           <div className={this.modalButtonClass("line")} title="Line Tool" onClick={this.handleLineDrawingToolButton}><span className="icon icon-pencil" style={{color: stroke}} /></div>
           <div className={this.modalButtonClass("rectangle")} style={{height: 30}} title="Rectangle Tool" onClick={this.handleRectangleToolButton}>{this.renderSVGIcon("rectangle")}</div>
