@@ -1,6 +1,7 @@
 export enum Events {
   TextToolSelected,
   LineDrawingToolSelected,
+  VectorToolSelected,
   SelectionToolSelected,
   ImageToolSelected,
   RectangleToolSelected,

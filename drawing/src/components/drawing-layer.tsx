@@ -88,7 +88,7 @@ export interface DrawingLayerViewProps {
 }
 
 export interface DrawingLayerViewState {
-  currentDrawingObject: LineObject|RectangleObject|EllipseObject|null
+  currentDrawingObject: LineObject|RectangleObject|EllipseObject|VectorObject|null
   objects: ObjectMap
   selectedObjects: DrawingObject[]
   selectionBox: SelectionBox|null
@@ -119,8 +119,6 @@ export interface DrawingObject {
   getBoundingBox(): BoundingBox
   render(options:DrawingObjectOptions): JSX.Element | null
 }
-
-export type DrawingObjectTypes = "line"
 
 export interface Point {x: number, y: number}
 export interface DeltaPoint {dx: number, dy: number}
@@ -205,6 +203,82 @@ export class LineObject implements DrawingObject {
               strokeWidth={this.strokeWidth}
               strokeDasharray={this.strokeDashArray}
               onClick={(e) => handleClick ? handleClick(e, this) : null}
+              onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
+              onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
+             />
+  }
+}
+
+export class VectorObject implements DrawingObject {
+  type: string
+  key: string|null
+  x: number
+  y: number
+  x2: number
+  y2: number
+  stroke: string
+  strokeDashArray: string
+  strokeWidth: number
+
+  constructor (json?:any) {
+    const {stroke, fill, strokeDashArray, strokeWidth} = DefaultToolbarSettings
+    this.type = "vector"
+    this.x = json ? (json.x || 0) : 0
+    this.y = json ? (json.y || 0) : 0
+    this.x2 = json ? (json.x2 || 0) : 0
+    this.y2 = json ? (json.y2 || 0) : 0
+    this.stroke = json ? (json.stroke || stroke) : stroke
+    this.strokeDashArray = json ? (json.strokeDashArray || strokeDashArray) : strokeDashArray
+    this.strokeWidth = json ? (json.strokeWidth || strokeWidth) : strokeWidth
+  }
+
+  serialize() {
+    return JSON.stringify({
+      type: this.type,
+      x: this.x,
+      y: this.y,
+      x2: this.x2,
+      y2: this.y2,
+      stroke: this.stroke,
+      strokeDashArray: this.strokeDashArray,
+      strokeWidth: this.strokeWidth
+    })
+  }
+
+  update(json:any) {
+    this.x = json.x1 || this.x
+    this.y = json.y1 || this.y
+    this.x2 = json.x2 || this.x2
+    this.y2 = json.y2 || this.y2
+    this.stroke = json.stroke || this.stroke
+    this.strokeDashArray = json.strokeDashArray || this.strokeDashArray
+    this.strokeWidth = json.strokeWidth || this.strokeWidth
+  }
+
+  inSelection(selectionBox:SelectionBox) {
+    const {nw, se} = this.getBoundingBox()
+    return selectionBox.overlaps(nw, se)
+  }
+
+  getBoundingBox() {
+    const {x, y, x2, y2} = this
+    const nw:Point = {x: Math.min(x, x2), y: Math.min(y, y2)}
+    const se:Point = {x: Math.max(x, x2), y: Math.max(y, y2)}
+    return {nw, se}
+  }
+
+  render(options:DrawingObjectOptions) : JSX.Element|null {
+    const {key, handleClick, handleHover} = options
+    return <line
+              key={key}
+              x1={this.x}
+              y1={this.y}
+              x2={this.x2}
+              y2={this.y2}
+              stroke={this.stroke}
+              strokeWidth={this.strokeWidth}
+              strokeDasharray={this.strokeDashArray}
+              onClick={(e) => handleClick ? handleClick(e, this) : null }
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
              />
@@ -701,10 +775,11 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
 }
 
 interface ObjectConstructorMap {
-  [key: string]: (typeof LineObject)|(typeof ImageObject)|(typeof RectangleObject)|(typeof EllipseObject)|(typeof TextObject)|null
+  [key: string]: (typeof LineObject)|(typeof VectorObject)|(typeof ImageObject)|(typeof RectangleObject)|(typeof EllipseObject)|(typeof TextObject)|null
 }
 const objectConstructors:ObjectConstructorMap = {
   "line": LineObject,
+  "vector": VectorObject,
   "rectangle": RectangleObject,
   "ellipse": EllipseObject,
   "image": ImageObject,
@@ -801,6 +876,51 @@ export class LineDrawingTool extends DrawingTool {
     }
 
     this.drawingLayer.setState({currentDrawingObject: line})
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+  }
+}
+
+export class VectorDrawingTool extends DrawingTool {
+
+  constructor(drawingLayer:DrawingLayerView) {
+    super(drawingLayer)
+  }
+
+  handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
+    const start = getWorkspacePoint(e)
+    const {stroke, strokeWidth, strokeDashArray} = this.settings
+    const vector:VectorObject = new VectorObject({x: start.x, y: start.y, x2: start.x, y2: start.y, stroke, strokeWidth, strokeDashArray})
+
+    const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
+      const end = getWorkspacePoint(e)
+      vector.x2 = end.x
+      vector.y2 = end.y
+      if (e.ctrlKey || e.altKey) {
+        const dx = Math.abs(vector.x2 - vector.x)
+        const dy = Math.abs(vector.y2 - vector.y)
+        if (dx > dy) {
+          vector.y2 = vector.y
+        }
+        else {
+          vector.x2 = vector.x
+        }
+      }
+      this.drawingLayer.setState({currentDrawingObject: vector})
+    }
+    const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
+      if ((vector.x !== vector.x2) || (vector.y !== vector.y2)) {
+        this.drawingLayer.commandManager.execute(new ToggleObjectCommand(vector))
+      }
+      this.drawingLayer.setState({currentDrawingObject: null})
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+
+    this.drawingLayer.setState({currentDrawingObject: vector})
     window.addEventListener("mousemove", handleMouseMove)
     window.addEventListener("mouseup", handleMouseUp)
   }
@@ -1121,6 +1241,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
     this.tools = {
       line: new LineDrawingTool(this),
+      vector: new VectorDrawingTool(this),
       selection: new SelectionDrawingTool(this),
       image: new ImageDrawingTool(this),
       rectangle: new RectangleDrawingTool(this),
@@ -1192,6 +1313,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     this.props.events.listen(Events.SettingsChanged, (settings:ToolbarSettings) => this.setCurrentToolSettings(settings) )
     this.props.events.listen(Events.TextToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.text as TextDrawingTool).setSettings(data)))
     this.props.events.listen(Events.LineDrawingToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.line as LineDrawingTool).setSettings(data)))
+    this.props.events.listen(Events.VectorToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.vector as VectorDrawingTool).setSettings(data)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
     this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setImageSetItem(data.imageSetItem)))
 

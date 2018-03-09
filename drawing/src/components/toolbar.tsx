@@ -46,7 +46,7 @@ export interface LineButtonData {
   lineColor: Color
 }
 
-export type ToolbarModalButton = "text" | "line" | "rectangle" | "ellipse" | "image" | "select"
+export type ToolbarModalButton = "text" | "line" | "rectangle" | "ellipse" | "image" | "select" | "vector"
 
 export interface ToolbarFlyoutViewProps {
   selected: boolean
@@ -167,8 +167,9 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
   addEventListeners() {
     this.props.events.listen(Events.TextToolSelected, () => this.setState({selectedButton: "text"}))
-    this.props.events.listen(Events.LineDrawingToolSelected, (data:LineButtonData) => this.setState({selectedButton: "line"}))
-    this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setState({selectedButton: "image"}))
+    this.props.events.listen(Events.LineDrawingToolSelected, () => this.setState({selectedButton: "line"}))
+    this.props.events.listen(Events.VectorToolSelected, () => this.setState({selectedButton: "vector"}))
+    this.props.events.listen(Events.ImageToolSelected, () => this.setState({selectedButton: "image"}))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setState({selectedButton: "select"}))
     this.props.events.listen(Events.RectangleToolSelected, () => this.setState({selectedButton: "rectangle"}))
     this.props.events.listen(Events.EllipseToolSelected, () => this.setState({selectedButton: "ellipse"}))
@@ -180,7 +181,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     const settings:ToolbarSettings = {
       stroke,
       fill,
-      strokeDashArray,
+      strokeDashArray: this.computeStrokeDashArray(strokeDashArray, strokeWidth),
       strokeWidth,
       fontSize,
       fontStyle,
@@ -192,6 +193,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   handleSettingsButton = () => this.props.events.emit(Events.SettingsToolSelected)
   handleTextToolButton = () => this.props.events.emit(Events.TextToolSelected, this.settings())
   handleLineDrawingToolButton = () => this.props.events.emit(Events.LineDrawingToolSelected, this.settings())
+  handleVectorToolButton = () => this.props.events.emit(Events.VectorToolSelected, this.settings())
   handleSelectionToolButton = () => this.props.events.emit(Events.SelectionToolSelected)
   handleImageToolButton = (data:ImageButtonData) => () => this.props.events.emit(Events.ImageToolSelected, {imageSetItem: data.imageSetItem})
   handleRectangleToolButton = () => this.props.events.emit(Events.RectangleToolSelected, this.settings())
@@ -207,6 +209,17 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   handleFontSizeChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.settingsChange({fontSize: parseInt(e.target.value, 10)})
   handleFontWeightChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.settingsChange({fontWeight: e.target.value as any})
   handleFontStyleChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.settingsChange({fontStyle: e.target.value as any})
+
+  computeStrokeDashArray(type: string, strokeWidth: number) {
+    switch (type) {
+      case "dotted":
+        return `${strokeWidth},${strokeWidth}`
+      case "dashed":
+        return `${strokeWidth*3},${strokeWidth*3}`
+      default:
+        return ""
+    }
+  }
 
   settingsChange(newState: Partial<ToolbarViewState>) {
     this.setState(newState as any, () => {
@@ -259,8 +272,8 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
             <label htmlFor="strokeDashArray">Stroke</label>
             <select value={this.state.strokeDashArray} name="strokeDashArray" onChange={this.handleStrokeDashArrayChange}>
               <option value="">Solid</option>
-              <option value="5,5">Dotted</option>
-              <option value="10,10">Dashed</option>
+              <option value="dotted">Dotted</option>
+              <option value="dashed">Dashed</option>
             </select>
           </div>
           <div className="form-group">
@@ -307,11 +320,14 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
       case "ellipse":
         iconElement = <ellipse cx={elementHalfSize} cy={elementHalfSize} rx={elementHalfSize} ry={elementHalfSize}  />
         break
+      case "vector":
+        iconElement = <line x1={0} y1={elementHalfSize} x2={elementSize} y2={elementHalfSize}  />
+        break
     }
 
     return (
       <svg width={iconSize} height={iconSize}>
-        <g transform={`translate(${iconMargin},${iconMargin})`} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={strokeDashArray}>
+        <g transform={`translate(${iconMargin},${iconMargin})`} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={this.computeStrokeDashArray(strokeDashArray, strokeWidth)}>
           {iconElement}
         </g>
       </svg>
@@ -325,14 +341,15 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
         <div className="buttons">
           <div className="button" title="Settings" onClick={this.handleSettingsButton}><span className="icon icon-cog" /></div>
           <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}><span className="icon icon-mouse-pointer" /></div>
-          <div className={this.modalButtonClass("line")} title="Line Tool" onClick={this.handleLineDrawingToolButton}><span className="icon icon-pencil" style={{color: stroke}} /></div>
+          <div className={this.modalButtonClass("line")} title="Freehand Tool" onClick={this.handleLineDrawingToolButton}><span className="icon icon-pencil" style={{color: stroke}} /></div>
+          <div className={this.modalButtonClass("vector")} style={{height: 30}} title="Line Tool" onClick={this.handleVectorToolButton}>{this.renderSVGIcon("vector")}</div>
           <div className={this.modalButtonClass("rectangle")} style={{height: 30}} title="Rectangle Tool" onClick={this.handleRectangleToolButton}>{this.renderSVGIcon("rectangle")}</div>
           <div className={this.modalButtonClass("ellipse")} style={{height: 30}} title="Ellipse Tool" onClick={this.handleEllipsisToolButton}>{this.renderSVGIcon("ellipse")}</div>
           <ToolbarFlyoutView selected={"image" === this.state.selectedButton}>
             {this.renderImageSetItems()}
           </ToolbarFlyoutView>
           <div className={this.modalButtonClass("text")} title="Text Tool" onClick={this.handleTextToolButton}>
-            <span style={{color: stroke, fontSize, fontWeight, fontStyle}}>T</span>
+            <span style={{color: stroke, fontSize, fontWeight, fontStyle}}>A</span>
           </div>
           <div className="button" title="Undo" onClick={this.handleUndoButton}><span className="icon icon-undo" /></div>
           <div className="button" title="Redo" onClick={this.handleRedoButton}><span className="icon icon-redo" /></div>
