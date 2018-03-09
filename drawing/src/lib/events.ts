@@ -5,6 +5,7 @@ export enum Events {
   ImageToolSelected,
   RectangleToolSelected,
   EllipseToolSelected,
+  SettingsToolSelected,
   UndoPressed,
   RedoPressed,
   DeletePressed

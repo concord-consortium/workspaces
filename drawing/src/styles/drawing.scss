@@ -31,7 +31,6 @@ body {
   background-color: #eee;
   cursor: pointer;
 
-
   .buttons {
     position: absolute;
     top: 0;
@@ -82,6 +81,40 @@ body {
     a {
       text-decoration: none;
       color: #000;
+    }
+  }
+
+  .settings {
+    position: absolute;
+    top: 0;
+    width: 100px;
+    left: 0; /* set in code */
+    bottom: 0;
+    background-color: #bbb;
+    cursor: pointer;
+    font-size: 14px;
+    border-right: 1px solid #aaa;
+    opacity: 0.75;
+
+    .title {
+      text-align: center;
+      padding: 5px;
+      background-color: #999;
+      color: #fff;
+    }
+
+    .form-group {
+      margin: 10px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+
+    select {
+      background-color: #fff;
     }
   }
 }

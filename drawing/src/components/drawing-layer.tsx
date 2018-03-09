@@ -1154,6 +1154,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         }
       }
     })
+    this.props.events.listen(Events.SettingsToolSelected, () => this.setCurrentTool(null))
     this.props.events.listen(Events.TextToolSelected, (data:TextButtonData) => this.setCurrentTool((this.tools.text as TextDrawingTool).setColor(data.color)))
     this.props.events.listen(Events.LineDrawingToolSelected, (data:LineButtonData) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.lineColor.hex)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))

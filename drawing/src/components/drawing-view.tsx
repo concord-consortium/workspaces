@@ -98,10 +98,10 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
   render() {
     return (
       <div>
-        <ToolbarView events={this.events} imageSetItems={this.state.imageSetItems} />
         <div className="workspace" ref="workspace" style={{left: TOOLBAR_WIDTH}}>
           <DrawingLayerView firebaseRef={this.props.firebaseRef} readonly={this.props.readonly} events={this.events} imageSetItems={this.state.imageSetItems} />
         </div>
+        <ToolbarView events={this.events} imageSetItems={this.state.imageSetItems} />
         {this.props.readonly ? <div className="read-only-blocker" /> : null}
       </div>
     )

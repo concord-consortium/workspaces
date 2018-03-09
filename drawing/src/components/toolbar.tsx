@@ -6,11 +6,11 @@ import { EventEmitter, Events } from "../lib/events"
 
 export const TOOLBAR_WIDTH = 48
 
-export interface LineColor {
+export interface Color {
   name: string
   hex: string
 }
-export const lineColors:LineColor[] = [
+export const colors:Color[] = [
   {name: "Black", hex: "#000"},
   {name: "Red", hex: "#f00"},
   {name: "Green", hex: "#006400"},
@@ -32,10 +32,10 @@ export interface ImageButtonData {
 }
 
 export interface LineButtonData {
-  lineColor: LineColor
+  lineColor: Color
 }
 
-export type ToolbarModalButton = "text" | "line" | "rectangle" | "ellipse" | "image" | "select"
+export type ToolbarModalButton = "text" | "line" | "rectangle" | "ellipse" | "image" | "select" | "settings"
 
 export interface ToolbarFlyoutViewProps {
   selected: boolean
@@ -111,6 +111,11 @@ export interface ToolbarViewProps {
 
 export interface ToolbarViewState {
   selectedButton: ToolbarModalButton|null
+  stroke: string,
+  fill: string,
+  strokeDashArray: string,
+  strokeWidth: number,
+  fontSize: number
 }
 
 export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewState> {
@@ -118,7 +123,12 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     super(props)
 
     this.state = {
-      selectedButton: "select"
+      selectedButton: "select",
+      stroke: "#000",
+      fill: "none",
+      strokeDashArray: "",
+      strokeWidth: 3,
+      fontSize: 27
     }
 
     this.addEventListeners()
@@ -131,10 +141,12 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     this.props.events.listen(Events.SelectionToolSelected, () => this.setState({selectedButton: "select"}))
     this.props.events.listen(Events.RectangleToolSelected, () => this.setState({selectedButton: "rectangle"}))
     this.props.events.listen(Events.EllipseToolSelected, () => this.setState({selectedButton: "ellipse"}))
+    this.props.events.listen(Events.SettingsToolSelected, () => this.setState({selectedButton: this.state.selectedButton === "settings" ? "select" : "settings"}))
   }
 
+  handleSettingsButton = () => this.props.events.emit(Events.SettingsToolSelected)
   handleTextToolButton = (color:string) => () => this.props.events.emit(Events.TextToolSelected, {color})
-  handleLineDrawingToolButton = (lineColor:LineColor) => () => this.props.events.emit(Events.LineDrawingToolSelected, {lineColor})
+  handleLineDrawingToolButton = (lineColor:Color) => () => this.props.events.emit(Events.LineDrawingToolSelected, {lineColor})
   handleSelectionToolButton = () => this.props.events.emit(Events.SelectionToolSelected)
   handleImageToolButton = (data:ImageButtonData) => () => this.props.events.emit(Events.ImageToolSelected, {imageSetItem: data.imageSetItem})
   handleRectangleToolButton = (data:PolygonButtonData) => () => this.props.events.emit(Events.RectangleToolSelected, {fill: data.fill, stroke: data.stroke})
@@ -143,19 +155,25 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   handleRedoButton = () => this.props.events.emit(Events.RedoPressed)
   handleDeleteButton = () => this.props.events.emit(Events.DeletePressed)
 
+  handleStrokeChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.setState({stroke: e.target.value})
+  handleFillChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.setState({fill: e.target.value})
+  handleStrokeDashArrayChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.setState({strokeDashArray: e.target.value})
+  handleStrokeWidthChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.setState({strokeWidth: parseInt(e.target.value, 10)})
+  handleFontSizeChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.setState({fontSize: parseInt(e.target.value, 10)})
+
   modalButtonClass(type:ToolbarModalButton) {
     const selected = type === this.state.selectedButton
     return `button ${selected ? "selected" : ""}`
   }
 
   renderTextButtons() {
-    return lineColors.map((lineColor, index) => {
+    return colors.map((lineColor, index) => {
       return <div key={index} className="button" title={`${lineColor.name} Text Drawing Mode`} onClick={this.handleTextToolButton(lineColor.hex)} style={{color: lineColor.hex}}>A</div>
     })
   }
 
   renderLineButtons() {
-    return lineColors.map((lineColor, index) => {
+    return colors.map((lineColor, index) => {
       return <div key={index} className="button" title={`${lineColor.name} Line Drawing Mode`} onClick={this.handleLineDrawingToolButton(lineColor)} style={{color: lineColor.hex}}><span className="icon icon-pencil" /></div>
     })
   }
@@ -168,13 +186,57 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
   renderPolygons(name: string, outline:string, solid:string, handler:(data:PolygonButtonData) => any) {
     const polygons:JSX.Element[] = []
-    lineColors.forEach((lineColor, index) => {
+    colors.forEach((lineColor, index) => {
       polygons.push(<div key={`outline-${index}`} className="button" title={`${lineColor.name} Outline ${name} Drawing Mode`} onClick={handler({type: name.toLowerCase(), stroke: lineColor.hex, fill: "none"})} style={{color: lineColor.hex}}>{outline}</div>)
     })
-    lineColors.forEach((lineColor, index) => {
+    colors.forEach((lineColor, index) => {
       polygons.push(<div key={`solid-${index}`} className="button" title={`${lineColor.name} Solid ${name} Drawing Mode`} onClick={handler({type: name.toLowerCase(), stroke: lineColor.hex, fill: lineColor.hex})} style={{color: lineColor.hex}}>{solid}</div>)
     })
     return polygons
+  }
+
+  renderSettings() {
+    const pluralize = (text: string, count: number) => count === 1 ? text : `${text}s`
+    return (
+      <div className="settings" style={{left: TOOLBAR_WIDTH}}>
+        <div className="title">Settings</div>
+        <form>
+          <div className="form-group">
+            <label htmlFor="stroke">Color</label>
+            <select value={this.state.stroke} name="stroke" onChange={this.handleStrokeChange}>
+              {colors.map((color, index) => <option value={color.hex} key={index}>{color.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="fill">Fill</label>
+            <select value={this.state.fill} name="fill" onChange={this.handleFillChange}>
+              <option value="none" key="none">None</option>
+              {colors.map((color, index) => <option value={color.hex} key={index}>{color.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="strokeDashArray">Stroke</label>
+            <select value={this.state.strokeDashArray} name="strokeDashArray" onChange={this.handleStrokeDashArrayChange}>
+              <option value="">Solid</option>
+              <option value="5,5">Dotted</option>
+              <option value="10,10">Dashed</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="strokeWidth">Thickness</label>
+            <select value={this.state.strokeWidth} name="strokeWidth" onChange={this.handleStrokeWidthChange}>
+              {[1, 2, 3, 4, 5].map((strokeWidth) => <option value={strokeWidth} key={strokeWidth}>{strokeWidth} {pluralize("pixel", strokeWidth)}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="fontSize">Font Size</label>
+            <select value={this.state.fontSize} name="fontSize" onChange={this.handleFontSizeChange}>
+              {[12, 17, 22, 27, 32, 37, 42].map((fontSize) => <option value={fontSize} key={fontSize}>{fontSize} {pluralize("pixel", fontSize)}</option>)}
+            </select>
+          </div>
+        </form>
+      </div>
+    )
   }
 
   render() {
@@ -182,6 +244,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
       <div className="toolbar" style={{width: TOOLBAR_WIDTH}}>
         <div className="buttons">
           <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}><span className="icon icon-mouse-pointer" /></div>
+          <div className={this.modalButtonClass("settings")} title="Settings" onClick={this.handleSettingsButton}>S</div>
           <ToolbarFlyoutView selected={"line" === this.state.selectedButton}>
             {this.renderLineButtons()}
           </ToolbarFlyoutView>
@@ -201,6 +264,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
           <div className="button" title="Redo" onClick={this.handleRedoButton}><span className="icon icon-redo" /></div>
           <div className="button" title="Delete" onClick={this.handleDeleteButton}><span className="icon icon-bin" /></div>
         </div>
+        {this.state.selectedButton === "settings" ? this.renderSettings() : null}
       </div>
     )
   }
