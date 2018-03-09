@@ -315,6 +315,10 @@ a {
           &.disconnected {
             background-color: #777;
           }
+
+          &.teacher {
+            background-color: #EA6D2F !important;
+          }
         }
       }
     }
@@ -594,9 +598,13 @@ a {
 
       .sidebar-header {
         text-align: center;
-        padding: 7px 0;
+        padding: 7px 5px;
         background-color: #3E90AC;
         font-size: 14px;
+
+        .sidebar-header-expand {
+          float: right;
+        }
       }
 
       .filter-selector {
@@ -607,12 +615,27 @@ a {
         border-bottom: 1px solid #fff;
 
         span {
-          padding: 3px 5px;
+          padding: 3px;
           margin: 0 3px;
         }
 
         .selected-filter {
           background-color: #6fc6da;
+        }
+      }
+
+      .filter {
+        text-align: center;
+        padding: 5px;
+        font-size: 12px;
+
+        select {
+          width: $sidebar-width - 10px;
+          padding: 3px 0;
+        }
+        input {
+          width: $sidebar-width - 15px;
+          padding: 3px 0;
         }
       }
 
@@ -755,7 +778,7 @@ a {
       }
     }
 
-    .dashboard-table, .dashboard-support {
+    .dashboard-table, .dashboard-support, .group-table {
       position: fixed;
       top: $header-height + $toolbar-height;
       right: 0;
@@ -777,6 +800,10 @@ a {
           tr:hover {
             background-color: #ddd;
             color: #fff;
+          }
+
+          td {
+            padding: 5px 0;
           }
         }
       }
@@ -809,7 +836,7 @@ a {
           font-style: italic;
         }
 
-        select {
+        .multi-select {
           display: block;
           width: 400px;
           height: 100px;

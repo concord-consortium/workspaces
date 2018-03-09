@@ -17,7 +17,7 @@ import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
-import { Support, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
+import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
 import { LogManager } from "../../../shared/log-manager"
 
 const timeago = require("timeago.js")
@@ -101,7 +101,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       onStateChanged: (newState) => {
         this.setState(newState)
       },
-      syncChanges: this.props.isTemplate
+      syncChanges: this.props.isTemplate,
+      tokens: this.props.portalTokens
     })
 
     this.infoRef = this.props.document.ref.child("info")
@@ -368,7 +369,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   handlePublishButton = () => {
     const {groupUsers} = this.state
     const {portalOffering, portalUser, groupRef, group} = this.props
-    if (!groupUsers || !portalOffering || !portalUser || (portalUser.type === "teacher") || !groupRef || !group) {
+    if (!groupUsers || !portalOffering || !portalUser || !groupRef || !group) {
       return
     }
 
@@ -575,7 +576,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="visible-support" key={supportId}>
         <div className="visible-support-close" onClick={() => this.handleCloseVisibleSupportItem(supportId) }>X</div>
         <span className="visible-support-icon">?</span>
-        {support.text}
+        {this.renderSupportText(support)}
       </div>
     )
   }
@@ -592,6 +593,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
+  renderSupportText(support:Support) {
+    let text = support.text
+    if (support.type) {
+      text = `${SupportTypeStrings[support.type]}: ${text}`.replace("?:", "?")
+    }
+    return text
+  }
+
   renderSupportDropdownItem(supports: FirebaseSupportMap, supportId:string) {
     const support = supports[supportId]
     if (!support) {
@@ -601,7 +610,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return (
       <div className="supports-dropdown-item" key={supportId} onClick={() => this.handleSupportDropdownItemClicked(supportId)}>
         {newSupport ? <div className="supports-dropdown-item-new" /> : null}
-        {support.text}
+        {this.renderSupportText(support)}
       </div>
     )
   }
@@ -650,7 +659,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       const portalUser = this.userLookup.lookup(id)
       if (portalUser) {
         const {connected} = groupUser
-        const className = `group-user ${groupUser.connected ? "connected" : "disconnected"}`
+        const className = `group-user ${groupUser.connected ? `connected ${portalUser.type}` : "disconnected"}`
         const titleSuffix = groupUser.connected ? `connected ${timeagoInstance.format(groupUser.connectedAt)}` : `disconnected ${timeagoInstance.format(groupUser.disconnectedAt)}`
         users.push(<div key={id} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
       }

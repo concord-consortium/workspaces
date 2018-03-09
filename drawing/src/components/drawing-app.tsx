@@ -30,7 +30,9 @@ export class DrawingApp extends React.Component<DrawingAppProps, DrawingAppState
     const images = params.images || null
 
     if (params.drawing) {
-      firebase.initializeApp(FirebaseConfig)
+      if (firebase.apps.length === 0) {
+        firebase.initializeApp(FirebaseConfig)
+      }
       firebase.auth().signInAnonymously()
         .then(() => {
           var drawingRef = firebase.database().ref("/drawings").child(params.drawing)

@@ -16,7 +16,7 @@ import { IFramePhoneLib,
  const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
 
 import * as firebase from "firebase"
-import { PortalOffering } from "./auth";
+import { PortalOffering, PortalTokens } from "./auth";
 import { getDocumentRef } from "./refs"
 
 export enum DragType { GrowLeft, GrowRight, GrowUp, GrowDown, GrowDownRight, GrowDownLeft, Position, None }
@@ -50,6 +50,7 @@ export interface WindowManagerSettings {
   document: Document
   onStateChanged: WindowManagerStateChangeFn
   syncChanges: boolean
+  tokens: PortalTokens|null
 }
 
 export interface FirebaseOrderMap {
@@ -72,11 +73,13 @@ export class WindowManager {
   windowOrder: string[]
   minimizedWindowOrder: string[]
   lastAttrsQuery: firebase.database.Query
+  tokens: PortalTokens|null
 
   constructor (settings: WindowManagerSettings) {
     this.document = settings.document
     this.onStateChanged = settings.onStateChanged
     this.syncChanges = settings.syncChanges
+    this.tokens = settings.tokens
 
     this.windows = {}
     this.windowOrder = []
@@ -428,7 +431,8 @@ export class WindowManager {
           firebase: {
             config: FirebaseConfig,
             dataPath: window.iframe.dataRef.toString().substring(window.iframe.dataRef.root.toString().length)
-          }
+          },
+          tokens: this.tokens
         }
         window.iframe.phone.addListener(WorkspaceClientInitResponseMessage, (resp:WorkspaceClientInitResponse) => {
           // TODO

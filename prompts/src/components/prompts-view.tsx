@@ -3,6 +3,8 @@ import * as queryString from "query-string"
 import * as firebase from "firebase"
 import { FirebaseConfig } from "../../../collabspace/src/lib/firebase-config"
 import { v1 as uuid } from "uuid"
+import { LogManager } from "../../../shared/log-manager"
+import { WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
 
 interface ActivityListItem {
   name: string
@@ -34,6 +36,7 @@ interface Activity {
 export interface EmbeddableProps {
   embeddable: ActivityEmbeddable
   ifNotEmpty: (o:any, key:string, fn:Function) => void
+  logManager: LogManager|null
 }
 export interface EmbeddableState {
   showHint: boolean
@@ -48,12 +51,16 @@ export class EmbeddableView extends React.Component<EmbeddableProps, EmbeddableS
     }
   }
 
-  toggleHint() {
-    this.setState({showHint: !this.state.showHint})
+  toggleHint(hint: string) {
+    const showHint = !this.state.showHint
+    if (this.props.logManager) {
+      this.props.logManager.logEvent(showHint ? "Opened LARA hint" : "Closed LARA hint", null, {hint})
+    }
+    this.setState({showHint})
   }
 
-  renderHintIcon() {
-    return <span className="hint-toggle" onClick={this.toggleHint}>?</span>
+  renderHintIcon(hint: string) {
+    return <span className="hint-toggle" onClick={() => this.toggleHint(hint)}>?</span>
   }
 
   renderHint(hint: string|null) {
@@ -62,7 +69,7 @@ export class EmbeddableView extends React.Component<EmbeddableProps, EmbeddableS
     }
     return (
       <div className="hint">
-        {this.renderHintIcon()}
+        {this.renderHintIcon(hint)}
         {this.state.showHint ? <span dangerouslySetInnerHTML={{__html: hint}} /> : null}
       </div>
     )
@@ -130,6 +137,8 @@ export interface PromptsViewState {
 
 export class PromptsView extends React.Component<PromptsViewProps, PromptsViewState> {
   activityListRef: firebase.database.Reference
+  workspaceClient: WorkspaceClient
+  logManager: LogManager|null
 
   constructor(props:PromptsViewProps){
     super(props)
@@ -158,10 +167,21 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
   }
 
   componentWillMount() {
-    firebase.initializeApp(FirebaseConfig)
+    if (firebase.apps.length === 0) {
+      firebase.initializeApp(FirebaseConfig)
+    }
     firebase.auth().signInAnonymously()
       .then(() => {
         this.setState({authenticated: true})
+
+        this.workspaceClient = new WorkspaceClient({
+          init: (req) => {
+            if ((req.type === "collabspace") && req.tokens) {
+              this.logManager = new LogManager({tokens: req.tokens, activity: "CollabSpace"})
+            }
+            return {}
+          }
+        })
 
         this.activityListRef = this.getRef("activityList")
         this.activityListRef.on("value", (snapshot) => {
@@ -225,11 +245,11 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
 
   renderPage(page:ActivityPage, index:number) {
     const style = {display: page === this.state.currentPage ? "block" : "none"}
+    //{this.ifNotEmpty(page, "name", () => <h2>{page.name}</h2>)}
     return (
       <div className="page" key={index} style={style}>
-        {this.ifNotEmpty(page, "name", () => <h2>{page.name}</h2>)}
         {this.ifNotEmpty(page, "text", () => <p dangerouslySetInnerHTML={{__html: page.text}}></p>)}
-        {this.ifNotEmpty(page, "embeddables", () => page.embeddables.map((embeddable, index) => <EmbeddableView key={index} embeddable={embeddable} ifNotEmpty={this.ifNotEmpty} />))}
+        {this.ifNotEmpty(page, "embeddables", () => page.embeddables.map((embeddable, index) => <EmbeddableView key={index} embeddable={embeddable} ifNotEmpty={this.ifNotEmpty} logManager={this.logManager} />))}
       </div>
     )
   }

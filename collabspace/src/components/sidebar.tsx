@@ -9,6 +9,7 @@ import { WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import * as queryString from "query-string"
 import { UserLookup } from "../lib/user-lookup"
+import { MAX_GROUPS } from "./app"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
@@ -142,6 +143,7 @@ export interface SidebarPublicationComponentProps {
   portalOffering: PortalOffering
   portalTokens: PortalTokens
   windowManager: WindowManager
+  expandAll: boolean
 }
 export interface SidebarPublicationComponentState {
   expanded: boolean
@@ -154,8 +156,14 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
   constructor (props:SidebarPublicationComponentProps) {
     super(props)
     this.state = {
-      expanded: false,
+      expanded: this.props.expandAll,
       creatorName: this.getUserName(this.props.publicationItem.publication.creator)
+    }
+  }
+
+  componentWillReceiveProps(nextProps: SidebarPublicationComponentProps) {
+    if (nextProps.expandAll !== this.props.expandAll) {
+      this.setState({expanded: nextProps.expandAll})
     }
   }
 
@@ -225,11 +233,15 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
       document: publication.documentId,
       publication: publicationItem.id
     }
+    if (portalTokens.portalJWT.user_type === "teacher") {
+      params.classInfoUrl = this.props.portalOffering.classInfoUrl
+      params.offeringId = this.props.portalOffering.id
+    }
     if (demoId) {
       params.demo = demoId
     }
     const {location} = window
-    const url = `${location.origin}${location.pathname}dashboard.html?${queryString.stringify(params)}`
+    const url = `${location.origin}${location.pathname.replace("index.html", "")}dashboard.html?${queryString.stringify(params)}`
 
     return (
       <div className="expanded-info">
@@ -270,7 +282,12 @@ export interface SidebarComponentProps {
 }
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
-  filter: "offering" | "group" | "mine"
+  filter: "offering" | "group" | "mine" | "search"
+  filterGroup: number
+  filterOffering: string
+  filterSearch: string
+  filterSearchTrimmed: string
+  expandAll: boolean
 }
 
 export class SidebarComponent extends React.Component<SidebarComponentProps, SidebarComponentState> {
@@ -281,7 +298,12 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     super(props)
     this.state = {
       publicationItems: [],
-      filter: "offering"
+      filter: "offering",
+      filterGroup: 0,
+      filterOffering: "all",
+      filterSearch: "",
+      filterSearchTrimmed: "",
+      expandAll: false
     }
     this.publicationsRef = getPublicationsRef(this.props.portalOffering)
 
@@ -311,32 +333,113 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   }
 
   getFilteredPublicationItems() {
-    const {publicationItems, filter} = this.state
+    const {publicationItems, filter, filterGroup, filterOffering, filterSearch, filterSearchTrimmed} = this.state
     const {portalOffering, portalUser, group} = this.props
+    const canonicalSearch = filterSearchTrimmed.toLowerCase()
     return publicationItems.filter((publicationItem) => {
       const {publication} = publicationItem
       switch (filter) {
+        case "offering":
+          if (filterOffering === "all") {
+            return true
+          }
+          if (filterOffering === "me") {
+            return publication.creator === portalUser.id
+          }
+          return publication.creator === filterOffering
         case "group":
-          return publication.group === group
+          return (filterGroup === 0) || (publication.group === filterGroup)
         case "mine":
           return publication.creator === portalUser.id
+        case "search":
+          if (canonicalSearch.length === 0) {
+            return false;
+          }
+          const creatorName = this.userLookup.lookup(publication.creator)
+          if (creatorName && (creatorName.fullName.toLowerCase().indexOf(canonicalSearch) !== -1)) {
+            return true
+          }
+          let titleMatched = false
+          Object.keys(publication.windows).forEach((windowId) => {
+            const publicationWindow = publication.windows[windowId]
+            titleMatched = titleMatched || publicationWindow.title.toLowerCase().indexOf(canonicalSearch) !== -1
+          })
+          return titleMatched
         default:
           return true
       }
     })
   }
 
+  handleToggleExpandContract = () => {
+    this.setState({expandAll: !this.state.expandAll})
+  }
+
+  renderExpandContract() {
+    return <div className="sidebar-header-expand" onClick={this.handleToggleExpandContract}>{this.state.expandAll ? "▼" : "▲"}</div>
+  }
+
   renderFilterSelector() {
     const className = (filter:string) => {
       return `clickable ${filter === this.state.filter ? "selected-filter" : ""}`
     }
+    //<span className={className("mine")} onClick={() => this.setState({filter: "mine"})}>Mine</span>
     return (
       <div className="filter-selector">
-        <span className={className("offering")} onClick={() => this.setState({filter: "offering"})}>All</span>
-        <span className={className("group")} onClick={() => this.setState({filter: "group"})}>Group</span>
-        <span className={className("mine")} onClick={() => this.setState({filter: "mine"})}>Mine</span>
+        <span className={className("offering")} onClick={() => this.setState({filter: "offering"})}>Users</span>
+        <span className={className("group")} onClick={() => this.setState({filter: "group"})}>Groups</span>
+        <span className={className("search")} onClick={() => this.setState({filter: "search"})}>Search</span>
       </div>
     )
+  }
+
+  handleOfferingFilterChanged = (e:React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({filterOffering: e.target.value})
+  }
+
+  handleGroupFilterChanged = (e:React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({filterGroup: parseInt(e.target.value, 10)})
+  }
+
+  handleSearchFilterChanged = (e:React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({filterSearch: e.target.value, filterSearchTrimmed: e.target.value.trim()})
+  }
+
+  renderFilter() {
+    let filter:JSX.Element|null = null
+    let options:JSX.Element[] = []
+
+    switch (this.state.filter) {
+      case "offering":
+        options.push(<option value="all" key="all-offering">All Users</option>)
+        options.push(<option value="me" key="me-offering">Me</option>)
+        this.userLookup.options().forEach((option) => {
+          options.push(<option value={option.value} key={option.key}>{option.name}</option>)
+        })
+        filter = (
+          <select onChange={this.handleOfferingFilterChanged} value={this.state.filterOffering}>
+            {options}
+          </select>
+        )
+        break
+      case "group":
+        options.push(<option value={0} key="all-groups">All Groups</option>)
+        options.push(<option value={this.props.group} key="me-group">My Group</option>)
+        for (let i=1; i <= MAX_GROUPS; i++) {
+          options.push(<option value={i} key={i}>Group {i}</option>)
+        }
+        filter = (
+          <select onChange={this.handleGroupFilterChanged} value={this.state.filterGroup}>
+            {options}
+          </select>
+        )
+        break
+      case "search":
+        filter = <input placeholder="Search..." onChange={this.handleSearchFilterChanged} value={this.state.filterSearch} />
+        break
+    }
+
+    return filter ? <div className="filter">{filter}</div> : null
   }
 
   renderPublishing() {
@@ -353,7 +456,10 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   renderPublications() {
     const publicationItems = this.getFilteredPublicationItems()
     if (publicationItems.length === 0) {
-      return <div className="none-found">No publications were found</div>
+      if ((this.state.filter !== "search") || (this.state.filterSearchTrimmed.length > 0)) {
+        return <div className="none-found">No publications were found</div>
+      }
+      return null
     }
 
     return (
@@ -367,6 +473,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
                    portalOffering={this.props.portalOffering}
                    portalTokens={this.props.portalTokens}
                    windowManager={this.props.windowManager}
+                   expandAll={this.state.expandAll}
                  />
         })}
       </div>
@@ -376,8 +483,12 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   render() {
     return (
       <div className="sidebar">
-        <div className="sidebar-header">Publications</div>
+        <div className="sidebar-header">
+          Publications
+          {this.renderExpandContract()}
+        </div>
         {this.renderFilterSelector()}
+        {this.renderFilter()}
         {this.renderPublishing()}
         {this.renderPublications()}
       </div>

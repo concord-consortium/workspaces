@@ -7,10 +7,12 @@ import { DocumentCrudComponent } from "./document-crud"
 import { WorkspaceComponent } from "./workspace"
 import { FirebaseConfig } from "../lib/firebase-config"
 import { DemoComponent } from "./demo"
-import { PortalUser, PortalOffering, collabSpaceAuth, firebaseAuth, PortalTokens } from "../lib/auth"
+import { PortalUser, PortalOffering, collabSpaceAuth, firebaseAuth, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { getUserTemplatePath, getSupportsRef, getSupportsSeenRef } from "../lib/refs"
 import { v4 as uuidV4 } from "uuid"
 import { LogManager } from "../../../shared/log-manager"
+
+export const MAX_GROUPS = 99;
 
 export interface AppComponentProps {}
 
@@ -55,6 +57,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
 
   constructor (props:AppComponentProps) {
     super(props)
+
     this.state = {
       authError: null,
       documentError: null,
@@ -82,7 +85,9 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   }
 
   componentWillMount() {
-    firebase.initializeApp(FirebaseConfig)
+    if (firebase.apps.length === 0) {
+      firebase.initializeApp(FirebaseConfig)
+    }
 
     collabSpaceAuth().then((portalInfo) => {
       const {tokens} = portalInfo
@@ -150,7 +155,12 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
           .then((template) => {
             const {firebaseUser} = this.state
             template.isReadonly = firebaseUser ? firebaseUser.uid !== template.ownerId : true
-            this.setState({template, document: this.state.portalOffering ? null : template})
+            this.setState({template, document: this.state.portalOffering ? null : template}, () => {
+              const params:AuthQueryParams = queryString.parse(window.location.search)
+              if (params.group) {
+                this.selectGroup(params.group)
+              }
+            })
           })
           .catch((documentError) => this.setState({documentError}))
       }
@@ -160,22 +170,26 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
     }
   }
 
+  selectGroup(groupValue: string) {
+    const group = parseInt(groupValue)
+    if (group > 0) {
+      this.setState({groupChosen: true, group})
+      if (this.state.template && this.state.portalOffering) {
+        this.state.template.getGroupOfferingDocument(this.state.portalOffering, group)
+          .then(([document, groupRef]) => {
+            const supportsRef = this.state.portalOffering ? getSupportsRef(this.state.portalOffering) : null;
+            const supportsSeenRef = this.state.portalOffering && this.state.portalUser ? getSupportsSeenRef(this.state.portalOffering, this.state.portalUser.id) : null;
+            this.setState({document, groupRef, supportsRef, supportsSeenRef})
+          })
+          .catch((documentError) => this.setState({documentError}))
+        }
+    }
+  }
+
   handleChoseGroup = (e:React.ChangeEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (this.refs.group) {
-      const group = parseInt(this.refs.group.value)
-      if (group > 0) {
-        this.setState({groupChosen: true, group})
-        if (this.state.template && this.state.portalOffering) {
-          this.state.template.getGroupOfferingDocument(this.state.portalOffering, group)
-            .then(([document, groupRef]) => {
-              const supportsRef = this.state.portalOffering ? getSupportsRef(this.state.portalOffering) : null;
-              const supportsSeenRef = this.state.portalOffering && this.state.portalUser ? getSupportsSeenRef(this.state.portalOffering, this.state.portalUser.id) : null;
-              this.setState({document, groupRef, supportsRef, supportsSeenRef})
-            })
-            .catch((documentError) => this.setState({documentError}))
-          }
-      }
+      this.selectGroup(this.refs.group.value)
     }
   }
 
@@ -186,7 +200,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   renderChoseGroup() {
     const {portalUser} = this.state
     const items:JSX.Element[] = []
-    for (let i=1; i <= 99; i++) {
+    for (let i=1; i <= MAX_GROUPS; i++) {
       items.push(<option value={i} key={i}>{i}</option>)
     }
     return (
