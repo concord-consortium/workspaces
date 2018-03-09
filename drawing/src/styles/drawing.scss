@@ -101,6 +101,7 @@ body {
       padding: 5px;
       background-color: #999;
       color: #fff;
+      font-size: 12px;
     }
 
     .form-group {
@@ -111,10 +112,12 @@ body {
       display: block;
       font-weight: bold;
       margin-bottom: 3px;
+      font-size: 12px;
     }
 
     select {
       background-color: #fff;
+      width: 80px;
     }
   }
 }
