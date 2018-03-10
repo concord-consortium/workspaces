@@ -238,22 +238,11 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     })
   }
 
-  renderPolygons(name: string, outline:string, solid:string, handler:(data:PolygonButtonData) => any) {
-    const polygons:JSX.Element[] = []
-    colors.forEach((lineColor, index) => {
-      polygons.push(<div key={`outline-${index}`} className="button" title={`${lineColor.name} Outline ${name} Drawing Mode`} onClick={handler({type: name.toLowerCase(), stroke: lineColor.hex, fill: "none"})} style={{color: lineColor.hex}}>{outline}</div>)
-    })
-    colors.forEach((lineColor, index) => {
-      polygons.push(<div key={`solid-${index}`} className="button" title={`${lineColor.name} Solid ${name} Drawing Mode`} onClick={handler({type: name.toLowerCase(), stroke: lineColor.hex, fill: lineColor.hex})} style={{color: lineColor.hex}}>{solid}</div>)
-    })
-    return polygons
-  }
-
   renderSettings() {
     const pluralize = (text: string, count: number) => count === 1 ? text : `${text}s`
     return (
       <div className="settings" style={{left: TOOLBAR_WIDTH}}>
-        <div className="title"><span className="icon icon-cog" /> Settings</div>
+        <div className="title"><span className="icon icon-menu" /> Settings</div>
         <form>
           <div className="form-group">
             <label htmlFor="stroke">Color</label>
@@ -321,7 +310,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
         iconElement = <ellipse cx={elementHalfSize} cy={elementHalfSize} rx={elementHalfSize} ry={elementHalfSize}  />
         break
       case "vector":
-        iconElement = <line x1={0} y1={elementHalfSize} x2={elementSize} y2={elementHalfSize}  />
+        iconElement = <line x1={0} y1={elementSize} x2={elementSize} y2={0}  />
         break
     }
 
@@ -339,7 +328,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     return (
       <div className="toolbar" style={{width: TOOLBAR_WIDTH}}>
         <div className="buttons">
-          <div className="button" title="Settings" onClick={this.handleSettingsButton}><span className="icon icon-cog" /></div>
+          <div className="button" title="Settings" onClick={this.handleSettingsButton}><span className="icon icon-menu" /></div>
           <div className={this.modalButtonClass("select")} title="Select" onClick={this.handleSelectionToolButton}><span className="icon icon-mouse-pointer" /></div>
           <div className={this.modalButtonClass("line")} title="Freehand Tool" onClick={this.handleLineDrawingToolButton}><span className="icon icon-pencil" style={{color: stroke}} /></div>
           <div className={this.modalButtonClass("vector")} style={{height: 30}} title="Line Tool" onClick={this.handleVectorToolButton}>{this.renderSVGIcon("vector")}</div>

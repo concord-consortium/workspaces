@@ -103,7 +103,7 @@ body {
       font-size: 12px;
 
       .icon {
-        font-size: 10px;
+        font-size: 12px;
         margin: 0 2px 0 10px;
       }
     }
@@ -232,4 +232,7 @@ body {
 }
 .icon-bin:before {
   content: "\e9ac";
+}
+.icon-menu:before {
+  content: "\e9bd";
 }

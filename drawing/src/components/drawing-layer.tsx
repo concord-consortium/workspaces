@@ -520,14 +520,21 @@ export class TextObject implements DrawingObject {
   height: number
   color: string
   uuid: string
+  fontSize: number
+  fontWeight: string
+  fontStyle: string
 
   constructor (json?:any) {
+    const {stroke, fontSize, fontWeight, fontStyle} = DefaultToolbarSettings
     this.type = "text"
     this.x = json ? json.x : 0
     this.y = json ? json.y : 0
     this.width = json ? (json.width || 300) : 300
-    this.color = json ? (json.color || "#000") : "#000"
+    this.color = json ? (json.color || stroke) : stroke
     this.uuid = json ? (json.uuid || uuid()) : uuid()
+    this.fontSize = json ? json.fontSize : fontSize
+    this.fontWeight = json ? json.fontWeight : fontWeight
+    this.fontStyle = json ? json.fontStyle : fontStyle
   }
 
   serialize() {
@@ -538,7 +545,10 @@ export class TextObject implements DrawingObject {
       y: this.y,
       width: this.width,
       color: this.color,
-      uuid: this.uuid
+      uuid: this.uuid,
+      fontSize: this.fontSize,
+      fontWeight: this.fontWeight,
+      fontStyle: this.fontStyle
     })
   }
 
@@ -548,6 +558,9 @@ export class TextObject implements DrawingObject {
     this.width = json.width || this.width
     this.color = json.color || this.color
     this.uuid = json.uuid || this.uuid
+    this.fontSize = json.fontSize || this.fontSize
+    this.fontWeight = json.fontWeight || this.fontWeight
+    this.fontStyle = json.fontStyle || this.fontStyle
   }
 
   inSelection(selectionBox:SelectionBox) {
@@ -684,8 +697,8 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   }
 
   styleWrapper(addBorder:boolean) {
-    const {color} = this.props.textObject
-    const style = addBorder ? `color: ${color}; border: 1px solid #aaa; padding: 0;` : `color: ${color}; border: none; padding: 1px;`
+    const {color, fontSize, fontWeight, fontStyle} = this.props.textObject
+    const style = `color: ${color}; font-size: ${fontSize}px; font-weight: ${fontWeight}; font-style: ${fontStyle}; border: ${addBorder ? "1px solid #aaa; padding: 0;" : "none; padding: 1px;"};`
     this.wrapperElement.setAttribute("style", style)
   }
 
@@ -1099,7 +1112,8 @@ export class TextDrawingTool extends DrawingTool {
     }
 
     const p = getWorkspacePoint(e)
-    const text:TextObject = new TextObject({x: p.x, y: p.y - 26 /* to move it above cursor */, color: this.settings.stroke, focused: true})
+    const {fontSize, fontWeight, fontStyle} = this.settings
+    const text:TextObject = new TextObject({x: p.x, y: p.y - 26 /* to move it above cursor */, color: this.settings.stroke, fontSize, fontWeight, fontStyle, focused: true})
     this.drawingLayer.autoFocusTextObject = text
     this.drawingLayer.commandManager.execute(new ToggleObjectCommand(text))
   }
