@@ -31,7 +31,6 @@ body {
   background-color: #eee;
   cursor: pointer;
 
-
   .buttons {
     position: absolute;
     top: 0;
@@ -82,6 +81,47 @@ body {
     a {
       text-decoration: none;
       color: #000;
+    }
+  }
+
+  .settings {
+    position: absolute;
+    top: 0;
+    width: 100px;
+    left: 0; /* set in code */
+    bottom: 0;
+    background-color: #bbb;
+    cursor: pointer;
+    font-size: 14px;
+    border-right: 1px solid #aaa;
+    opacity: 0.75;
+
+    .title {
+      padding: 5px;
+      background-color: #999;
+      color: #fff;
+      font-size: 12px;
+
+      .icon {
+        font-size: 12px;
+        margin: 0 2px 0 10px;
+      }
+    }
+
+    .form-group {
+      margin: 10px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 3px;
+      font-size: 12px;
+    }
+
+    select {
+      background-color: #fff;
+      width: 80px;
     }
   }
 }
@@ -187,6 +227,12 @@ body {
 .icon-redo:before {
   content: "\e966";
 }
+.icon-cog:before {
+  content: "\e994";
+}
 .icon-bin:before {
   content: "\e9ac";
+}
+.icon-menu:before {
+  content: "\e9bd";
 }

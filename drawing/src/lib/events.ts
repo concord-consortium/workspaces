@@ -1,13 +1,16 @@
 export enum Events {
   TextToolSelected,
   LineDrawingToolSelected,
+  VectorToolSelected,
   SelectionToolSelected,
   ImageToolSelected,
   RectangleToolSelected,
   EllipseToolSelected,
+  SettingsToolSelected,
   UndoPressed,
   RedoPressed,
-  DeletePressed
+  DeletePressed,
+  SettingsChanged
 }
 
 export type EventEmitterCallback = (data?:any) => void
