@@ -14,6 +14,7 @@ import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
 import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemoryRowModel';
 import { Strings } from '../strings';
+import { CaseTableHeader } from './case-table-header';
 
 interface ICaseTableProps {
   dataSet?: IDataSet;
@@ -130,6 +131,12 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         onNewAttribute: (name: string) => {
           if (this.props.dataSet) {
             addAttributeToDataSet(this.props.dataSet, { name });
+          }
+        },
+        onRenameAttribute: (id: string, name: string) => {
+          if (this.props.dataSet) {
+            //addAttributeToDataSet(this.props.dataSet, { name });
+            alert("TODO: implement rename attribute")
           }
         },
         onNewCase: () => {
@@ -533,6 +540,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           onCellEditingStopped={this.handleCellEditingStopped}
           enableSorting={true}
           postSort={this.handlePostSort}
+          frameworkComponents={{
+            agColumnHeader: CaseTableHeader as (new () => any)
+          }}
         />
       </div>
     );

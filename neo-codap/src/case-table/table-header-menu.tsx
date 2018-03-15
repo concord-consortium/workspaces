@@ -1,15 +1,19 @@
 import * as React from 'react';
 import NewAttributeDialog from './new-attribute-dialog';
+import RenameAttributeDialog from './rename-attribute-dialog';
 import { IDataSet } from '../data-manager/data-manager';
 import { GridApi } from 'ag-grid';
 import { Icon, Menu, Popover, Position, MenuDivider, MenuItem } from '@blueprintjs/core';
 import { Strings } from '../strings';
+import { listenForCaseTableEvents } from './case-table-events';
+
 import '@blueprintjs/core/dist/blueprint.css';
 
 interface ITableHeaderMenuProps {
   dataSet?: IDataSet;
   gridApi: GridApi;
   onNewAttribute: (name: string) => void;
+  onRenameAttribute: (id: string, name: string) => void;
   onNewCase: () => void;
   onRemoveAttribute: (id: string) => void;
   onRemoveCases: (ids: string[]) => void;
@@ -19,6 +23,9 @@ interface ITableHeaderMenuProps {
 
 interface ITableHeaderMenuState {
   isNewAttributeDialogOpen: boolean;
+  isRenameAttributeDialogOpen: boolean;
+  renameAttributeId: string;
+  renameAttributeName: string;
 }
 
 export default
@@ -28,8 +35,23 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
     super(props);
 
     this.state = {
-      isNewAttributeDialogOpen: false
+      isNewAttributeDialogOpen: false,
+      isRenameAttributeDialogOpen: false,
+      renameAttributeId: "",
+      renameAttributeName: ""
     };
+
+    listenForCaseTableEvents((event) => {
+      switch (event.type) {
+        case "rename-attribute":
+          this.setState({
+            isRenameAttributeDialogOpen: true,
+            renameAttributeId: event.id,
+            renameAttributeName: event.name
+          });
+          break;
+      }
+    });
   }
 
   openNewAttributeDialog = () => {
@@ -38,6 +60,15 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
 
   closeNewAttributeDialog = () => {
     this.setState({ isNewAttributeDialogOpen: false });
+  }
+
+  closeRenameAttributeDialog = () => {
+    this.setState({ isRenameAttributeDialogOpen: false });
+  }
+
+  handleRenameAttribute = (id: string, name: string) => {
+    this.props.onRenameAttribute(id, name)
+    this.closeRenameAttributeDialog()
   }
 
   handleNewCase = () => {
@@ -162,6 +193,14 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
           onNewAttribute={this.props.onNewAttribute}
           onClose={this.closeNewAttributeDialog}
           strings={this.props.strings}
+        />
+        <RenameAttributeDialog
+          id={this.state.renameAttributeId}
+          isOpen={this.state.isRenameAttributeDialogOpen}
+          onRenameAttribute={this.handleRenameAttribute}
+          onClose={this.closeRenameAttributeDialog}
+          strings={this.props.strings}
+          name={this.state.renameAttributeName}
         />
       </div>
     );
