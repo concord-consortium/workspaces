@@ -19,6 +19,7 @@ import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } f
 import { UserLookup } from "../lib/user-lookup"
 import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
 import { LogManager } from "../../../shared/log-manager"
+import { merge } from "lodash"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
@@ -335,10 +336,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleAddCaseTableAndGraph = () => {
-    const title = (prompt("Enter the title of the table and graph", "Untitled Table/Graph") || "").trim()
+  handleAddGraph = () => {
+    const title = (prompt("Enter the title of the graph", "Untitled Graph") || "").trim()
     if (title.length > 0) {
-      this.windowManager.add(this.constructRelativeUrl("neo-codap.html"), title)
+      this.windowManager.add(this.constructRelativeUrl("neo-codap.html?mode=graph"), title)
     }
   }
 
@@ -355,9 +356,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       const {windows} = firebaseDocument.data
       if (windows.attrs) {
         Object.keys(windows.attrs).forEach((windowId) => {
-          const localWindow = this.windowManager.windows[windowId]
-          if (localWindow) {
-            windows.attrs[windowId] = localWindow.attrs
+          const attrs = windows.attrs[windowId]
+          if (attrs) {
+            const localWindow = this.windowManager.windows[windowId]
+            if (localWindow) {
+              windows.attrs[windowId] = merge({}, localWindow.attrs, {dataSet: attrs.dataSet})
+            }
           }
         })
       }
@@ -729,7 +733,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
           <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
-          <button type="button" onClick={this.handleAddCaseTableAndGraph}>Add Table &amp; Graph</button>
+          <button type="button" onClick={this.handleAddGraph}>Add Graph</button>
           </div>
         <div className="right-buttons">
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}

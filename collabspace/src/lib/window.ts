@@ -3,6 +3,10 @@ import { IFramePhoneParent } from "../../../shared/workspace-client"
 import { FirebaseOrderMap } from "./window-manager"
 import * as firebase from "firebase"
 
+export interface FirebaseWindowDataSet {
+  documentId: string
+  dataSetId: string
+}
 export interface FirebaseWindowAttrs {
   top: number
   left: number
@@ -14,6 +18,7 @@ export interface FirebaseWindowAttrs {
   // restore to maximized after being minimized
   minimized: boolean
   maximized: boolean
+  dataSet?: FirebaseWindowDataSet
 }
 
 export interface FirebaseWindowAttrsMap {
