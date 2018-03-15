@@ -100,7 +100,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
   }
 
   handleCopyIntoDocument = () => {
-    const title = `${this.props.window.title} by ${this.props.creatorName} in group ${this.props.publication.group}`
+    const title = `${this.props.window.title} (by ${this.props.creatorName} in group ${this.props.publication.group})`
     this.props.windowManager.copyWindowFromPublication(this.props.portalOffering, this.props.publication, this.props.windowId, title)
       .catch((err:any) => alert(err.toString()))
   }

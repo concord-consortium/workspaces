@@ -1,6 +1,6 @@
 import { Window, WindowMap, IFrame, FirebaseWindowAttrs } from "./window"
-import { Document, FirebasePublication } from "./document"
-import { FirebaseWindowAttrsMap, FirebaseWindows } from "./window"
+import { Document, FirebasePublication, FirebaseDataSet } from "./document"
+import { FirebaseWindowAttrsMap, FirebaseWindows, FirebaseWindowDataSet } from "./window"
 import { FirebaseConfig } from "./firebase-config"
 import { IFramePhoneLib,
   IFramePhoneParent,
@@ -17,7 +17,7 @@ import { IFramePhoneLib,
 
 import * as firebase from "firebase"
 import { PortalOffering, PortalTokens } from "./auth";
-import { getDocumentRef } from "./refs"
+import { getDocumentRef, getRelativeRefPath } from "./refs"
 
 export enum DragType { GrowLeft, GrowRight, GrowUp, GrowDown, GrowDownRight, GrowDownLeft, Position, None }
 export interface DragInfo {
@@ -304,8 +304,8 @@ export class WindowManager {
     return newTitle
   }
 
-  add(url: string, title:string, iframeData?:any) {
-    const attrs = {
+  add(url: string, title:string, iframeData?:any, dataSet?:FirebaseWindowDataSet) {
+    const attrs:FirebaseWindowAttrs = {
       top: this.randInRange(50, 200),
       left: this.randInRange(50, 200),
       width: 700,
@@ -314,6 +314,9 @@ export class WindowManager {
       maximized: false,
       url,
       title: this.ensureUniqueTitle(title),
+    }
+    if (dataSet) {
+      attrs.dataSet = dataSet
     }
     Window.CreateInFirebase({document: this.document, attrs}, iframeData)
       .then((window) => {
@@ -427,10 +430,14 @@ export class WindowManager {
           type: "collabspace",
           version: "1.0.0",
           id: window.id,
+          documentId: this.document.id,
           readonly: this.document.isReadonly,
           firebase: {
             config: FirebaseConfig,
-            dataPath: window.iframe.dataRef.toString().substring(window.iframe.dataRef.root.toString().length)
+            dataPath: getRelativeRefPath(window.iframe.dataRef),
+            dataSet: window.attrs.dataSet,
+            dataSetsPath: getRelativeRefPath(this.document.getDataSetsDataRef()),
+            attrsPath: getRelativeRefPath(this.document.getWindowsDataRef("attrs"))
           },
           tokens: this.tokens
         }
@@ -462,7 +469,9 @@ export class WindowManager {
   copyWindowFromPublication(portalOffering:PortalOffering, publication:FirebasePublication, windowId: string, title:string) {
     return new Promise<void>((resolve, reject) => {
       // open the publication document
-      const documentWindowsRef = getDocumentRef(portalOffering, publication.documentId).child("data").child("windows")
+      const documentDataRef = getDocumentRef(portalOffering, this.document.id).child("data")
+      const publicationDataRef = getDocumentRef(portalOffering, publication.documentId).child("data")
+      const documentWindowsRef = publicationDataRef.child("windows")
       documentWindowsRef.once("value")
         .then((snapshot) => {
           const windows:FirebaseWindows|null = snapshot.val()
@@ -473,7 +482,28 @@ export class WindowManager {
             return reject("Cannot find window in publication!")
           }
           else {
-            this.add(attrs.url, title, iframeData)
+            const {dataSet} = attrs
+            const done = () => this.add(attrs.url, title, iframeData, dataSet)
+            if (dataSet) {
+              // copy datasets from publication into document if it doesn't already exist
+              const existingRef = documentDataRef.child("datasets").child(dataSet.documentId)
+              existingRef.once("value", (snapshot) => {
+                const val = snapshot.val()
+                if (!val) {
+                  const copyRef = publicationDataRef.child("datasets").child(dataSet.documentId)
+                  copyRef.once("value", (snapshot) => {
+                    existingRef.set(snapshot.val())
+                    done()
+                  })
+                }
+                else {
+                  done()
+                }
+              })
+            }
+            else {
+              done()
+            }
           }
         })
         .catch(reject)

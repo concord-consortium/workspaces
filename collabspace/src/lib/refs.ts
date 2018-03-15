@@ -51,7 +51,7 @@ export const getDocumentPath = (offering:PortalOffering, documentId?:string) => 
 }
 
 export const getDocumentRef = (offering:PortalOffering, documentId?:string) => {
-  return firebase.database().ref(getDocumentPath(offering, documentId))
+    return firebase.database().ref(getDocumentPath(offering, documentId))
 }
 
 export const getPublicationsPath = (offering:PortalOffering, publicationId?:string) => {
@@ -99,3 +99,8 @@ export const getSupportsSeenPath = (offering:PortalOffering, userId?:string, sup
 export const getSupportsSeenRef = (offering:PortalOffering, userId?:string, supportId?:string) => {
   return firebase.database().ref(getSupportsSeenPath(offering, userId, supportId))
 }
+
+export const getRelativeRefPath = (ref:firebase.database.Reference) => {
+  return ref.toString().substring(ref.root.toString().length)
+}
+

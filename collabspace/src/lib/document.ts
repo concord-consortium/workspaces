@@ -3,7 +3,22 @@ import { FirebaseWindows } from "./window"
 import { PortalInfo, PortalOffering, PortalUser, PortalUserConnectionStatusMap } from "./auth"
 import { getUserTemplatePath, getOfferingRef, getDocumentPath } from "./refs"
 
+
+export interface FirebaseDataSetCreatorMap {
+  [key: string]: string
+}
+
+export interface FirebaseDataSetMap {
+  [key: string]: FirebaseDataSet
+}
+
+export interface FirebaseDataSet {
+  creators: FirebaseDataSetCreatorMap
+  data: any
+}
+
 export interface FirebaseDocumentData {
+  datasets?: FirebaseDataSetMap
   windows: FirebaseWindows
 }
 
@@ -161,6 +176,10 @@ export class Document {
     return this.dataRef.child(`windows/${child}`)
   }
 
+  getDataSetsDataRef() {
+    return this.dataRef.child("datasets")
+  }
+
   getFirebaseOffering(offering:PortalOffering) {
     return new Promise<[FirebaseOffering, firebase.database.Reference]>((resolve, reject) => {
       const offeringRef = getOfferingRef(offering)
@@ -232,7 +251,7 @@ export class Document {
     })
   }
 
-  copy(newBasePath:string, documentFilter?:(firebaseDocument:FirebaseDocument) => void): Promise<Document> {
+  copy(newBasePath:string, documentFilter?:(firebaseDocument:FirebaseDocument, newId: string) => void): Promise<Document> {
     return new Promise<Document>((resolve, reject) => {
       const newRef = firebase.database().ref(newBasePath).push()
       const newId = newRef.key as string
@@ -243,8 +262,33 @@ export class Document {
           reject("Cannot copy document")
         }
         else {
+          // update the dataset document ids
+          if (firebaseDocument.data) {
+            if (firebaseDocument.data.datasets) {
+              const {datasets} = firebaseDocument.data
+              const updatedDataSets:FirebaseDataSetMap = {}
+              Object.keys(firebaseDocument.data.datasets).forEach((dataSetId) => {
+                const updatedId = dataSetId === this.id ? newId : dataSetId
+                updatedDataSets[updatedId] = datasets[dataSetId]
+              })
+              firebaseDocument.data.datasets = updatedDataSets
+            }
+
+            const {attrs} = firebaseDocument.data.windows
+            if (attrs) {
+              Object.keys(attrs).forEach((windowId) => {
+                const windowAttrs = attrs[windowId]
+                if (windowAttrs && windowAttrs.dataSet) {
+                  if (windowAttrs.dataSet.documentId === this.id) {
+                    windowAttrs.dataSet.documentId = newId
+                  }
+                }
+              })
+            }
+          }
+
           if (documentFilter) {
-            documentFilter(firebaseDocument)
+            documentFilter(firebaseDocument, newId)
           }
 
           newRef.set(firebaseDocument, (err) => {
