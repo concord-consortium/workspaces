@@ -1,0 +1,7 @@
+{
+  "ATTRIBUTE": "attribute",
+  "neo-codap:ATTRIBUTE": "column",
+
+  "CASE": "case",
+  "neo-codap:CASE": "row"
+}

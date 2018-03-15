@@ -8,7 +8,7 @@ import * as firebase from "firebase";
 import sizeMe from "react-sizeme";
 const html2canvas = require("html2canvas");
 import * as queryString from 'query-string';
-
+import { Strings } from "../../../shared/strings"
 
 interface ISizeMeSize {
   width:number|null;
@@ -31,9 +31,12 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   workspaceClient: WorkspaceClient;
   appDOMNodeRef: HTMLElement | null;
   cancelListDataSets?: Function
+  strings: Strings
 
   constructor (props:NeoCodapProps) {
     super(props)
+
+    this.strings = new Strings("en-us", "neo-codap")
 
     const urlParams = queryString.parse(location.search)
     this.state = {
@@ -152,6 +155,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
         <NeoCodapApp
           dataSet={dataSet}
           onDOMNodeRef={(ref: HTMLElement | null) => this.appDOMNodeRef = ref}
+          strings={this.strings}
         />
       </div>
     )

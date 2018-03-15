@@ -3,6 +3,7 @@ import NewAttributeDialog from './new-attribute-dialog';
 import { IDataSet } from '../data-manager/data-manager';
 import { GridApi } from 'ag-grid';
 import { Icon, Menu, Popover, Position, MenuDivider, MenuItem } from '@blueprintjs/core';
+import { Strings } from "../../../shared/strings";
 import '@blueprintjs/core/dist/blueprint.css';
 
 interface ITableHeaderMenuProps {
@@ -13,6 +14,7 @@ interface ITableHeaderMenuProps {
   onRemoveAttribute: (id: string) => void;
   onRemoveCases: (ids: string[]) => void;
   onSampleData?: (name: string) => void;
+  strings: Strings
 }
 
 interface ITableHeaderMenuState {
@@ -109,29 +111,33 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
   }
 
   renderMenu() {
+    const {strings} = this.props
+    const kase = strings.translate("case", {capitalize: true})
+    const kases = strings.translate("case", {capitalize: true, count: this.getSelectedRowNodeCount()})
+    const attribute = strings.translate("attribute", {capitalize: true})
     return (
       <Menu>
         <MenuItem
           iconName="pt-icon-add-column-right"
-          text="New Attribute..."
+          text={`New ${attribute}...`}
           onClick={this.openNewAttributeDialog}
         />
         <MenuItem
           iconName="pt-icon-add-row-bottom"
-          text="New Case"
+          text={`New ${kase}...`}
           onClick={this.handleNewCase}
         />
         <MenuDivider />
         <MenuItem
           iconName="pt-icon-remove-column"
-          text="Remove Attribute"
+          text={`Remove ${attribute}...`}
           disabled={!this.props.dataSet || !this.props.dataSet.attributes.length}
         >
           {this.renderAttributeSubMenuItems()}
         </MenuItem>
         <MenuItem
           iconName="pt-icon-remove-row-bottom"
-          text={this.getSelectedRowNodeCount() === 1 ? 'Remove Case' : 'Remove Cases'}
+          text={`Remove ${kases}`}
           onClick={this.handleRemoveCases}
           disabled={!this.getSelectedRowNodeCount()}
         />
@@ -155,6 +161,7 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
           isOpen={this.state.isNewAttributeDialogOpen}
           onNewAttribute={this.props.onNewAttribute}
           onClose={this.closeNewAttributeDialog}
+          strings={this.props.strings}
         />
       </div>
     );

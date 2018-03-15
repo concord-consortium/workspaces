@@ -13,10 +13,12 @@ import 'ag-grid/dist/styles/ag-grid.css';
 import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
 import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemoryRowModel';
+import { Strings } from "../../../shared/strings"
 
 interface ICaseTableProps {
   dataSet?: IDataSet;
   onSampleData?: (name: string) => void;
+  strings: Strings
 }
 
 interface ICaseTableState {
@@ -145,7 +147,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
             this.props.dataSet.removeCases(ids);
           }
         },
-        onSampleData: this.props.onSampleData
+        onSampleData: this.props.onSampleData,
+        strings: this.props.strings
       },
       headerClass: 'cdp-case-index-header',
       cellClass: 'cdp-case-index-cell',
@@ -334,7 +337,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       column: this.gridColumnApi.getColumn(cellIDs.attrID)
     };
   }
-      
+
   saveCellEditState() {
     const focusedCell = this.gridApi.getFocusedCell(),
           rowIndex = this.editCellEvent && this.editCellEvent.rowIndex,
