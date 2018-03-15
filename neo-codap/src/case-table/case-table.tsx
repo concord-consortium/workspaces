@@ -13,12 +13,12 @@ import 'ag-grid/dist/styles/ag-grid.css';
 import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
 import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemoryRowModel';
-import { Strings } from "../../../shared/strings"
+import { Strings } from '../strings';
 
 interface ICaseTableProps {
   dataSet?: IDataSet;
   onSampleData?: (name: string) => void;
-  strings: Strings
+  strings: Strings;
 }
 
 interface ICaseTableState {
@@ -481,12 +481,12 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     this.checkForEnterAfterCellEditingStopped = false;
   }
 
-  handlePostSort = (rowNodes:RowNode[]) => {
+  handlePostSort = (rowNodes: RowNode[]) => {
     // move the entry row to the bottom
-    const localRow = rowNodes.find((rowNode) => rowNode.data.id === LOCAL_CASE_ID)
+    const localRow = rowNodes.find((rowNode) => rowNode.data.id === LOCAL_CASE_ID);
     if (localRow) {
-      rowNodes.splice(rowNodes.indexOf(localRow), 1)
-      rowNodes.push(localRow)
+      rowNodes.splice(rowNodes.indexOf(localRow), 1);
+      rowNodes.push(localRow);
     }
   }
 

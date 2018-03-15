@@ -3,7 +3,7 @@ import NewAttributeDialog from './new-attribute-dialog';
 import { IDataSet } from '../data-manager/data-manager';
 import { GridApi } from 'ag-grid';
 import { Icon, Menu, Popover, Position, MenuDivider, MenuItem } from '@blueprintjs/core';
-import { Strings } from "../../../shared/strings";
+import { Strings } from '../strings';
 import '@blueprintjs/core/dist/blueprint.css';
 
 interface ITableHeaderMenuProps {
@@ -14,7 +14,7 @@ interface ITableHeaderMenuProps {
   onRemoveAttribute: (id: string) => void;
   onRemoveCases: (ids: string[]) => void;
   onSampleData?: (name: string) => void;
-  strings: Strings
+  strings: Strings;
 }
 
 interface ITableHeaderMenuState {
@@ -111,10 +111,10 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
   }
 
   renderMenu() {
-    const {strings} = this.props
-    const kase = strings.translate("case", {capitalize: true})
-    const kases = strings.translate("case", {capitalize: true, count: this.getSelectedRowNodeCount()})
-    const attribute = strings.translate("attribute", {capitalize: true})
+    const {strings} = this.props;
+    const kase = strings.translate('case', {capitalize: true});
+    const kases = strings.translate('case', {capitalize: true, count: this.getSelectedRowNodeCount()});
+    const attribute = strings.translate('attribute', {capitalize: true});
     return (
       <Menu>
         <MenuItem

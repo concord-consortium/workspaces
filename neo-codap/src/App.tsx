@@ -5,7 +5,7 @@ import { CaseTable } from './case-table/case-table';
 import { Graph } from './graph/graph';
 import { FocusStyleManager } from '@blueprintjs/core';
 import * as queryString from 'query-string';
-import { Strings } from "../../shared/strings"
+import { Strings } from './strings';
 const isLocalHost = (window.location.hostname.indexOf('localhost') >= 0) ||
                     (window.location.hostname.indexOf('127.0.0.1') >= 0),
       urlParams = queryString.parse(location.search),
@@ -19,7 +19,7 @@ const isLocalHost = (window.location.hostname.indexOf('localhost') >= 0) ||
 interface IAppProps {
   dataSet?: IDataSet;
   onDOMNodeRef?: (ref: HTMLElement | null) => void;
-  strings: Strings;
+  inCollabSpace?: boolean;
 }
 
 interface IAppState {
@@ -27,10 +27,12 @@ interface IAppState {
 }
 
 class App extends React.Component<IAppProps, IAppState> {
+  strings: Strings;
 
   constructor(props: IAppProps) {
     super(props);
 
+    this.strings = new Strings('en-us', this.props.inCollabSpace ? 'collabspace' : '');
     const dataSet = this.props.dataSet || DataSet.create({ name: 'untitled' });
 
     this.state = {
@@ -70,7 +72,7 @@ class App extends React.Component<IAppProps, IAppState> {
                   <CaseTable
                     dataSet={this.state.dataSet}
                     onSampleData={isLocalHost ? this.handleSampleData : undefined}
-                    strings={this.props.strings}
+                    strings={this.strings}
                   />
                 </div>
               )
