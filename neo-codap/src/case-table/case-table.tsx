@@ -6,7 +6,7 @@ import { addAttributeToDataSet, addCanonicalCasesToDataSet,
 import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
 import { CellComp, CellEditingStartedEvent, CellEditingStoppedEvent, ColDef, Column,
-          ColumnApi, GridApi, GridReadyEvent, RowRenderer } from 'ag-grid';
+          ColumnApi, GridApi, GridReadyEvent, RowRenderer, RowNode } from 'ag-grid';
 import { ValueGetterParams, ValueFormatterParams, ValueSetterParams } from 'ag-grid/dist/lib/entities/colDef';
 import { assign, cloneDeep, findIndex, isEqual, sortedIndexBy } from 'lodash';
 import 'ag-grid/dist/styles/ag-grid.css';
@@ -481,6 +481,15 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     this.checkForEnterAfterCellEditingStopped = false;
   }
 
+  handlePostSort = (rowNodes:RowNode[]) => {
+    // move the entry row to the bottom
+    const localRow = rowNodes.find((rowNode) => rowNode.data.id === LOCAL_CASE_ID)
+    if (localRow) {
+      rowNodes.splice(rowNodes.indexOf(localRow), 1)
+      rowNodes.push(localRow)
+    }
+  }
+
   componentWillMount() {
     window.addEventListener('keyup', this.handleKeyUp);
   }
@@ -522,6 +531,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           enableCellChangeFlash={true}
           onCellEditingStarted={this.handleCellEditingStarted}
           onCellEditingStopped={this.handleCellEditingStopped}
+          enableSorting={true}
+          postSort={this.handlePostSort}
         />
       </div>
     );
