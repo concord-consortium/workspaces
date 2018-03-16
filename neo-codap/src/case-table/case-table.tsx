@@ -15,11 +15,11 @@ import './case-table.css';
 import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemoryRowModel';
 import { Strings } from '../strings';
 import { CaseTableHeader } from './case-table-header';
-import { emitCaseTableEvent } from './case-table-events'
+import { emitCaseTableEvent } from './case-table-events';
 
 interface IPos {
-  left: number
-  top: number
+  left: number;
+  top: number;
 }
 
 interface ICaseTableProps {
@@ -31,7 +31,7 @@ interface ICaseTableProps {
 interface ICaseTableState {
   rowSelection: string;
   rowModelType: string;
-  addAttributeButtonPos: IPos|null
+  addAttributeButtonPos: IPos|null;
 }
 
 const LOCAL_CASE_ID = '__local__';
@@ -103,8 +103,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   savedEditCell?: ICellIDs;
   savedEditContent?: string;
 
-  gridElement: HTMLDivElement|null
-  headerElement: HTMLDivElement|null
+  gridElement: HTMLDivElement|null;
+  headerElement: HTMLDivElement|null;
 
   // we don't need to refresh for changes the table already knows about
   localChanges: IInputCase[] = [];
@@ -149,8 +149,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         },
         onRenameAttribute: (id: string, name: string) => {
           if (this.props.dataSet) {
-            //addAttributeToDataSet(this.props.dataSet, { name });
-            alert("TODO: implement rename attribute")
+            // addAttributeToDataSet(this.props.dataSet, { name });
+            alert('TODO: implement rename attribute');
           }
         },
         onNewCase: () => {
@@ -417,7 +417,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         case 'removeAttribute':
           if (dataSet) {
             columnDefs = this.getColumnDefs(dataSet);
-            setTimeout(() => this.handleSetAddAttributePos(), 1)
+            setTimeout(() => this.handleSetAddAttributePos(), 1);
           }
           break;
         case 'addCasesWithIDs':
@@ -531,18 +531,18 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   }
 
   handleSetAddAttributePos = () => {
-    console.log("handleSetAddAttributePos")
+    // console.log("handleSetAddAttributePos")
     if (this.gridElement) {
-      const classes = this.gridElement.getElementsByClassName('ag-header-row')
-      this.headerElement = classes.item(classes.length - 1) as HTMLDivElement
+      const classes = this.gridElement.getElementsByClassName('ag-header-row');
+      this.headerElement = classes.item(classes.length - 1) as HTMLDivElement;
       if (this.headerElement) {
-        const gridRect = this.gridElement.getBoundingClientRect()
-        const headerRect = this.headerElement.getBoundingClientRect()
-        const left = headerRect.right - gridRect.left
-        const top = headerRect.top - gridRect.top
-        const {addAttributeButtonPos} = this.state
+        const gridRect = this.gridElement.getBoundingClientRect();
+        const headerRect = this.headerElement.getBoundingClientRect();
+        const left = headerRect.right - gridRect.left;
+        const top = headerRect.top - gridRect.top;
+        const {addAttributeButtonPos} = this.state;
         if (!addAttributeButtonPos || (addAttributeButtonPos.top !== top) || (addAttributeButtonPos.left !== left)) {
-          this.setState({addAttributeButtonPos: {top, left}})
+          this.setState({addAttributeButtonPos: {top, left}});
         }
       }
     }
@@ -553,18 +553,33 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   }
 
   handleAddAttributeButton = () => {
-    emitCaseTableEvent({type: 'add-attribute'})
+    emitCaseTableEvent({type: 'add-attribute'});
   }
 
   renderAddAttributeButtonPos() {
-    const {addAttributeButtonPos} = this.state
+    const {addAttributeButtonPos} = this.state;
     if (addAttributeButtonPos !== null) {
-      const {top, left} = addAttributeButtonPos
+      const {top, left} = addAttributeButtonPos;
       return (
-        <span style={{position: 'absolute', fontSize: 10, top, left, marginLeft: 5, marginTop: 3, padding: '1px 4px', border: '1px solid #777', cursor: 'pointer'}} onClick={this.handleAddAttributeButton}>+</span>
-      )
+        <span
+          onClick={this.handleAddAttributeButton}
+          style={{
+            position: 'absolute',
+            fontSize: 10,
+            top,
+            left,
+            marginLeft: 5,
+            marginTop: 3,
+            padding: '1px 4px',
+            border: '1px solid #777',
+            cursor: 'pointer'
+          }}
+        >
+          +
+        </span>
+      );
     }
-    return null
+    return null;
   }
 
   render() {
@@ -590,6 +605,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           enableSorting={true}
           postSort={this.handlePostSort}
           frameworkComponents={{
+            // tslint:disable-next-line:no-any
             agColumnHeader: CaseTableHeader as (new () => any)
           }}
           onViewportChanged={() => this.handleSetAddAttributePos()}

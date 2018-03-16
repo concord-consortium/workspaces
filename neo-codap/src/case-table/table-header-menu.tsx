@@ -37,23 +37,25 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
     this.state = {
       isNewAttributeDialogOpen: false,
       isRenameAttributeDialogOpen: false,
-      renameAttributeId: "",
-      renameAttributeName: ""
+      renameAttributeId: '',
+      renameAttributeName: ''
     };
 
     listenForCaseTableEvents((event) => {
       switch (event.type) {
-        case "rename-attribute":
+        case 'rename-attribute':
           this.setState({
             isRenameAttributeDialogOpen: true,
             renameAttributeId: event.id,
             renameAttributeName: event.name
           });
           break;
-        case "add-attribute":
+        case 'add-attribute':
           this.setState({
             isNewAttributeDialogOpen: true
           });
+          break;
+        default:
           break;
       }
     });
@@ -72,8 +74,8 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
   }
 
   handleRenameAttribute = (id: string, name: string) => {
-    this.props.onRenameAttribute(id, name)
-    this.closeRenameAttributeDialog()
+    this.props.onRenameAttribute(id, name);
+    this.closeRenameAttributeDialog();
   }
 
   handleNewCase = () => {

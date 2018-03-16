@@ -9,7 +9,7 @@ interface IRenameAttributeDialogProps {
   onRenameAttribute: (id: string, name: string) => void;
   onClose: () => void;
   strings: Strings;
-  name: string
+  name: string;
 }
 
 interface IRenameAttributeDialogState {
@@ -23,12 +23,12 @@ class RenameAttributeDialog extends React.Component<IRenameAttributeDialogProps,
     super(props);
 
     this.state = {
-      name: this.props.name || ""
+      name: this.props.name || ''
     };
   }
 
   componentWillReceiveProps(nextProps: IRenameAttributeDialogProps) {
-    this.setState({name: nextProps.name})
+    this.setState({name: nextProps.name});
   }
 
   handleNameChange = (evt: React.FormEvent<HTMLInputElement>) => {

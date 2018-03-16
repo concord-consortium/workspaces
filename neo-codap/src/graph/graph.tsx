@@ -389,22 +389,24 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
     }
 
-    handleDragOver = (e:React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault()
+    handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
     }
 
-    handleDrop = (e:React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault()
+    handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
         try {
-            const data = JSON.parse(e.dataTransfer.getData('text'))
+            const data = JSON.parse(e.dataTransfer.getData('text'));
             if (data) {
                 if (data.type === 'drag-column-from-case-table') {
                     // TODO: handle drop from case table
-                    alert("Dropped " + data.name);
+                    alert('Dropped ' + data.name);
                 }
             }
         }
-        catch (e) {}
+        catch (e) {
+            alert('Unable to parse dropped info');
+        }
     }
 
     renderAttributeMenu(axisLabel: string, menuLabel: string, addNoneOption?: boolean) {
