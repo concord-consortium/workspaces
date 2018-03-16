@@ -4,7 +4,11 @@ export interface RenameAttributeEvent {
   name: string
 }
 
-export type CaseTableEvent = RenameAttributeEvent
+export interface AddAttributeEvent {
+  type: 'add-attribute'
+}
+
+export type CaseTableEvent = RenameAttributeEvent | AddAttributeEvent
 
 export type Listener = (event: CaseTableEvent) => void
 

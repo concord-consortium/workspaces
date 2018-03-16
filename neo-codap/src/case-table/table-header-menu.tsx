@@ -50,6 +50,11 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
             renameAttributeName: event.name
           });
           break;
+        case "add-attribute":
+          this.setState({
+            isNewAttributeDialogOpen: true
+          });
+          break;
       }
     });
   }

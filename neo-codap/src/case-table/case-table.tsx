@@ -15,6 +15,12 @@ import './case-table.css';
 import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemoryRowModel';
 import { Strings } from '../strings';
 import { CaseTableHeader } from './case-table-header';
+import { emitCaseTableEvent } from './case-table-events'
+
+interface IPos {
+  left: number
+  top: number
+}
 
 interface ICaseTableProps {
   dataSet?: IDataSet;
@@ -25,6 +31,7 @@ interface ICaseTableProps {
 interface ICaseTableState {
   rowSelection: string;
   rowModelType: string;
+  addAttributeButtonPos: IPos|null
 }
 
 const LOCAL_CASE_ID = '__local__';
@@ -96,6 +103,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   savedEditCell?: ICellIDs;
   savedEditContent?: string;
 
+  gridElement: HTMLDivElement|null
+  headerElement: HTMLDivElement|null
+
   // we don't need to refresh for changes the table already knows about
   localChanges: IInputCase[] = [];
 
@@ -108,7 +118,11 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     this.state = {
       rowSelection: 'multiple',
       rowModelType: 'inMemory',
+      addAttributeButtonPos: null
     };
+
+    this.gridElement = null;
+    this.headerElement = null;
 
     this.updateGridState(dataSet);
   }
@@ -191,6 +205,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       colId: attribute.id,
       editable: true,
       width: widths[attribute.name] || defaultWidth,
+      lockPosition: true,
       valueGetter: (params: ValueGetterParams) => {
         const { dataSet } = this.props,
               caseID = params.node.id,
@@ -402,6 +417,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         case 'removeAttribute':
           if (dataSet) {
             columnDefs = this.getColumnDefs(dataSet);
+            setTimeout(() => this.handleSetAddAttributePos(), 1)
           }
           break;
         case 'addCasesWithIDs':
@@ -514,13 +530,46 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
+  handleSetAddAttributePos = () => {
+    console.log("handleSetAddAttributePos")
+    if (this.gridElement) {
+      const classes = this.gridElement.getElementsByClassName('ag-header-row')
+      this.headerElement = classes.item(classes.length - 1) as HTMLDivElement
+      if (this.headerElement) {
+        const gridRect = this.gridElement.getBoundingClientRect()
+        const headerRect = this.headerElement.getBoundingClientRect()
+        const left = headerRect.right - gridRect.left
+        const top = headerRect.top - gridRect.top
+        const {addAttributeButtonPos} = this.state
+        if (!addAttributeButtonPos || (addAttributeButtonPos.top !== top) || (addAttributeButtonPos.left !== left)) {
+          this.setState({addAttributeButtonPos: {top, left}})
+        }
+      }
+    }
+  }
+
   componentWillReact() {
     this.updateGridState(this.props.dataSet);
   }
 
+  handleAddAttributeButton = () => {
+    emitCaseTableEvent({type: 'add-attribute'})
+  }
+
+  renderAddAttributeButtonPos() {
+    const {addAttributeButtonPos} = this.state
+    if (addAttributeButtonPos !== null) {
+      const {top, left} = addAttributeButtonPos
+      return (
+        <span style={{position: 'absolute', fontSize: 10, top, left, marginLeft: 5, marginTop: 3, padding: '1px 4px', border: '1px solid #777', cursor: 'pointer'}} onClick={this.handleAddAttributeButton}>+</span>
+      )
+    }
+    return null
+  }
+
   render() {
     return (
-      <div className="neo-codap-case-table ag-theme-fresh">
+      <div className="neo-codap-case-table ag-theme-fresh" ref={(el) => this.gridElement = el}>
         <AgGridReact
           columnDefs={this.gridColumnDefs}
           enableColResize={true}
@@ -543,7 +592,9 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           frameworkComponents={{
             agColumnHeader: CaseTableHeader as (new () => any)
           }}
+          onViewportChanged={() => this.handleSetAddAttributePos()}
         />
+        {this.renderAddAttributeButtonPos()}
       </div>
     );
   }

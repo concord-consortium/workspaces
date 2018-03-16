@@ -59,6 +59,14 @@ export class CaseTableHeader extends React.Component<ICaseTableHeaderProps, ICas
     this.setState({sort})
   }
 
+  handleDragStart = (e:React.DragEvent<HTMLDivElement>) => {
+    const data = {
+      type: 'drag-column-from-case-table',
+      name: this.props.column.colDef.headerName
+    };
+    e.dataTransfer.setData('text', JSON.stringify(data));
+  }
+
   renderSort() {
     const {sort} = this.state
     return sort ? <i className={`ag-icon ag-icon-${sort}`}></i> : null
@@ -67,7 +75,7 @@ export class CaseTableHeader extends React.Component<ICaseTableHeaderProps, ICas
   render() {
     return (
       <div>
-        <div className="customHeaderLabel" onClick={this.handleClick}>
+        <div className="customHeaderLabel" onClick={this.handleClick} draggable={true} onDragStart={this.handleDragStart}>
           {this.props.displayName}
           {this.renderSort()}
         </div>
