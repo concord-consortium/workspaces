@@ -149,8 +149,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         },
         onRenameAttribute: (id: string, name: string) => {
           if (this.props.dataSet) {
-            // addAttributeToDataSet(this.props.dataSet, { name });
-            alert('TODO: implement rename attribute');
+            this.props.dataSet.setAttributeName(id, name);
           }
         },
         onNewCase: () => {
@@ -412,13 +411,22 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       let columnDefs = null,
           rowTransaction: RowDataTransaction | null = null,
           shouldSaveEditState = true;
+      const attributeChanged = () => {
+        if (dataSet) {
+          columnDefs = this.getColumnDefs(dataSet);
+          setTimeout(() => this.handleSetAddAttributePos(), 1);
+        }
+      };
       switch (action.name) {
+        case '@APPLY_SNAPSHOT':
+          if (/^\/attributes\//.test(action.path || '')) {
+            attributeChanged();
+          }
+          break;
         case 'addAttributeWithID':
         case 'removeAttribute':
-          if (dataSet) {
-            columnDefs = this.getColumnDefs(dataSet);
-            setTimeout(() => this.handleSetAddAttributePos(), 1);
-          }
+        case 'setAttributeName':
+          attributeChanged();
           break;
         case 'addCasesWithIDs':
         case 'addCanonicalCasesWithIDs':
