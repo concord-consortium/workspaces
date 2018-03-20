@@ -10,7 +10,8 @@ export enum Events {
   UndoPressed,
   RedoPressed,
   DeletePressed,
-  SettingsChanged
+  SettingsChanged,
+  ObjectsSelected
 }
 
 export type EventEmitterCallback = (data?:any) => void

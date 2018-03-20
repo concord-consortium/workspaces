@@ -2,8 +2,9 @@ import * as React from "react"
 import * as firebase from "firebase"
 import * as CodeMirror from "codemirror"
 import { EventEmitter, Events } from "../lib/events"
-import { TOOLBAR_WIDTH, ImageButtonData, LineButtonData, PolygonButtonData, TextButtonData, ToolbarSettings, DefaultToolbarSettings } from "./toolbar"
+import { TOOLBAR_WIDTH, ImageButtonData, LineButtonData, PolygonButtonData, TextButtonData, ToolbarSettings, DefaultToolbarSettings, computeStrokeDashArray} from "./toolbar"
 import { v4 as uuid } from "uuid"
+import { isEqual } from "lodash"
 
 const SELECTION_COLOR = "#777"
 const HOVER_COLOR = "#ccff00"
@@ -109,6 +110,7 @@ export interface DrawingObjectOptions {
   drawingLayer: DrawingLayerView
 }
 export interface DrawingObject {
+  [key: string]: any
   type: string
   key: string|null
   x: number
@@ -201,7 +203,7 @@ export class LineObject implements DrawingObject {
               stroke={this.color}
               fill="none"
               strokeWidth={this.strokeWidth}
-              strokeDasharray={this.strokeDashArray}
+              strokeDasharray={computeStrokeDashArray(this.strokeDashArray, this.strokeWidth)}
               onClick={(e) => handleClick ? handleClick(e, this) : null}
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
@@ -277,7 +279,7 @@ export class VectorObject implements DrawingObject {
               y2={this.y2}
               stroke={this.stroke}
               strokeWidth={this.strokeWidth}
-              strokeDasharray={this.strokeDashArray}
+              strokeDasharray={computeStrokeDashArray(this.strokeDashArray, this.strokeWidth)}
               onClick={(e) => handleClick ? handleClick(e, this) : null }
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
@@ -358,7 +360,7 @@ export class RectangleObject implements DrawingObject {
               stroke={this.stroke}
               fill={this.fill}
               strokeWidth={this.strokeWidth}
-              strokeDasharray={this.strokeDashArray}
+              strokeDasharray={computeStrokeDashArray(this.strokeDashArray, this.strokeWidth)}
               onClick={(e) => handleClick ? handleClick(e, this) : null }
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
@@ -439,7 +441,7 @@ export class EllipseObject implements DrawingObject {
               stroke={this.stroke}
               fill={this.fill}
               strokeWidth={this.strokeWidth}
-              strokeDasharray={this.strokeDashArray}
+              strokeDasharray={computeStrokeDashArray(this.strokeDashArray, this.strokeWidth)}
               onClick={(e) => handleClick ? handleClick(e, this) : null}
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
@@ -682,6 +684,7 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   codeMirror: CodeMirror.EditorFromTextArea
   wrapperElement: HTMLElement
   sizer: HTMLElement
+  addBorder: boolean
 
   constructor(props:TextEditorViewProps){
     super(props)
@@ -700,6 +703,7 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
     const {color, fontSize, fontWeight, fontStyle} = this.props.textObject
     const style = `color: ${color}; font-size: ${fontSize}px; font-weight: ${fontWeight}; font-style: ${fontStyle}; border: ${addBorder ? "1px solid #aaa; padding: 0;" : "none; padding: 1px;"};`
     this.wrapperElement.setAttribute("style", style)
+    this.addBorder = addBorder
   }
 
   handleFocused = () => {
@@ -771,6 +775,9 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   componentWillReceiveProps(nextProps:TextEditorViewProps) {
     if (nextProps.resizing !== this.props.resizing) {
       this.styleWrapper(nextProps.resizing)
+    }
+    else {
+      this.styleWrapper(this.addBorder)
     }
   }
 
@@ -1072,6 +1079,7 @@ export class SelectionDrawingTool extends DrawingTool {
       selectedObjects.splice(index, 1)
     }
     this.drawingLayer.setState({selectedObjects})
+    this.drawingLayer.emitSelectedObjects(selectedObjects)
   }
 }
 
@@ -1279,6 +1287,10 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     this.updateImageDataUriCache(nextProps.imageSetItems)
   }
 
+  emitSelectedObjects(selectedObjects: DrawingObject[]) {
+    this.props.events.emit(Events.ObjectsSelected, selectedObjects)
+  }
+
   updateImageDataUriCache(imageSetItems:ImageSetItem[]) {
     imageSetItems.forEach((imageSetItem) => {
       if (!this.state.imageDataUriCache[imageSetItem.src]) {
@@ -1324,7 +1336,10 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         }
       }
     })
-    this.props.events.listen(Events.SettingsChanged, (settings:ToolbarSettings) => this.setCurrentToolSettings(settings) )
+    this.props.events.listen(Events.SettingsChanged, (settings:ToolbarSettings) => {
+      this.updateSelectedObjects(settings)
+      this.setCurrentToolSettings(settings)
+    })
     this.props.events.listen(Events.TextToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.text as TextDrawingTool).setSettings(data)))
     this.props.events.listen(Events.LineDrawingToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.line as LineDrawingTool).setSettings(data)))
     this.props.events.listen(Events.VectorToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.vector as VectorDrawingTool).setSettings(data)))
@@ -1364,6 +1379,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         if (json && object) {
           object.update(json)
           this.forceUpdate()
+          // do a second forced update in case the bounding box changes due to a text font/weight change
+          setTimeout(() => this.forceUpdate())
         }
       }
     })
@@ -1379,6 +1396,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
           }
           delete this.state.objects[snapshot.key]
           this.setState({objects: this.state.objects, selectedObjects})
+          this.emitSelectedObjects(selectedObjects)
         }
       }
     })
@@ -1403,12 +1421,33 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   setCurrentTool(tool:DrawingTool|null) {
     this.currentTool = tool
     this.setState({selectionBox: null, selectedObjects: [], hoverObject: null})
+    this.emitSelectedObjects([])
   }
 
   setCurrentToolSettings(settings:ToolbarSettings) {
     if (this.currentTool) {
       this.currentTool.setSettings(settings)
     }
+  }
+
+  updateSelectedObjects(settings:ToolbarSettings) {
+    const { selectedObjects } = this.state
+    const setProp = (selectedObject: DrawingObject, name:string, newValue:any) => {
+      if (selectedObject.hasOwnProperty(name)) {
+        selectedObject[name] = newValue
+      }
+    }
+    selectedObjects.forEach((selectedObject) => {
+      setProp(selectedObject, "color", settings.stroke),
+      setProp(selectedObject, "stroke", settings.stroke),
+      setProp(selectedObject, "fill", settings.fill),
+      setProp(selectedObject, "strokeDashArray", settings.strokeDashArray),
+      setProp(selectedObject, "strokeWidth", settings.strokeWidth),
+      setProp(selectedObject, "fontSize", settings.fontSize),
+      setProp(selectedObject, "fontStyle", settings.fontStyle),
+      setProp(selectedObject, "fontWeight", settings.fontWeight)
+      this.updateObject(selectedObject)
+    })
   }
 
   forEachObject(callback: (object:DrawingObject, key?:string) => void) {
@@ -1519,6 +1558,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         }
       })
       this.setState({selectionBox: null, selectedObjects})
+      this.emitSelectedObjects(selectedObjects)
     }
   }
 

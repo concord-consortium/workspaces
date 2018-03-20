@@ -1,10 +1,23 @@
 import * as React from "react"
 import * as firebase from "firebase"
 import { DrawingMode } from "./drawing-view"
-import { ImageSetItem } from "./drawing-layer"
+import { ImageSetItem, DrawingObject } from "./drawing-layer"
 import { EventEmitter, Events } from "../lib/events"
 
 export const TOOLBAR_WIDTH = 48
+
+export const computeStrokeDashArray = (type: string, strokeWidth: string|number) => {
+  const dotted = strokeWidth
+  const dashed = (strokeWidth as number) * 3
+  switch (type) {
+    case "dotted":
+      return `${dotted},${dotted}`
+    case "dashed":
+      return `${dashed},${dashed}`
+    default:
+      return ""
+  }
+}
 
 export interface Color {
   name: string
@@ -174,6 +187,23 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     this.props.events.listen(Events.RectangleToolSelected, () => this.setState({selectedButton: "rectangle"}))
     this.props.events.listen(Events.EllipseToolSelected, () => this.setState({selectedButton: "ellipse"}))
     this.props.events.listen(Events.SettingsToolSelected, () => this.setState({showSettings: !this.state.showSettings}))
+    this.props.events.listen(Events.ObjectsSelected, (selectedObjects: DrawingObject[]) => this.objectsSelected(selectedObjects))
+  }
+
+  objectsSelected(selectedObjects: DrawingObject[]) {
+    if (selectedObjects.length > 0) {
+      const selectedObject = selectedObjects[selectedObjects.length - 1]
+      const prop = (name:string, existingValue:any) => selectedObject.hasOwnProperty(name) ? selectedObject[name] : existingValue
+      this.setState({
+        stroke: prop("color", prop("stroke", this.state.stroke)),
+        fill: prop("fill", this.state.fill),
+        strokeDashArray: prop("strokeDashArray", this.state.strokeDashArray),
+        strokeWidth: prop("strokeWidth", this.state.strokeWidth),
+        fontSize: prop("fontSize", this.state.fontSize),
+        fontStyle: prop("fontStyle", this.state.fontStyle),
+        fontWeight: prop("fontWeight", this.state.fontWeight)
+      })
+    }
   }
 
   settings() {
@@ -181,7 +211,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
     const settings:ToolbarSettings = {
       stroke,
       fill,
-      strokeDashArray: this.computeStrokeDashArray(strokeDashArray, strokeWidth),
+      strokeDashArray,
       strokeWidth,
       fontSize,
       fontStyle,
@@ -209,17 +239,6 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
   handleFontSizeChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.settingsChange({fontSize: parseInt(e.target.value, 10)})
   handleFontWeightChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.settingsChange({fontWeight: e.target.value as any})
   handleFontStyleChange = (e:React.ChangeEvent<HTMLSelectElement>) => this.settingsChange({fontStyle: e.target.value as any})
-
-  computeStrokeDashArray(type: string, strokeWidth: number) {
-    switch (type) {
-      case "dotted":
-        return `${strokeWidth},${strokeWidth}`
-      case "dashed":
-        return `${strokeWidth*3},${strokeWidth*3}`
-      default:
-        return ""
-    }
-  }
 
   settingsChange(newState: Partial<ToolbarViewState>) {
     this.setState(newState as any, () => {
@@ -316,7 +335,7 @@ export class ToolbarView extends React.Component<ToolbarViewProps, ToolbarViewSt
 
     return (
       <svg width={iconSize} height={iconSize}>
-        <g transform={`translate(${iconMargin},${iconMargin})`} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={this.computeStrokeDashArray(strokeDashArray, strokeWidth)}>
+        <g transform={`translate(${iconMargin},${iconMargin})`} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeDasharray={computeStrokeDashArray(strokeDashArray, strokeWidth)}>
           {iconElement}
         </g>
       </svg>
