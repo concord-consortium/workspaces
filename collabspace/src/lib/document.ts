@@ -83,6 +83,7 @@ export interface FirebaseArtifact {
 
 export interface FirebasePublicationWindow {
   title:string
+  ownerId?:string
   artifacts: FirebaseArtifactMap
 }
 
@@ -170,10 +171,14 @@ export class Document {
     return Document.StringifyTemplateHashParam(this.ownerId, this.id)
   }
 
+  getWindowsRef() {
+    return this.dataRef.child("windows")
+  }
+
   // NOTE: the child should be a key in FirebaseWindow
   // TODO: figure out how to type check the child param in FirebaseWindow
   getWindowsDataRef(child:"attrs"|"order"|"minimizedOrder"|"iframeData") {
-    return this.dataRef.child(`windows/${child}`)
+    return this.getWindowsRef().child(child)
   }
 
   getDataSetsDataRef() {

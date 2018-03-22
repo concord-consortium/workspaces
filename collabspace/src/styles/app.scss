@@ -489,6 +489,49 @@ a {
           }
         }
 
+        .ownerbar {
+          position: absolute;
+          top: $titlebar-height;
+          left: 0;
+          right: 0;
+          height: $titlebar-height;
+          background-color: #aaa;
+          color: #333;
+          font-size: 12px;
+          cursor: pointer;
+
+          .info {
+            float: left;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+
+            .inner-info {
+              display: inline-block;
+              margin: 3px 0 0 6px;
+            }
+          }
+
+          .links {
+            float: right;
+            padding: 5px 6px 0 0;
+            font-size: 10px;
+
+            span {
+              margin-left: 5px;
+              padding: 2px 4px 1px 4px;
+              color: #000;
+              background-color: #f5f5f5;
+              cursor: pointer;
+            }
+          }
+
+          &.top {
+            background-color: #bbb;
+            color: #fff;
+          }
+        }
+
         .iframe, .iframe-overlay {
           position: absolute;
           top: $titlebar-height;

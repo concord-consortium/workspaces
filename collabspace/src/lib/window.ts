@@ -19,6 +19,7 @@ export interface FirebaseWindowAttrs {
   minimized: boolean
   maximized: boolean
   dataSet?: FirebaseWindowDataSet
+  ownerId?: string|null
 }
 
 export interface FirebaseWindowAttrsMap {

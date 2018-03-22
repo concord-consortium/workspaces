@@ -146,6 +146,10 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     this.props.windowManager.windowLoaded(this.props.window, iframe)
   }
 
+  handleCreatePublicCopy = (e:React.MouseEvent<HTMLSpanElement>) => {
+    this.props.windowManager.createPublicCopy(this.props.window)
+  }
+
   renderIframeOverlay() {
     if (this.props.isTopWindow) {
       return null
@@ -170,6 +174,22 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     return null
   }
 
+  renderOwnerBar(isTopWindow: boolean) {
+    const className = `ownerbar${isTopWindow ? " top" : ""}`
+    return (
+      <div className={className}>
+        <div className="info">
+          <div className="inner-info">
+            This is a private window, visible only to you.
+          </div>
+        </div>
+        <div className="links">
+          <span className="clickable" onClick={this.handleCreatePublicCopy}>Create Public Copy</span>
+        </div>
+      </div>
+    )
+  }
+
   render() {
     const {window, isTopWindow} = this.props
     const {attrs} = window
@@ -179,6 +199,8 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       ? {top: 0, right: 0, bottom: 0, left: 0, zIndex: this.props.zIndex}
       : {top: attrs.top, width: attrs.width, left: attrs.left, height: attrs.height, zIndex: this.props.zIndex}
     const titleWidth = attrs.width - (this.props.isTemplate ? 65 : 55)
+    const privateWindow = !!attrs.ownerId
+    const iframeTop = privateWindow ? 44 : 22;
 
     if (minimized) {
       windowStyle.display = "none"
@@ -192,7 +214,8 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
           </div>
           {this.renderButtons()}
         </div>
-        <div className="iframe">
+        { privateWindow ? this.renderOwnerBar(isTopWindow) : null}
+        <div className="iframe" style={{top: iframeTop}}>
           <WindowIframeComponent key={window.id} src={url} loaded={this.handleIframeLoaded} />
           {this.renderReadonlyBlocker()}
         </div>

@@ -9,7 +9,7 @@ import { WindowComponent } from "./window"
 import { MinimizedWindowComponent } from "./minimized-window"
 import { InlineEditorComponent } from "./inline-editor"
 import { SidebarComponent } from "./sidebar"
-import { WindowManager, WindowManagerState, DragType } from "../lib/window-manager"
+import { WindowManager, WindowManagerState, DragType, OrderedWindow } from "../lib/window-manager"
 import { v4 as uuidV4} from "uuid"
 import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
@@ -23,6 +23,11 @@ import { merge } from "lodash"
 
 const timeago = require("timeago.js")
 const timeagoInstance = timeago()
+
+export interface NonPrivateWindowParams {
+  window?: Window
+  ownerId?: string
+}
 
 export interface WorkspaceComponentProps {
   portalUser: PortalUser|null
@@ -103,7 +108,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         this.setState(newState)
       },
       syncChanges: this.props.isTemplate,
-      tokens: this.props.portalTokens
+      tokens: this.props.portalTokens,
+      nonPrivateWindow: this.nonPrivateWindow
     })
 
     this.infoRef = this.props.document.ref.child("info")
@@ -153,6 +159,18 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.removeEventListener("mousedown", this.handleWindowMouseDown)
     window.removeEventListener("mousemove", this.handleWindowMouseMove, true)
     window.removeEventListener("mouseup", this.handleWindowMouseUp, true)
+  }
+
+  userId() {
+    if (this.props.portalUser) {
+      return `${this.props.portalUser.id}:${this.props.firebaseUser.uid}`
+    }
+    return this.props.firebaseUser.uid
+  }
+
+  nonPrivateWindow = (params: NonPrivateWindowParams) => {
+    const ownerId = params.ownerId || (params.window ? params.window.attrs.ownerId : undefined)
+    return !ownerId || (ownerId === this.userId())
   }
 
   handleToggleViewArtifact = (artifact: FirebaseArtifact) => {
@@ -313,7 +331,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     e.preventDefault()
     const [url, ...rest] = e.dataTransfer.getData("text/uri-list").split("\n")
     if (url) {
-      this.windowManager.add(url, "Untitled")
+      this.windowManager.add({url, title: "Untitled"})
     }
   }
 
@@ -325,21 +343,28 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   handleAddDrawingButton = () => {
     const title = (prompt("Enter the title of the drawing", "Untitled Drawing") || "").trim()
     if (title.length > 0) {
-      this.windowManager.add(this.constructRelativeUrl("drawing-tool-v2.html"), title)
+      this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title})
+    }
+  }
+
+  handleAddPrivateDrawingButton = () => {
+    const title = (prompt("Enter the title of the drawing", "Untitled Private Drawing") || "").trim()
+    if (title.length > 0) {
+      this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title, ownerId: this.userId()})
     }
   }
 
   handleAddCaseTable = () => {
     const title = (prompt("Enter the title of the table", "Untitled Table") || "").trim()
     if (title.length > 0) {
-      this.windowManager.add(this.constructRelativeUrl("neo-codap.html?mode=table"), title)
+      this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=table"), title})
     }
   }
 
   handleAddGraph = () => {
     const title = (prompt("Enter the title of the graph", "Untitled Graph") || "").trim()
     if (title.length > 0) {
-      this.windowManager.add(this.constructRelativeUrl("neo-codap.html?mode=graph"), title)
+      this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=graph"), title})
     }
   }
 
@@ -360,7 +385,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           if (attrs) {
             const localWindow = this.windowManager.windows[windowId]
             if (localWindow) {
-              windows.attrs[windowId] = merge({}, localWindow.attrs, {dataSet: attrs.dataSet})
+              windows.attrs[windowId] = merge({}, localWindow.attrs, attrs.dataSet ? {dataSet: attrs.dataSet} : {})
             }
           }
         })
@@ -401,6 +426,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                 windows[windowId] = {
                   title: attrs.title,
                   artifacts: {}
+                }
+                if (attrs.ownerId) {
+                  windows[windowId].ownerId = attrs.ownerId
                 }
               }
             })
@@ -732,6 +760,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="buttons">
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
+          {!this.props.isTemplate ? <button type="button" onClick={this.handleAddPrivateDrawingButton}>Add Private Drawing</button> : null}
           <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
           <button type="button" onClick={this.handleAddGraph}>Add Graph</button>
           </div>
@@ -755,7 +784,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   renderAllWindows() {
     const {allOrderedWindows, topWindow} = this.state
-    return allOrderedWindows.map((orderedWindow) => {
+    const userId = this.userId()
+    const nonPrivateWindows = allOrderedWindows.filter((orderedWindow: OrderedWindow) => this.nonPrivateWindow({window: orderedWindow.window}))
+    return nonPrivateWindows.map((orderedWindow) => {
       const {window} = orderedWindow
       return <WindowComponent
                key={window.id}
@@ -770,7 +801,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderMinimizedWindows() {
-    const windows = this.state.minimizedWindows.map((window) => {
+    const nonPrivateWindows = this.state.minimizedWindows.filter((window) => this.nonPrivateWindow({window}))
+    const windows = nonPrivateWindows.map((window) => {
       return <MinimizedWindowComponent
                key={window.id}
                window={window}

@@ -18,6 +18,15 @@ import { IFramePhoneLib,
 import * as firebase from "firebase"
 import { PortalOffering, PortalTokens } from "./auth";
 import { getDocumentRef, getRelativeRefPath } from "./refs"
+import { NonPrivateWindowParams } from "../components/workspace";
+
+export interface AddWindowParams {
+  url: string
+  title: string
+  ownerId?: string
+  iframeData?: any,
+  dataSet?: FirebaseWindowDataSet
+}
 
 export enum DragType { GrowLeft, GrowRight, GrowUp, GrowDown, GrowDownRight, GrowDownLeft, Position, None }
 export interface DragInfo {
@@ -51,6 +60,7 @@ export interface WindowManagerSettings {
   onStateChanged: WindowManagerStateChangeFn
   syncChanges: boolean
   tokens: PortalTokens|null
+  nonPrivateWindow: (nonPrivateWindowParams: NonPrivateWindowParams) => boolean
 }
 
 export interface FirebaseOrderMap {
@@ -74,12 +84,14 @@ export class WindowManager {
   minimizedWindowOrder: string[]
   lastAttrsQuery: firebase.database.Query
   tokens: PortalTokens|null
+  nonPrivateWindow: (nonPrivateWindowParams: NonPrivateWindowParams) => boolean
 
   constructor (settings: WindowManagerSettings) {
     this.document = settings.document
     this.onStateChanged = settings.onStateChanged
     this.syncChanges = settings.syncChanges
     this.tokens = settings.tokens
+    this.nonPrivateWindow = settings.nonPrivateWindow
 
     this.windows = {}
     this.windowOrder = []
@@ -162,7 +174,9 @@ export class WindowManager {
         attrs
       })
       this.windows[windowId] = window
-      this.moveToTop(window)
+      if (this.nonPrivateWindow({window})) {
+        this.moveToTop(window)
+      }
     }
   }
 
@@ -224,7 +238,7 @@ export class WindowManager {
       const order = windowOrder.indexOf(window.id)
       if (window && (order !== -1)) {
         this.state.allOrderedWindows.push({order, window})
-        if (!window.attrs.minimized) {
+        if (!window.attrs.minimized && this.nonPrivateWindow({window})) {
           if (!this.state.topWindow || (order > topOrder)) {
             this.state.topWindow = window
             topOrder = order
@@ -304,7 +318,9 @@ export class WindowManager {
     return newTitle
   }
 
-  add(url: string, title:string, iframeData?:any, dataSet?:FirebaseWindowDataSet) {
+  add(params:AddWindowParams) {
+    //url: string, title:string, ownerId: string, iframeData?:any, dataSet?:FirebaseWindowDataSet) {
+    const {url, title, ownerId, iframeData, dataSet} = params
     const attrs:FirebaseWindowAttrs = {
       top: this.randInRange(50, 200),
       left: this.randInRange(50, 200),
@@ -313,7 +329,10 @@ export class WindowManager {
       minimized: false,
       maximized: false,
       url,
-      title: this.ensureUniqueTitle(title),
+      title: this.ensureUniqueTitle(title)
+    }
+    if (ownerId) {
+      attrs.ownerId = ownerId
     }
     if (dataSet) {
       attrs.dataSet = dataSet
@@ -412,6 +431,13 @@ export class WindowManager {
     }
   }
 
+  createPublicCopy(window:Window) {
+    const title = prompt("Enter name of new window")
+    if (title !== null) {
+      this.copyWindow(window, title)
+    }
+  }
+
   changeTitle(window:Window, newTitle:string) {
     const {attrs} = window
     attrs.title = newTitle
@@ -451,7 +477,7 @@ export class WindowManager {
 
   postToAllWindows(message:string, request:object) {
     this.forEachWindow((window) => {
-      if (window.iframe.connected) {
+      if (window.iframe && window.iframe.connected) {
         window.iframe.phone.post(message, request)
       }
     })
@@ -463,6 +489,25 @@ export class WindowManager {
       if (window) {
         callback(window)
       }
+    })
+  }
+
+  copyWindow(window: Window, title: string) {
+    return new Promise<void>((resolve, reject) => {
+      const windowsRef = this.document.getWindowsRef()
+      windowsRef.once("value")
+        .then((snapshot) => {
+          const windows:FirebaseWindows|null = snapshot.val()
+          const firebaseWindow = windows && windows.attrs[window.id]
+          const iframeData = windows && windows.iframeData && windows.iframeData[window.id] ? windows.iframeData[window.id] : undefined
+          if (!firebaseWindow) {
+            return reject("Cannot find window in document")
+          }
+          const {dataSet, url} = firebaseWindow
+          this.add({url, title, iframeData, dataSet})
+          resolve()
+        })
+        .catch(reject)
     })
   }
 
@@ -482,8 +527,11 @@ export class WindowManager {
             return reject("Cannot find window in publication!")
           }
           else {
-            const {dataSet} = attrs
-            const done = () => this.add(attrs.url, title, iframeData, dataSet)
+            const {dataSet, url} = attrs
+            const done = () => {
+              this.add({url, title, iframeData, dataSet})
+              resolve()
+            }
             if (dataSet) {
               // copy datasets from publication into document if it doesn't already exist
               const existingRef = documentDataRef.child("datasets").child(dataSet.documentId)
