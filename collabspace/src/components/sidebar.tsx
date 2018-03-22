@@ -180,27 +180,34 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
     const {publicationItem} = this.props
     const {publication} = publicationItem
     const windowIds = Object.keys(publication.windows)
+    const windows:JSX.Element[] = []
 
     if (windowIds.length === 0) {
       return null
     }
 
+    windowIds.forEach((windowId) => {
+      const window = publication.windows[windowId]
+      if (!window.ownerId) {
+        windows.push(
+          <SidebarPublicationWindowComponent
+            key={windowId}
+            publicationId={publicationItem.id}
+            publication={publication}
+            windowId={windowId}
+            window={window}
+            creatorName={this.state.creatorName}
+            toggleViewArtifact={this.props.toggleViewArtifact}
+            portalOffering={this.props.portalOffering}
+            windowManager={this.props.windowManager}
+          />
+        )
+      }
+    })
+
     return (
       <div className="windows">
-        {windowIds.map((windowId) => {
-          const window = publication.windows[windowId]
-          return <SidebarPublicationWindowComponent
-                   key={windowId}
-                   publicationId={publicationItem.id}
-                   publication={publication}
-                   windowId={windowId}
-                   window={window}
-                   creatorName={this.state.creatorName}
-                   toggleViewArtifact={this.props.toggleViewArtifact}
-                   portalOffering={this.props.portalOffering}
-                   windowManager={this.props.windowManager}
-                 />
-        })}
+        {windows}
       </div>
     )
   }
