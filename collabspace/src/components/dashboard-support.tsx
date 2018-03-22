@@ -6,9 +6,7 @@ import { FirebaseOfferingMap, FirebasePublicationMap, FirebasePublication } from
 import { UserLookup } from "../lib/user-lookup"
 import { MAX_GROUPS } from "./app"
 import * as queryString from "query-string"
-
-const timeago = require("timeago.js")
-const timeagoInstance = timeago()
+import { LiveTimeAgoComponent } from "./live-time-ago"
 
 export interface DashboardSuportComponentProps {
   firebaseUser: firebase.User
@@ -301,7 +299,7 @@ export class DashboardSuportComponent extends React.Component<DashboardSuportCom
     return (
       <div className="support" key={index}>
         <div className="support-right">
-          <div>{timeagoInstance.format(support.createdAt)}</div>
+          <div><LiveTimeAgoComponent timestamp={support.createdAt} /></div>
           <div>
             <button onClick={() => this.handleCopySupport(support)}>Copy Support Text</button>
             <button onClick={() => this.handleDeleteSupport(support)}>Delete Support</button>

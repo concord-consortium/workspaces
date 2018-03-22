@@ -10,9 +10,7 @@ import escapeFirebaseKey from "../lib/escape-firebase-key"
 import * as queryString from "query-string"
 import { UserLookup } from "../lib/user-lookup"
 import { MAX_GROUPS } from "./app"
-
-const timeago = require("timeago.js")
-const timeagoInstance = timeago()
+import { LiveTimeAgoComponent } from "./live-time-ago"
 
 const demoId = queryString.parse(window.location.search).demo
 
@@ -270,7 +268,7 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
     return (
       <div className="publication">
         <div className="publication-header clickable" onClick={this.handleToggle}>
-          #{index} <span className="initials" title={name}>{initials}</span> in group {group} <span className="ago">{timeagoInstance.format(createdAt)}</span>
+          #{index} <span className="initials" title={name}>{initials}</span> in group {group} <span className="ago"><LiveTimeAgoComponent timestamp={createdAt} /></span>
         </div>
         {this.state.expanded ? this.renderExpanded() : null}
       </div>
