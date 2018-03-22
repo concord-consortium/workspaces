@@ -20,9 +20,7 @@ import { UserLookup } from "../lib/user-lookup"
 import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
 import { LogManager } from "../../../shared/log-manager"
 import { merge } from "lodash"
-
-const timeago = require("timeago.js")
-const timeagoInstance = timeago()
+import { LiveTimeAgoComponent } from "./live-time-ago"
 
 export interface NonPrivateWindowParams {
   window?: Window
@@ -692,7 +690,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       if (portalUser) {
         const {connected} = groupUser
         const className = `group-user ${groupUser.connected ? `connected ${portalUser.type}` : "disconnected"}`
-        const titleSuffix = groupUser.connected ? `connected ${timeagoInstance.format(groupUser.connectedAt)}` : `disconnected ${timeagoInstance.format(groupUser.disconnectedAt)}`
+        const titleSuffix = groupUser.connected ? `connected` : `disconnected`
         users.push(<div key={id} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
       }
     })
@@ -725,11 +723,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const {creator, createdAt} = publication
     const user = this.userLookup.lookup(creator)
     const name = user ? user.fullName : "Unknown User"
-    const message = `Published ${timeagoInstance.format(createdAt)} by ${name} in group ${publication.group}`
     return (
       <div className="buttons">
         <div className="left-buttons">
-          <div className="readonly-message">{message}</div>
+          <div className="readonly-message">
+            Published <LiveTimeAgoComponent timestamp={createdAt} /> by {name} in group {publication.group}
+          </div>
         </div>
         <div className="right-buttons">
           <button type="button" onClick={this.handleViewAllPublications}>View All Publications</button>

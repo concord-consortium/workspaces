@@ -5,10 +5,8 @@ import {v4 as uuidV4} from "uuid"
 import {FirebaseDocument, Document, FirebaseDocumentInfo} from "../lib/document"
 import {getUserTemplateListRef} from "../lib/refs"
 import {AppHashParams} from "./app"
+import { LiveTimeAgoComponent } from "./live-time-ago"
 
-const timeago = require("timeago.js")
-
-const timeagoInstance = timeago()
 
 export interface DocumentInfoItem {
   id: string
@@ -55,7 +53,7 @@ export class DocumentCrudItemComponent extends React.Component<DocumentCrudItemC
       <tr>
         <td className="checkbox"><input type="checkbox" checked={item.checked} onChange={this.handleChange} /></td>
         <td><a href={`#${queryString.stringify(hashParams)}`}>{info.name}</a></td>
-        <td>{timeagoInstance.format(info.createdAt)}</td>
+        <td><LiveTimeAgoComponent timestamp={info.createdAt} /></td>
       </tr>
     )
   }
