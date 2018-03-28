@@ -96,7 +96,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
 
       this.setState({portalUser: portalInfo.user, portalOffering: portalInfo.offering, portalTokens: tokens})
       this.logManager = new LogManager({tokens, activity: "CollabSpace"})
-      this.jwtKeepalive = new JWTKeepalive(tokens, (portalTokens, expired) => this.setState({portalTokens}))
+      this.jwtKeepalive = new JWTKeepalive(tokens, (portalTokens, expired, authError) => this.setState({portalTokens, authError}))
 
       return firebaseAuth().then((firebaseUser) => {
         this.setState({firebaseUser})

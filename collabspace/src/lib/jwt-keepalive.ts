@@ -1,16 +1,16 @@
 import { AuthQueryParams, PortalTokens, getPortalJWTWithBearerToken, getFirebaseJWTWithBearerToken } from "./auth"
 import * as queryString from "query-string"
 
-export type JWTKeepaliveCallback = (tokens:PortalTokens, expired: boolean) => void
+export type JWTKeepaliveCallback = (tokens:PortalTokens, expired: boolean, error: string|null) => void
 
 const seconds = (n:number) => n * 1000
 const minutes = (n:number) => seconds(n) * 60
 const now = () => Date.now()
 
-const REFRESH_TIMEOUT = minutes(1)
-const DURATION_BEFORE_IDLE_CHECK = minutes(3)
-const MAX_IDLE_DURATION = minutes(1)
-const MAX_DURATION = minutes(10)
+const REFRESH_TIMEOUT = minutes(30)
+const DURATION_BEFORE_IDLE_CHECK = minutes(60)
+const MAX_IDLE_DURATION = minutes(10)
+const MAX_DURATION = minutes(120)
 
 export class JWTKeepalive {
   private tokens: PortalTokens|null
@@ -78,26 +78,31 @@ export class JWTKeepalive {
     }
 
     if (this.startedAt + MAX_DURATION < rightNow) {
-      console.log("Reached max duration, stopping")
-      this.callback(tokens, true)
+      this.callback(tokens, true, "Your session has reached its maximum length.  Please login again.")
       return
     }
 
     if (this.startedAt + DURATION_BEFORE_IDLE_CHECK < rightNow) {
-      console.log("Reached idle check duration")
       if (this.idle && (rightNow - this.idleAt > MAX_IDLE_DURATION)) {
-        console.log("Idle for too long during check, stopping")
-        this.callback(tokens, true)
+        this.callback(tokens, true, "Your session has been idle for too long.  Please login again.")
         return
       }
     }
 
-    console.log("refreshing tokens")
     getPortalJWTWithBearerToken(tokens.firebaseJWT.domain, "Bearer/JWT", tokens.rawPortalJWT, params.demo)
       .then(([rawPortalJWT, portalJWT]) => {
+        const {rawFirebaseJWT, firebaseJWT, domain} = tokens
+        const newTokens:PortalTokens = {
+          rawPortalJWT,
+          portalJWT,
+          rawFirebaseJWT,
+          firebaseJWT,
+          domain
+        }
+        this.callback(newTokens, false, null)
       })
       .catch((err) => {
-
+        this.callback(tokens, true, "Unable to automatically refresh your login.  Please manually login again.")
       })
     this.startJWTRefreshTimer()
   }
