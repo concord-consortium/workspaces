@@ -489,6 +489,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     return (
       <div className="sidebar">
         <div className="sidebar-header">
+          <i className="icon icon-newspaper" />
           Publications
           {this.renderExpandContract()}
         </div>

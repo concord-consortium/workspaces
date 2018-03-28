@@ -190,8 +190,19 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     )
   }
 
+  renderSidebarMenu(left: number) {
+    return (
+      <div className="sidebar-menu" style={{left}}>
+        <div className="sidebar-menu-inner">
+          <i className="icon icon-newspaper" title="Publish Window" />
+          <i className="icon icon-copy" title="Copy Window" />
+        </div>
+      </div>
+    )
+  }
+
   render() {
-    const {window, isTopWindow} = this.props
+    const {window, isTopWindow, isTemplate} = this.props
     const {attrs} = window
     const {title, maximized, minimized, url} = attrs
     const titlebarClass = `titlebar${isTopWindow ? " top" : ""}`
@@ -226,6 +237,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         {!maximized ? <div className="bottom-drag" onMouseDown={this.handleDragBottom} /> : null}
         {!maximized ? <div className="bottom-left-drag" onMouseDown={this.handleDragBottomLeft} /> : null}
         {!maximized ? <div className="bottom-right-drag" onMouseDown={this.handleDragBottomRight} /> : null}
+        {isTopWindow && !maximized && !isTemplate ? this.renderSidebarMenu(windowStyle.width + 4) : null}
       </div>
     )
   }

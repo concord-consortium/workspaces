@@ -758,16 +758,16 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return (
       <div className="buttons">
         <div className="left-buttons">
-          <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
-          {!this.props.isTemplate ? <button type="button" onClick={this.handleAddPrivateDrawingButton}>Add Private Drawing</button> : null}
-          <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
-          <button type="button" onClick={this.handleAddGraph}>Add Graph</button>
+          <button type="button" onClick={this.handleAddDrawingButton}><i className="icon icon-pencil" /> Add Drawing</button>
+          {!this.props.isTemplate ? <button type="button" onClick={this.handleAddPrivateDrawingButton}><i className="icon icon-pencil" /> Add Private Drawing</button> : null}
+          <button type="button" onClick={this.handleAddCaseTable}><i className="icon icon-table2" /> Add Table</button>
+          <button type="button" onClick={this.handleAddGraph}><i className="icon icon-stats-dots" /> Add Graph</button>
           </div>
         <div className="right-buttons">
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
           {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
-          {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}>Publish</button> : null}
+          {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}><i className="icon icon-newspaper" /> Publish All</button> : null}
         </div>
       </div>
     )

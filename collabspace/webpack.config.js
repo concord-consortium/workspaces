@@ -1,5 +1,4 @@
 const webpack = require("webpack");
-const ExtractTextPlugin = require("extract-text-webpack-plugin");
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
@@ -12,16 +11,10 @@ const distPath = __dirname + "/../dist/collabspace";
 const globalsList = ["react", "react-dom", "firebase", "lodash",
                     "mobx", "mobx-state-tree", "query-string", "uuid"];
 
-const extractSass = new ExtractTextPlugin({
-   filename: cssFilename,
-   disable: isDev
-});
-
 module.exports = [
     {
         entry: {
             app: "./src/app.tsx",
-            styles: "./src/styles/app.scss",
             globals: globalsList
         },
 
@@ -39,24 +32,55 @@ module.exports = [
         module: {
             rules: [
                 { enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
-
                 { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
-
-                {
-                    test: /\.scss$/,
-                    use: extractSass.extract({
-                        use: [
-                            {loader: "css-loader", options: { sourceMap: isDev }},
-                            {loader: "sass-loader", options: { sourceMap: isDev }}
-                        ],
-                        fallback: 'style-loader'
-                    })
-                }
+                { test: /\.scss$/i, loaders: ['style-loader', 'css-loader', 'sass-loader']},
+                { test: /\.css$/, loaders: ['style-loader', 'css-loader']},
+                { test: /\.(png|woff|woff2|eot|ttf|svg)$/, loader: 'url-loader' }
             ]
         },
 
         plugins: [
-            extractSass,
+            new webpack.optimize.CommonsChunkPlugin({
+                name: "globals",
+                filename: jsFilename
+            }),
+            new HtmlWebpackPlugin({
+                filename: '../index.html',
+                template: 'src/index.template.html'
+            }),
+            new CopyWebpackPlugin([
+                {from: 'src/public', to: distPath}
+            ])
+        ]
+    },
+    {
+        entry: {
+            app: "./src/app.tsx",
+            globals: globalsList
+        },
+
+        output: {
+            filename: jsFilename,
+            path: distPath + "/assets"
+        },
+
+        devtool: isDev ? "source-map" : "",
+
+        resolve: {
+            extensions: [".webpack.js", ".web.js", ".ts", ".tsx", ".js"]
+        },
+
+        module: {
+            rules: [
+                { enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
+                { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
+                { test: /\.scss$/i, loaders: ['style-loader', 'css-loader', 'sass-loader']},
+                { test: /\.css$/, loaders: ['style-loader', 'css-loader']},
+                { test: /\.(png|woff|woff2|eot|ttf|svg)$/, loader: 'url-loader' }
+            ]
+        },
+
+        plugins: [
             new webpack.optimize.CommonsChunkPlugin({
                 name: "globals",
                 filename: jsFilename
@@ -147,7 +171,6 @@ module.exports = [
     {
         entry: {
             "dashboard": "./src/dashboard.tsx",
-            "dashboard-styles": "./src/styles/app.scss",
             "dashboard-globals": globalsList
         },
 
@@ -165,24 +188,13 @@ module.exports = [
         module: {
             rules: [
                 { enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
-
                 { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
-
-                {
-                    test: /\.scss$/,
-                    use: extractSass.extract({
-                        use: [
-                            {loader: "css-loader", options: { sourceMap: isDev }},
-                            {loader: "sass-loader", options: { sourceMap: isDev }}
-                        ],
-                        fallback: 'style-loader'
-                    })
-                }
+                { test: /\.scss$/i, loaders: ['style-loader', 'css-loader', 'sass-loader']},
+                { test: /\.css$/, loaders: ['style-loader', 'css-loader']}
             ]
         },
 
         plugins: [
-            extractSass,
             new webpack.optimize.CommonsChunkPlugin({
                 name: "dashboard-globals",
                 filename: jsFilename
