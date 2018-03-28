@@ -355,7 +355,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   handleAddCaseTable = () => {
     const title = (prompt("Enter the title of the table", "Untitled Table") || "").trim()
     if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=table"), title})
+      this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=table"), title, createNewDataSet: true})
     }
   }
 

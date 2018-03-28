@@ -26,6 +26,7 @@ export interface AddWindowParams {
   ownerId?: string
   iframeData?: any,
   dataSet?: FirebaseWindowDataSet
+  createNewDataSet?: boolean
 }
 
 export enum DragType { GrowLeft, GrowRight, GrowUp, GrowDown, GrowDownRight, GrowDownLeft, Position, None }
@@ -320,7 +321,7 @@ export class WindowManager {
 
   add(params:AddWindowParams) {
     //url: string, title:string, ownerId: string, iframeData?:any, dataSet?:FirebaseWindowDataSet) {
-    const {url, title, ownerId, iframeData, dataSet} = params
+    const {url, title, ownerId, iframeData, dataSet, createNewDataSet} = params
     const attrs:FirebaseWindowAttrs = {
       top: this.randInRange(50, 200),
       left: this.randInRange(50, 200),
@@ -334,11 +335,30 @@ export class WindowManager {
     if (ownerId) {
       attrs.ownerId = ownerId
     }
+
+    let dataSetCreatorRef:firebase.database.Reference
+
     if (dataSet) {
       attrs.dataSet = dataSet
     }
+    else if (createNewDataSet) {
+      // we have a bit of a catch-22, we need the window id as the value of the creator but
+      // we don't have that until we create it in Firebase so we just use a TDB value that we ignore
+      // in the workspace client (since TDB is not a valid window id)
+      dataSetCreatorRef = this.document.getDataSetsDataRef().child(this.document.id).child("creators").push("TDB")
+      if (dataSetCreatorRef.key) {
+        const newDataSet:FirebaseWindowDataSet = {
+          documentId: this.document.id,
+          dataSetId: dataSetCreatorRef.key
+        }
+        attrs.dataSet = newDataSet
+      }
+    }
     Window.CreateInFirebase({document: this.document, attrs}, iframeData)
       .then((window) => {
+        if (createNewDataSet && dataSetCreatorRef) {
+          dataSetCreatorRef.set(window.id)
+        }
         this.moveToTop(window, true)
       })
       .catch((err) => {})
