@@ -48,6 +48,7 @@ export interface WindowComponentProps {
   zIndex: number
   isTemplate: boolean
   isReadonly: boolean
+  publishWindow: (window:Window|null) => void
 }
 export interface WindowComponentState {
   editingTitle: boolean
@@ -150,6 +151,14 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     this.props.windowManager.createPublicCopy(this.props.window)
   }
 
+  handlePublishWindow = () => {
+    this.props.publishWindow(this.props.window)
+  }
+
+  handleCopyWindow = () => {
+
+  }
+
   renderIframeOverlay() {
     if (this.props.isTopWindow) {
       return null
@@ -194,8 +203,8 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     return (
       <div className="sidebar-menu" style={{left}}>
         <div className="sidebar-menu-inner">
-          <i className="icon icon-newspaper" title="Publish Window" />
-          <i className="icon icon-copy" title="Copy Window" />
+          <i className="icon icon-newspaper" title="Publish Window" onClick={this.handlePublishWindow} />
+          <i className="icon icon-copy" title="Copy Window" onClick={this.handleCopyWindow} />
         </div>
       </div>
     )

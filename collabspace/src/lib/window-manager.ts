@@ -495,11 +495,15 @@ export class WindowManager {
     }
   }
 
+  postToWindow(window:Window, message:string, request:object) {
+    if (window.iframe && window.iframe.connected) {
+      window.iframe.phone.post(message, request)
+    }
+  }
+
   postToAllWindows(message:string, request:object) {
     this.forEachWindow((window) => {
-      if (window.iframe && window.iframe.connected) {
-        window.iframe.phone.post(message, request)
-      }
+      this.postToWindow(window, message, request)
     })
   }
 

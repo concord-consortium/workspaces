@@ -394,6 +394,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   handlePublishButton = () => {
+    this.handlePublish(null)
+  }
+
+  handlePublish = (publishWindow:Window|null) => {
     const {groupUsers} = this.state
     const {portalOffering, portalUser, groupRef, group} = this.props
     if (!groupUsers || !portalOffering || !portalUser || !groupRef || !group) {
@@ -420,7 +424,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
             const windows:FirebasePublicationWindowMap = {}
             Object.keys(attrsMap).forEach((windowId) => {
               const attrs = attrsMap[windowId]
-              if (attrs) {
+              if (attrs && (!publishWindow || (publishWindow.id === windowId))) {
                 windows[windowId] = {
                   title: attrs.title,
                   artifacts: {}
@@ -439,7 +443,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
               groupMembers: groupUsers,
               createdAt: firebase.database.ServerValue.TIMESTAMP,
               documentId: document.id,
-              windows: windows
+              windows: windows,
+              partial: publishWindow !== null
             }
 
             const publicationRef = getPublicationsRef(portalOffering).push(publication)
@@ -451,10 +456,20 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                 publicationsPath: getPublicationsPath(portalOffering, publicationId),
                 artifactStoragePath: getArtifactsStoragePath(portalOffering, publicationId)
               }
-              this.windowManager.postToAllWindows(
-                WorkspaceClientPublishRequestMessage,
-                publishRequest
-              )
+
+              if (publishWindow) {
+                this.windowManager.postToWindow(
+                  publishWindow,
+                  WorkspaceClientPublishRequestMessage,
+                  publishRequest
+                )
+              }
+              else {
+                this.windowManager.postToAllWindows(
+                  WorkspaceClientPublishRequestMessage,
+                  publishRequest
+                )
+              }
             }
 
             donePublishing()
@@ -795,6 +810,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                windowManager={this.windowManager}
                isTemplate={this.props.isTemplate}
                isReadonly={this.props.document.isReadonly}
+               publishWindow={this.handlePublish}
              />
     })
   }
