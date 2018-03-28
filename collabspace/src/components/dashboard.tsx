@@ -11,6 +11,7 @@ import { DashboardTableComponent } from "./dashboard-table"
 import { DashboardSuportComponent } from "./dashboard-support"
 import { GroupListComponent } from "./group-list"
 import { LogManager } from "../../../shared/log-manager"
+import { JWTKeepalive } from "../lib/jwt-keepalive"
 
 export interface DashboardQueryParams extends AuthQueryParams {
   document?: string
@@ -36,6 +37,7 @@ export interface DashboardComponentState {
 
 export class DashboardComponent extends React.Component<DashboardComponentProps, DashboardComponentState> {
   logManager: LogManager
+  jwtKeepalive: JWTKeepalive
 
   constructor (props:DashboardComponentProps) {
     super(props);
@@ -67,6 +69,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
         }
 
         this.logManager = new LogManager({tokens, activity: "CollabSpace:Dashboard"})
+        this.jwtKeepalive = new JWTKeepalive(tokens, (portalTokens, expired, error) => this.setState({portalTokens, error}))
 
         const isTeacher = user.type === "teacher"
         this.setState({portalOffering: offering, portalUser: user, portalTokens: tokens, isTeacher})
@@ -99,7 +102,7 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
           }
         })
       })
-      .catch((error) => this.setState({error}))
+      .catch((error) => this.setState({error: `Unable to authenticate: ${error.toString().replace("Signature", "Access token")}`}))
   }
 
   renderError() {
