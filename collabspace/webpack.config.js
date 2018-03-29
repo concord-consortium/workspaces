@@ -55,47 +55,6 @@ module.exports = [
     },
     {
         entry: {
-            app: "./src/app.tsx",
-            globals: globalsList
-        },
-
-        output: {
-            filename: jsFilename,
-            path: distPath + "/assets"
-        },
-
-        devtool: isDev ? "source-map" : "",
-
-        resolve: {
-            extensions: [".webpack.js", ".web.js", ".ts", ".tsx", ".js"]
-        },
-
-        module: {
-            rules: [
-                { enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
-                { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
-                { test: /\.scss$/i, loaders: ['style-loader', 'css-loader', 'sass-loader']},
-                { test: /\.css$/, loaders: ['style-loader', 'css-loader']},
-                { test: /\.(png|woff|woff2|eot|ttf|svg)$/, loader: 'url-loader' }
-            ]
-        },
-
-        plugins: [
-            new webpack.optimize.CommonsChunkPlugin({
-                name: "globals",
-                filename: jsFilename
-            }),
-            new HtmlWebpackPlugin({
-                filename: '../index.html',
-                template: 'src/index.template.html'
-            }),
-            new CopyWebpackPlugin([
-                {from: 'src/public', to: distPath}
-            ])
-        ]
-    },
-    {
-        entry: {
             "drawing-tool": "./src/drawing-tool.tsx",
             "drawing-tool-globals": globalsList
         },
