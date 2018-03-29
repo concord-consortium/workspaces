@@ -69,6 +69,7 @@ export interface FirebasePublication {
   createdAt: number|object
   documentId: string
   windows: FirebasePublicationWindowMap
+  partial: boolean
 }
 export interface FirebasePublicationMap {
   [key: string]: FirebasePublication

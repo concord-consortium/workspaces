@@ -54,6 +54,9 @@ export interface WorkspaceComponentState extends WindowManagerState {
   supportsSeen: FirebaseSupportSeenUsersSupportMap|null
   showSupportsDropdown: boolean
   visibleSupportIds: string[]
+  showModal: "copy"|"add-drawing"|"add-table"|"add-graph"|null
+  onModalOk: ((title: string, ownerId?:string|null) => void) |null
+  copyWindow: Window|null
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -64,6 +67,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   windowManager: WindowManager
   userOnDisconnect: firebase.database.OnDisconnect|null
   userLookup: UserLookup
+  modalDialogNewWindowTitle: HTMLInputElement|null
 
   constructor (props:WorkspaceComponentProps) {
     super(props)
@@ -85,7 +89,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       supports: null,
       supportsSeen: null,
       showSupportsDropdown: false,
-      visibleSupportIds: []
+      visibleSupportIds: [],
+      showModal: null,
+      onModalOk: null,
+      copyWindow: null
     }
   }
 
@@ -136,6 +143,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.addEventListener("mousedown", this.handleWindowMouseDown)
     window.addEventListener("mousemove", this.handleWindowMouseMove, true)
     window.addEventListener("mouseup", this.handleWindowMouseUp, true)
+  }
+
+  componentDidUpdate() {
+    if (this.modalDialogNewWindowTitle) {
+      this.modalDialogNewWindowTitle.select()
+      this.modalDialogNewWindowTitle.focus()
+    }
   }
 
   componentWillUnmount() {
@@ -339,31 +353,30 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   handleAddDrawingButton = () => {
-    const title = (prompt("Enter the title of the drawing", "Untitled Drawing") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title})
-    }
-  }
-
-  handleAddPrivateDrawingButton = () => {
-    const title = (prompt("Enter the title of the drawing", "Untitled Private Drawing") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title, ownerId: this.userId()})
-    }
+    this.setState({
+      showModal: "add-drawing",
+      onModalOk: (title: string, ownerId?: string) => {
+        this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title, ownerId})
+      }
+    })
   }
 
   handleAddCaseTable = () => {
-    const title = (prompt("Enter the title of the table", "Untitled Table") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=table"), title, createNewDataSet: true})
-    }
+    this.setState({
+      showModal: "add-table",
+      onModalOk: (title: string, ownerId?: string) => {
+        this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=table"), title, ownerId, createNewDataSet: true})
+      }
+    })
   }
 
   handleAddGraph = () => {
-    const title = (prompt("Enter the title of the graph", "Untitled Graph") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=graph"), title})
-    }
+    this.setState({
+      showModal: "add-graph",
+      onModalOk: (title: string, ownerId?: string) => {
+        this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=graph"), title, ownerId})
+      }
+    })
   }
 
   handleCreateDemoButton = () => {
@@ -393,7 +406,21 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleCopy = (copyWindow:Window) => {
+    this.setState({
+      showModal: "copy",
+      copyWindow,
+      onModalOk: (title: string, ownerId: string) => {
+        this.windowManager.copyWindow(copyWindow, title, ownerId)
+      }
+    })
+  }
+
   handlePublishButton = () => {
+    this.handlePublish(null)
+  }
+
+  handlePublish = (publishWindow:Window|null) => {
     const {groupUsers} = this.state
     const {portalOffering, portalUser, groupRef, group} = this.props
     if (!groupUsers || !portalOffering || !portalUser || !groupRef || !group) {
@@ -418,9 +445,31 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           .then((snapshot) => {
             const attrsMap:FirebaseWindowAttrsMap = snapshot.val() || {}
             const windows:FirebasePublicationWindowMap = {}
+
+            const windowIdsToPublish:string[] = []
+            if (publishWindow) {
+              windowIdsToPublish.push(publishWindow.id)
+
+              /*
+                leave out for now
+
+              // find linked dataset windows
+              const publishWindowAttrs = attrsMap[publishWindow.id]
+              if (publishWindowAttrs && publishWindowAttrs.dataSet) {
+                const dataSetId = publishWindowAttrs.dataSet.dataSetId
+                Object.keys(attrsMap).forEach((windowId) => {
+                  const attrs = attrsMap[windowId]
+                  if ((windowId !== publishWindow.id) && attrs && attrs.dataSet && (attrs.dataSet.dataSetId === dataSetId)) {
+                    windowIdsToPublish.push(windowId)
+                  }
+                })
+              }
+              */
+            }
+
             Object.keys(attrsMap).forEach((windowId) => {
               const attrs = attrsMap[windowId]
-              if (attrs) {
+              if (attrs && (!publishWindow || (windowIdsToPublish.indexOf(windowId) !== -1))) {
                 windows[windowId] = {
                   title: attrs.title,
                   artifacts: {}
@@ -439,7 +488,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
               groupMembers: groupUsers,
               createdAt: firebase.database.ServerValue.TIMESTAMP,
               documentId: document.id,
-              windows: windows
+              windows: windows,
+              partial: publishWindow !== null
             }
 
             const publicationRef = getPublicationsRef(portalOffering).push(publication)
@@ -451,10 +501,20 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                 publicationsPath: getPublicationsPath(portalOffering, publicationId),
                 artifactStoragePath: getArtifactsStoragePath(portalOffering, publicationId)
               }
-              this.windowManager.postToAllWindows(
-                WorkspaceClientPublishRequestMessage,
-                publishRequest
-              )
+
+              if (publishWindow) {
+                this.windowManager.postToWindowIds(
+                  windowIdsToPublish,
+                  WorkspaceClientPublishRequestMessage,
+                  publishRequest
+                )
+              }
+              else {
+                this.windowManager.postToAllWindows(
+                  WorkspaceClientPublishRequestMessage,
+                  publishRequest
+                )
+              }
             }
 
             donePublishing()
@@ -758,16 +818,15 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return (
       <div className="buttons">
         <div className="left-buttons">
-          <button type="button" onClick={this.handleAddDrawingButton}>Add Drawing</button>
-          {!this.props.isTemplate ? <button type="button" onClick={this.handleAddPrivateDrawingButton}>Add Private Drawing</button> : null}
-          <button type="button" onClick={this.handleAddCaseTable}>Add Table</button>
-          <button type="button" onClick={this.handleAddGraph}>Add Graph</button>
+          <button type="button" onClick={this.handleAddDrawingButton}><i className="icon icon-pencil" /> Add Drawing</button>
+          <button type="button" onClick={this.handleAddCaseTable}><i className="icon icon-table2" /> Add Table</button>
+          <button type="button" onClick={this.handleAddGraph}><i className="icon icon-stats-dots" /> Add Graph</button>
           </div>
         <div className="right-buttons">
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
           {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
-          {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}>Publish</button> : null}
+          {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}><i className="icon icon-newspaper" /> Publish All</button> : null}
         </div>
       </div>
     )
@@ -795,6 +854,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                windowManager={this.windowManager}
                isTemplate={this.props.isTemplate}
                isReadonly={this.props.document.isReadonly}
+               publishWindow={this.handlePublish}
+               copyWindow={this.handleCopy}
              />
     })
   }
@@ -866,6 +927,106 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
+  renderModalDialog() {
+    let titlebar = ""
+    let title = ""
+    let okButton = ""
+    let content:JSX.Element|null = null
+    let newWindowIsPrivate:HTMLInputElement|null
+
+    const handleOk = () => {
+      const {onModalOk} = this.state
+      if (onModalOk) {
+        let newTitle = this.modalDialogNewWindowTitle ? this.modalDialogNewWindowTitle.value.trim() : ""
+        if (newTitle.length == 0) {
+          newTitle = title
+        }
+        const ownerId = newWindowIsPrivate && newWindowIsPrivate.checked ? this.userId() : null
+        onModalOk(newTitle, ownerId)
+        this.setState({showModal: null})
+      }
+    }
+
+    const handleOnKeyDown = (e:React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.keyCode === 13) {
+        handleOk()
+      }
+    }
+
+    const handleCancel = () => {
+      this.setState({showModal: null})
+    }
+
+    switch (this.state.showModal) {
+      case "copy":
+        title = this.state.copyWindow ? `Copy of ${this.state.copyWindow.attrs.title}` : ""
+        titlebar = "Copy Window"
+        okButton = "Copy"
+        break
+      case "add-drawing":
+        title = "Untitled Drawing"
+        titlebar = "Add Drawing"
+        okButton = "Add"
+        break
+      case "add-table":
+        title = "Untitled Table"
+        titlebar = "Add Table"
+        okButton = "Add"
+        break
+      case "add-graph":
+        title = "Untitled Graph"
+        titlebar = "Add Graph"
+        okButton = "Add"
+        break
+    }
+
+    let visibilityGroup:JSX.Element|null = null
+    if (!this.props.isTemplate) {
+      visibilityGroup = (
+        <div className="form-group">
+          <label htmlFor="windowType">Visibility</label>
+          <input type="radio" name="windowType" value="public" defaultChecked /> Public
+          <input type="radio" name="windowType" value="private" ref={(el) => newWindowIsPrivate = el} /> Private
+        </div>
+      )
+    }
+
+    return (
+      <div className="modal-dialog">
+        <div className="modal-dialog-title">{titlebar}</div>
+        <div className="modal-dialog-content">
+          <div className="modal-dialog-inner-content">
+            <div className="form-group">
+              <label htmlFor="windowTitle">Name</label>
+              <input id="windowTitle" type="text" placeholder="New name of window" defaultValue={title} ref={(el) => this.modalDialogNewWindowTitle = el} onKeyDown={handleOnKeyDown} />
+            </div>
+
+            {visibilityGroup}
+
+            <div className="form-group" style={{textAlign: "right"}} >
+              <button onClick={handleOk}>{okButton}</button>
+              <button onClick={handleCancel}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  renderModal() {
+    if (!this.state.showModal) {
+      return null
+    }
+    return (
+      <div className="modal" onClick={this.handleClearViewArtifact}>
+        <div className="modal-background" />
+        <div className="modal-dialog-container">
+          {this.renderModalDialog()}
+        </div>
+      </div>
+    )
+  }
+
   render() {
     return (
       <div className="workspace" onDrop={this.handleDrop} onDragOver={this.handleDragOver}>
@@ -874,6 +1035,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderWindowArea()}
         {this.renderVisibleSupports()}
         {this.renderSidebarComponent()}
+        {this.renderModal()}
         {this.renderArtifact()}
         {this.renderReadonlyBlocker()}
       </div>
