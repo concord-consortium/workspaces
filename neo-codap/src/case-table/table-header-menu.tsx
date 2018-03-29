@@ -73,9 +73,20 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
     this.setState({ isRenameAttributeDialogOpen: false });
   }
 
-  handleRenameAttribute = (id: string, name: string) => {
+  handleRenameAttributeCallback = (id: string, name: string) => {
     this.props.onRenameAttribute(id, name);
     this.closeRenameAttributeDialog();
+  }
+
+  handleRenameAttribute = (evt: React.MouseEvent<HTMLElement>, attrID: string, name: string) => {
+    if (this.props.onRenameAttribute) {
+      debugger;
+      this.setState({
+        isRenameAttributeDialogOpen: true,
+        renameAttributeId: attrID,
+        renameAttributeName: name
+      });
+    }
   }
 
   handleNewCase = () => {
@@ -84,15 +95,9 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
     }
   }
 
-  handleRemoveAttribute = (evt: React.MouseEvent<HTMLElement>) => {
+  handleRemoveAttribute = (evt: React.MouseEvent<HTMLElement>, attrID: string) => {
     if (this.props.onRemoveAttribute) {
-      const elt: HTMLElement = evt.target as HTMLElement,
-            classes = elt.className,
-            match = /data-id-([-\w]*)/.exec(classes),
-            attrID = match && match[1];
-      if (attrID) {
-        this.props.onRemoveAttribute(attrID);
-      }
+      this.props.onRemoveAttribute(attrID);
     }
   }
 
@@ -124,15 +129,14 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
     }
   }
 
-  renderAttributeSubMenuItems() {
+  renderAttributeSubMenuItems(onClick: (evt: React.MouseEvent<HTMLElement>, attrID: string, name?: string) => void) {
     if (!this.props.dataSet || !this.props.dataSet.attributes.length) { return null; }
     return this.props.dataSet.attributes.map((attr) => {
       return (
         <MenuItem
-          className={`data-id-${attr.id}`}
           text={attr.name}
           key={attr.id}
-          onClick={this.handleRemoveAttribute}
+          onClick={(evt) => onClick(evt, attr.id, attr.name)}
         />
       );
     });
@@ -167,11 +171,18 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
         />
         <MenuDivider />
         <MenuItem
+          iconName="pt-icon-text-highlight"
+          text={`Rename ${attribute}...`}
+          disabled={!this.props.dataSet || !this.props.dataSet.attributes.length}
+        >
+          {this.renderAttributeSubMenuItems(this.handleRenameAttribute)}
+        </MenuItem>
+        <MenuItem
           iconName="pt-icon-remove-column"
           text={`Remove ${attribute}...`}
           disabled={!this.props.dataSet || !this.props.dataSet.attributes.length}
         >
-          {this.renderAttributeSubMenuItems()}
+          {this.renderAttributeSubMenuItems(this.handleRemoveAttribute)}
         </MenuItem>
         <MenuItem
           iconName="pt-icon-remove-row-bottom"
@@ -204,7 +215,7 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
         <RenameAttributeDialog
           id={this.state.renameAttributeId}
           isOpen={this.state.isRenameAttributeDialogOpen}
-          onRenameAttribute={this.handleRenameAttribute}
+          onRenameAttribute={this.handleRenameAttributeCallback}
           onClose={this.closeRenameAttributeDialog}
           strings={this.props.strings}
           name={this.state.renameAttributeName}

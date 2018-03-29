@@ -14,7 +14,6 @@ import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
 import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemoryRowModel';
 import { Strings } from '../strings';
-import { CaseTableHeader } from './case-table-header';
 import { emitCaseTableEvent } from './case-table-events';
 
 interface IPos {
@@ -612,13 +611,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           onCellEditingStopped={this.handleCellEditingStopped}
           enableSorting={true}
           postSort={this.handlePostSort}
-          frameworkComponents={{
-            // tslint:disable-next-line:no-any
-            agColumnHeader: CaseTableHeader as (new () => any)
-          }}
           onViewportChanged={() => this.handleSetAddAttributePos()}
         />
-        {this.renderAddAttributeButtonPos()}
       </div>
     );
   }
