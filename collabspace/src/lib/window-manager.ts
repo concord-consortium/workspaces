@@ -501,6 +501,15 @@ export class WindowManager {
     }
   }
 
+  postToWindowIds(windowIds:string[], message:string, request:object) {
+    windowIds.forEach((windowId) => {
+      const window = this.windows[windowId]
+      if (window) {
+        this.postToWindow(window, message, request)
+      }
+    })
+  }
+
   postToAllWindows(message:string, request:object) {
     this.forEachWindow((window) => {
       this.postToWindow(window, message, request)

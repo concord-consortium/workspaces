@@ -422,9 +422,31 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           .then((snapshot) => {
             const attrsMap:FirebaseWindowAttrsMap = snapshot.val() || {}
             const windows:FirebasePublicationWindowMap = {}
+
+            const windowIdsToPublish:string[] = []
+            if (publishWindow) {
+              windowIdsToPublish.push(publishWindow.id)
+
+              /*
+                leave out for now
+
+              // find linked dataset windows
+              const publishWindowAttrs = attrsMap[publishWindow.id]
+              if (publishWindowAttrs && publishWindowAttrs.dataSet) {
+                const dataSetId = publishWindowAttrs.dataSet.dataSetId
+                Object.keys(attrsMap).forEach((windowId) => {
+                  const attrs = attrsMap[windowId]
+                  if ((windowId !== publishWindow.id) && attrs && attrs.dataSet && (attrs.dataSet.dataSetId === dataSetId)) {
+                    windowIdsToPublish.push(windowId)
+                  }
+                })
+              }
+              */
+            }
+
             Object.keys(attrsMap).forEach((windowId) => {
               const attrs = attrsMap[windowId]
-              if (attrs && (!publishWindow || (publishWindow.id === windowId))) {
+              if (attrs && (!publishWindow || (windowIdsToPublish.indexOf(windowId) !== -1))) {
                 windows[windowId] = {
                   title: attrs.title,
                   artifacts: {}
@@ -458,8 +480,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
               }
 
               if (publishWindow) {
-                this.windowManager.postToWindow(
-                  publishWindow,
+                this.windowManager.postToWindowIds(
+                  windowIdsToPublish,
                   WorkspaceClientPublishRequestMessage,
                   publishRequest
                 )
