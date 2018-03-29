@@ -54,7 +54,8 @@ export interface WorkspaceComponentState extends WindowManagerState {
   supportsSeen: FirebaseSupportSeenUsersSupportMap|null
   showSupportsDropdown: boolean
   visibleSupportIds: string[]
-  showModal: "copy"|null
+  showModal: "copy"|"add-drawing"|"add-table"|"add-graph"|null
+  onModalOk: ((title: string, ownerId?:string|null) => void) |null
   copyWindow: Window|null
 }
 
@@ -66,6 +67,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   windowManager: WindowManager
   userOnDisconnect: firebase.database.OnDisconnect|null
   userLookup: UserLookup
+  modalDialogNewWindowTitle: HTMLInputElement|null
 
   constructor (props:WorkspaceComponentProps) {
     super(props)
@@ -89,6 +91,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       showSupportsDropdown: false,
       visibleSupportIds: [],
       showModal: null,
+      onModalOk: null,
       copyWindow: null
     }
   }
@@ -140,6 +143,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.addEventListener("mousedown", this.handleWindowMouseDown)
     window.addEventListener("mousemove", this.handleWindowMouseMove, true)
     window.addEventListener("mouseup", this.handleWindowMouseUp, true)
+  }
+
+  componentDidUpdate() {
+    if (this.modalDialogNewWindowTitle) {
+      this.modalDialogNewWindowTitle.select()
+      this.modalDialogNewWindowTitle.focus()
+    }
   }
 
   componentWillUnmount() {
@@ -343,31 +353,30 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   handleAddDrawingButton = () => {
-    const title = (prompt("Enter the title of the drawing", "Untitled Drawing") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title})
-    }
-  }
-
-  handleAddPrivateDrawingButton = () => {
-    const title = (prompt("Enter the title of the drawing", "Untitled Private Drawing") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title, ownerId: this.userId()})
-    }
+    this.setState({
+      showModal: "add-drawing",
+      onModalOk: (title: string, ownerId?: string) => {
+        this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title, ownerId})
+      }
+    })
   }
 
   handleAddCaseTable = () => {
-    const title = (prompt("Enter the title of the table", "Untitled Table") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=table"), title, createNewDataSet: true})
-    }
+    this.setState({
+      showModal: "add-table",
+      onModalOk: (title: string, ownerId?: string) => {
+        this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=table"), title, ownerId, createNewDataSet: true})
+      }
+    })
   }
 
   handleAddGraph = () => {
-    const title = (prompt("Enter the title of the graph", "Untitled Graph") || "").trim()
-    if (title.length > 0) {
-      this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=graph"), title})
-    }
+    this.setState({
+      showModal: "add-graph",
+      onModalOk: (title: string, ownerId?: string) => {
+        this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=graph"), title, ownerId})
+      }
+    })
   }
 
   handleCreateDemoButton = () => {
@@ -400,7 +409,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   handleCopy = (copyWindow:Window) => {
     this.setState({
       showModal: "copy",
-      copyWindow
+      copyWindow,
+      onModalOk: (title: string, ownerId: string) => {
+        this.windowManager.copyWindow(copyWindow, title, ownerId)
+      }
     })
   }
 
@@ -807,7 +819,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="buttons">
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}><i className="icon icon-pencil" /> Add Drawing</button>
-          {!this.props.isTemplate ? <button type="button" onClick={this.handleAddPrivateDrawingButton}><i className="icon icon-pencil" /> Add Private Drawing</button> : null}
           <button type="button" onClick={this.handleAddCaseTable}><i className="icon icon-table2" /> Add Table</button>
           <button type="button" onClick={this.handleAddGraph}><i className="icon icon-stats-dots" /> Add Graph</button>
           </div>
@@ -917,53 +928,87 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderModalDialog() {
+    let titlebar = ""
     let title = ""
+    let okButton = ""
     let content:JSX.Element|null = null
-    let newWindowTitle:HTMLInputElement|null
     let newWindowIsPrivate:HTMLInputElement|null
 
-    const handleCopy = () => {
-      if (this.state.copyWindow && newWindowTitle && newWindowIsPrivate) {
-        const ownerId = newWindowIsPrivate.checked ? this.userId() : null
-        debugger
-        this.windowManager.copyWindow(this.state.copyWindow, newWindowTitle.value.trim(), ownerId)
+    const handleOk = () => {
+      const {onModalOk} = this.state
+      if (onModalOk) {
+        let newTitle = this.modalDialogNewWindowTitle ? this.modalDialogNewWindowTitle.value.trim() : ""
+        if (newTitle.length == 0) {
+          newTitle = title
+        }
+        const ownerId = newWindowIsPrivate && newWindowIsPrivate.checked ? this.userId() : null
+        onModalOk(newTitle, ownerId)
+        this.setState({showModal: null})
       }
-      this.setState({showModal: null, copyWindow: null})
+    }
+
+    const handleOnKeyDown = (e:React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.keyCode === 13) {
+        handleOk()
+      }
     }
 
     const handleCancel = () => {
-      this.setState({showModal: null, copyWindow: null})
+      this.setState({showModal: null})
     }
 
     switch (this.state.showModal) {
       case "copy":
-        const name = this.state.copyWindow ? `Copy of ${this.state.copyWindow.attrs.title}` : ""
-        title = "Copy Window"
-        content = (
+        title = this.state.copyWindow ? `Copy of ${this.state.copyWindow.attrs.title}` : ""
+        titlebar = "Copy Window"
+        okButton = "Copy"
+        break
+      case "add-drawing":
+        title = "Untitled Drawing"
+        titlebar = "Add Drawing"
+        okButton = "Add"
+        break
+      case "add-table":
+        title = "Untitled Table"
+        titlebar = "Add Table"
+        okButton = "Add"
+        break
+      case "add-graph":
+        title = "Untitled Graph"
+        titlebar = "Add Graph"
+        okButton = "Add"
+        break
+    }
+
+    let visibilityGroup:JSX.Element|null = null
+    if (!this.props.isTemplate) {
+      visibilityGroup = (
+        <div className="form-group">
+          <label htmlFor="windowType">Visibility</label>
+          <input type="radio" name="windowType" value="public" defaultChecked /> Public
+          <input type="radio" name="windowType" value="private" ref={(el) => newWindowIsPrivate = el} /> Private
+        </div>
+      )
+    }
+
+    return (
+      <div className="modal-dialog">
+        <div className="modal-dialog-title">{titlebar}</div>
+        <div className="modal-dialog-content">
           <div className="modal-dialog-inner-content">
             <div className="form-group">
-              <label htmlFor="copyWindowName">Name</label>
-              <input id="copyWindowName" type="text" placeholder="New name of window" defaultValue={name} ref={(el) => newWindowTitle = el} />
+              <label htmlFor="windowTitle">Name</label>
+              <input id="windowTitle" type="text" placeholder="New name of window" defaultValue={title} ref={(el) => this.modalDialogNewWindowTitle = el} onKeyDown={handleOnKeyDown} />
             </div>
 
-            <div className="form-group">
-              <label htmlFor="copyWindowType">Visibility</label>
-              <input type="radio" name="copyWindowType" value="public" defaultChecked /> Public
-              <input type="radio" name="copyWindowType" value="private" ref={(el) => newWindowIsPrivate = el} /> Private
-            </div>
+            {visibilityGroup}
 
             <div className="form-group" style={{textAlign: "right"}} >
-              <button onClick={handleCopy}>Copy</button>
+              <button onClick={handleOk}>{okButton}</button>
               <button onClick={handleCancel}>Cancel</button>
             </div>
           </div>
-        )
-        break
-    }
-    return (
-      <div className="modal-dialog">
-        <div className="modal-dialog-title">{title}</div>
-        <div className="modal-dialog-content">{content}</div>
+        </div>
       </div>
     )
   }

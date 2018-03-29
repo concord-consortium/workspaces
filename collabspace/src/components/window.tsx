@@ -201,7 +201,6 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       : {top: attrs.top, width: attrs.width, left: attrs.left, height: attrs.height, zIndex: this.props.zIndex}
     const titleWidth = attrs.width - (this.props.isTemplate ? 65 : 55)
     const privateWindow = !!attrs.ownerId
-    const iframeTop = privateWindow ? 44 : 22;
 
     if (minimized) {
       windowStyle.display = "none"
@@ -217,7 +216,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
           {this.renderButtons()}
         </div>
 
-        <div className="iframe" style={{top: iframeTop}}>
+        <div className="iframe">
           <WindowIframeComponent key={window.id} src={url} loaded={this.handleIframeLoaded} />
           {this.renderReadonlyBlocker()}
         </div>
