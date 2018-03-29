@@ -451,13 +451,6 @@ export class WindowManager {
     }
   }
 
-  createPublicCopy(window:Window) {
-    const title = prompt("Enter name of new window")
-    if (title !== null) {
-      this.copyWindow(window, title)
-    }
-  }
-
   changeTitle(window:Window, newTitle:string) {
     const {attrs} = window
     attrs.title = newTitle
@@ -525,7 +518,7 @@ export class WindowManager {
     })
   }
 
-  copyWindow(window: Window, title: string) {
+  copyWindow(window: Window, title: string, ownerId: string|null) {
     return new Promise<void>((resolve, reject) => {
       const windowsRef = this.document.getWindowsRef()
       windowsRef.once("value")
@@ -537,7 +530,11 @@ export class WindowManager {
             return reject("Cannot find window in document")
           }
           const {dataSet, url} = firebaseWindow
-          this.add({url, title, iframeData, dataSet})
+          const addWindowParams:AddWindowParams = {url, title, iframeData, dataSet}
+          if (ownerId) {
+            addWindowParams.ownerId = ownerId
+          }
+          this.add(addWindowParams)
           resolve()
         })
         .catch(reject)

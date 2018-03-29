@@ -54,6 +54,8 @@ export interface WorkspaceComponentState extends WindowManagerState {
   supportsSeen: FirebaseSupportSeenUsersSupportMap|null
   showSupportsDropdown: boolean
   visibleSupportIds: string[]
+  showModal: "copy"|null
+  copyWindow: Window|null
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -85,7 +87,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       supports: null,
       supportsSeen: null,
       showSupportsDropdown: false,
-      visibleSupportIds: []
+      visibleSupportIds: [],
+      showModal: null,
+      copyWindow: null
     }
   }
 
@@ -391,6 +395,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       windows.order = this.windowManager.arrayToFirebaseOrderMap(this.windowManager.windowOrder)
       windows.minimizedOrder = this.windowManager.arrayToFirebaseOrderMap(this.windowManager.minimizedWindowOrder)
     }
+  }
+
+  handleCopy = (copyWindow:Window) => {
+    this.setState({
+      showModal: "copy",
+      copyWindow
+    })
   }
 
   handlePublishButton = () => {
@@ -833,6 +844,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                isTemplate={this.props.isTemplate}
                isReadonly={this.props.document.isReadonly}
                publishWindow={this.handlePublish}
+               copyWindow={this.handleCopy}
              />
     })
   }
@@ -904,6 +916,72 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
+  renderModalDialog() {
+    let title = ""
+    let content:JSX.Element|null = null
+    let newWindowTitle:HTMLInputElement|null
+    let newWindowIsPrivate:HTMLInputElement|null
+
+    const handleCopy = () => {
+      if (this.state.copyWindow && newWindowTitle && newWindowIsPrivate) {
+        const ownerId = newWindowIsPrivate.checked ? this.userId() : null
+        debugger
+        this.windowManager.copyWindow(this.state.copyWindow, newWindowTitle.value.trim(), ownerId)
+      }
+      this.setState({showModal: null, copyWindow: null})
+    }
+
+    const handleCancel = () => {
+      this.setState({showModal: null, copyWindow: null})
+    }
+
+    switch (this.state.showModal) {
+      case "copy":
+        const name = this.state.copyWindow ? `Copy of ${this.state.copyWindow.attrs.title}` : ""
+        title = "Copy Window"
+        content = (
+          <div className="modal-dialog-inner-content">
+            <div className="form-group">
+              <label htmlFor="copyWindowName">Name</label>
+              <input id="copyWindowName" type="text" placeholder="New name of window" defaultValue={name} ref={(el) => newWindowTitle = el} />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="copyWindowType">Visibility</label>
+              <input type="radio" name="copyWindowType" value="public" defaultChecked /> Public
+              <input type="radio" name="copyWindowType" value="private" ref={(el) => newWindowIsPrivate = el} /> Private
+            </div>
+
+            <div className="form-group" style={{textAlign: "right"}} >
+              <button onClick={handleCopy}>Copy</button>
+              <button onClick={handleCancel}>Cancel</button>
+            </div>
+          </div>
+        )
+        break
+    }
+    return (
+      <div className="modal-dialog">
+        <div className="modal-dialog-title">{title}</div>
+        <div className="modal-dialog-content">{content}</div>
+      </div>
+    )
+  }
+
+  renderModal() {
+    if (!this.state.showModal) {
+      return null
+    }
+    return (
+      <div className="modal" onClick={this.handleClearViewArtifact}>
+        <div className="modal-background" />
+        <div className="modal-dialog-container">
+          {this.renderModalDialog()}
+        </div>
+      </div>
+    )
+  }
+
   render() {
     return (
       <div className="workspace" onDrop={this.handleDrop} onDragOver={this.handleDragOver}>
@@ -912,6 +990,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderWindowArea()}
         {this.renderVisibleSupports()}
         {this.renderSidebarComponent()}
+        {this.renderModal()}
         {this.renderArtifact()}
         {this.renderReadonlyBlocker()}
       </div>

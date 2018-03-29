@@ -49,6 +49,7 @@ export interface WindowComponentProps {
   isTemplate: boolean
   isReadonly: boolean
   publishWindow: (window:Window|null) => void
+  copyWindow: (window:Window) => void
 }
 export interface WindowComponentState {
   editingTitle: boolean
@@ -147,16 +148,12 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     this.props.windowManager.windowLoaded(this.props.window, iframe)
   }
 
-  handleCreatePublicCopy = (e:React.MouseEvent<HTMLSpanElement>) => {
-    this.props.windowManager.createPublicCopy(this.props.window)
-  }
-
   handlePublishWindow = () => {
     this.props.publishWindow(this.props.window)
   }
 
   handleCopyWindow = () => {
-
+    this.props.copyWindow(this.props.window)
   }
 
   renderIframeOverlay() {
@@ -181,22 +178,6 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       return <div className="readonly-iframe-blocker" />
     }
     return null
-  }
-
-  renderOwnerBar(isTopWindow: boolean) {
-    const className = `ownerbar${isTopWindow ? " top" : ""}`
-    return (
-      <div className={className}>
-        <div className="info">
-          <div className="inner-info">
-            This is a private window, visible only to you.
-          </div>
-        </div>
-        <div className="links">
-          <span className="clickable" onClick={this.handleCreatePublicCopy}>Create Public Copy</span>
-        </div>
-      </div>
-    )
   }
 
   renderSidebarMenu(left: number) {
@@ -231,10 +212,11 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         <div className={titlebarClass} onMouseDown={this.handleDragWindow}>
           <div className="title" style={{width: titleWidth}}>
             {this.props.isTemplate ? <InlineEditorComponent text={title} changeText={this.handleChangeTitle} width={titleWidth} /> : <div className="static">{title}</div>}
+            { privateWindow ? " [PRIVATE]" : null}
           </div>
           {this.renderButtons()}
         </div>
-        { privateWindow ? this.renderOwnerBar(isTopWindow) : null}
+
         <div className="iframe" style={{top: iframeTop}}>
           <WindowIframeComponent key={window.id} src={url} loaded={this.handleIframeLoaded} />
           {this.renderReadonlyBlocker()}
@@ -246,7 +228,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         {!maximized ? <div className="bottom-drag" onMouseDown={this.handleDragBottom} /> : null}
         {!maximized ? <div className="bottom-left-drag" onMouseDown={this.handleDragBottomLeft} /> : null}
         {!maximized ? <div className="bottom-right-drag" onMouseDown={this.handleDragBottomRight} /> : null}
-        {isTopWindow && !maximized && !isTemplate ? this.renderSidebarMenu(windowStyle.width + 4) : null}
+        {isTopWindow && !maximized && !isTemplate ? this.renderSidebarMenu(windowStyle.width + 1) : null}
       </div>
     )
   }

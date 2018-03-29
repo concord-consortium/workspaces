@@ -819,6 +819,74 @@ a {
       }
     }
 
+    .modal {
+      position: fixed;
+      top: $header-height + $toolbar-height;
+      right: $sidebar-width;
+      bottom: 0;
+      left: 0;
+
+      .modal-background {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        background-color: #000;
+        opacity: 0.5;
+      }
+      .modal-dialog-container {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        .modal-dialog {
+          width: 500px;
+          background-color: #fff;
+          font-size: 13px;
+
+          .modal-dialog-title {
+            background-color: #3E90AC;
+            color: #fff;
+            padding: 2px 5px;
+          }
+
+          .modal-dialog-content {
+            .modal-dialog-inner-content {
+              margin: 20px;
+
+              input[type=text] {
+                width: 100%;
+              }
+
+              .form-group {
+                margin-top: 10px;
+              }
+
+              label {
+                display: block;
+                font-weight: bold;
+                margin-bottom: 5px;
+              }
+
+              button, .button {
+                border: 1px solid #313131;
+                padding: 3px 8px;
+                margin-top: 2px;
+                font-size: 14px;
+                margin-right: 10px;
+              }
+            }
+          }
+        }
+      }
+    }
+
     .visible-supports {
       position: absolute;
       top: $header-height + $toolbar-height;
