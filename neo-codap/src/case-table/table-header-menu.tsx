@@ -79,14 +79,11 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
   }
 
   handleRenameAttribute = (evt: React.MouseEvent<HTMLElement>, attrID: string, name: string) => {
-    if (this.props.onRenameAttribute) {
-      debugger;
-      this.setState({
-        isRenameAttributeDialogOpen: true,
-        renameAttributeId: attrID,
-        renameAttributeName: name
-      });
-    }
+    this.setState({
+      isRenameAttributeDialogOpen: true,
+      renameAttributeId: attrID,
+      renameAttributeName: name
+    });
   }
 
   handleNewCase = () => {
