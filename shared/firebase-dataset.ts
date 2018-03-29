@@ -110,7 +110,7 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
       // dependent actions don't trigger onAction handlers.
       setTimeout(action);
     }
-  
+
     if ((call.type === 'action') && !isFromFirebase) {
       // if readOnly, exit without making any changes
       if (readOnly) { return; }
@@ -122,6 +122,14 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
                 pushRef = firebaseRef.child(kAttributesPath).push();
           applyActionToFirebase(() => {
             pushRef.set(cloneWithoutID(snapshot, 'id'));
+          });
+          break;
+        }
+        case 'setAttributeName': {
+          const attrID = call.args[0],
+                name = call.args[1];
+          applyActionToFirebase(() => {
+            firebaseRef.child(`${kAttributesPath}/${attrID}`).child('name').set(name);
           });
           break;
         }
@@ -218,7 +226,7 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
         applyFirebaseAction(() => applySnapshot(dataSet, aSnapshot));
       }
     });
-  
+
     // Based on https://stackoverflow.com/a/27995609, the 'once' handler
     // should fire after the initial firing of the 'on' handler.
     return propertiesRef.once('value');
@@ -226,13 +234,13 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
 
   function attachAttributeHandlers(firebaseRef: FirebaseRef, dataSet: IDataSet) {
     const attributesRef = firebaseRef.child(kAttributesPath);
-  
+
     attributesRef.on('child_added', (child) => {
       if (!child || !child.key) { return; }
       const snapshot: IAttributeSnapshot = Object.assign({ id: child.key }, child.val());
       applyFirebaseAction(() => dataSet.addAttributeWithID(snapshot));
     });
-  
+
     attributesRef.on('child_changed', (child) => {
       if (!child || !child.key) { return; }
       const attribute = dataSet.attrFromID(child.key),
@@ -241,17 +249,17 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
         applyFirebaseAction(() => applySnapshot(attribute, snapshot));
       }
     });
-  
+
     attributesRef.on('child_removed', (child) => {
       if (!child || !child.key) { return; }
       applyFirebaseAction(() => child.key && dataSet.removeAttribute(child.key));
     });
-  
+
     // According to https://stackoverflow.com/a/27995609, this will resolve after
     // the preexisting attributes have all been handled in the 'child_added' handler.
     return attributesRef.once('value');
   }
-  
+
   function attachCaseHandlers(firebaseRef: FirebaseRef, dataSet: IDataSet) {
     const casesRef = firebaseRef.child(kCasesPath);
 
@@ -266,23 +274,23 @@ export function loadDataSetFromFirebase(firebaseRef: FirebaseRef, readOnly: bool
         applyFirebaseAction(() => dataSet.setCanonicalCaseValues([snapshot as IInputCase]));
       }
     });
-  
+
     casesRef.on('child_changed', (child) => {
       if (!child || !child.key) { return; }
       const snapshot: IInputCase = Object.assign({ [kLocalIDName]: child.key }, child.val());
       applyFirebaseAction(() => dataSet.setCanonicalCaseValues([snapshot]));
     });
-  
+
     casesRef.on('child_removed', (child) => {
       if (!child || !child.key) { return; }
       applyFirebaseAction(() => child.key && dataSet.removeCases([child.key]));
     });
-  
+
     // According to https://stackoverflow.com/a/27995609, this will resolve after
     // the preexisting cases have all been handled in the 'child_added' handler.
     return casesRef.once('value');
   }
-  
+
   return attachDataSetHandler(firebaseRef)
     .then((snapshot) => {
       return attachAttributeHandlers(firebaseRef, dataSet);

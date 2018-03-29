@@ -389,6 +389,26 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         }
     }
 
+    handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+    }
+
+    handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        try {
+            const data = JSON.parse(e.dataTransfer.getData('text'));
+            if (data) {
+                if (data.type === 'drag-column-from-case-table') {
+                    // TODO: handle drop from case table
+                    alert('Dropped ' + data.name);
+                }
+            }
+        }
+        catch (e) {
+            alert('Unable to parse dropped info');
+        }
+    }
+
     renderAttributeMenu(axisLabel: string, menuLabel: string, addNoneOption?: boolean) {
         const renderAttributeItems = () => {
             if (!this.props.dataSet) { return null; }
@@ -744,7 +764,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         // Note: the graph popover is conditionally rendered so that the SVG element can get all mouse
         // events for data point mouseovers and clicks.
         return (
-            <div className="neo-codap-graph">
+            <div className="neo-codap-graph" onDragOver={this.handleDragOver} onDrop={this.handleDrop}>
                 {node.toReact()}
                 {this.renderXAxisPopover()}
                 {this.renderYAxisPopover()}

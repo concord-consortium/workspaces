@@ -9,7 +9,6 @@ import sizeMe from "react-sizeme";
 const html2canvas = require("html2canvas");
 import * as queryString from 'query-string';
 
-
 interface ISizeMeSize {
   width:number|null;
   height:number|null;
@@ -152,6 +151,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
         <NeoCodapApp
           dataSet={dataSet}
           onDOMNodeRef={(ref: HTMLElement | null) => this.appDOMNodeRef = ref}
+          inCollabSpace={true}
         />
       </div>
     )

@@ -446,6 +446,13 @@ export const DataSet = types.model('DataSet', {
         }
       },
 
+      setAttributeName(attributeID: string, name: string) {
+        const attribute = attributeID && attrIDMap[attributeID];
+        if (attribute) {
+          attribute.setName(name);
+        }
+      },
+
       removeAttribute(attributeID: string) {
         const attrIndex = attrIndexFromID(attributeID),
               attribute = attributeID && attrIDMap[attributeID],
