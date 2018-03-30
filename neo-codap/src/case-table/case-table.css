@@ -4,8 +4,9 @@
   box-sizing: border-box;
 }
 
-.cdp-case-index-cell {
-  background-color: #EEE;
+.ag-theme-fresh .cdp-case-index-cell,
+.ag-theme-fresh .cdp-case-index-cell.ag-cell-data-changed {  /* .cdp-case-index-cell.ag-cell-data-changed is to prevent flashing during sort */
+  background-color: #EEE !important;
 }
 
 .ag-theme-fresh .ag-cell-no-focus {
@@ -40,3 +41,4 @@
   margin: 0 1em 0 0;
   font-size: 12pt;
 }
+
