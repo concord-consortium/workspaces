@@ -933,6 +933,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     let okButton = ""
     let content:JSX.Element|null = null
     let newWindowIsPrivate:HTMLInputElement|null
+    let enableVisibiltyOptions = !this.props.isTemplate
 
     const handleOk = () => {
       const {onModalOk} = this.state
@@ -972,16 +973,18 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         title = "Untitled Table"
         titlebar = "Add Table"
         okButton = "Add"
+        enableVisibiltyOptions = false
         break
       case "add-graph":
         title = "Untitled Graph"
         titlebar = "Add Graph"
         okButton = "Add"
+        enableVisibiltyOptions = false
         break
     }
 
     let visibilityGroup:JSX.Element|null = null
-    if (!this.props.isTemplate) {
+    if (enableVisibiltyOptions) {
       visibilityGroup = (
         <div className="form-group">
           <label htmlFor="windowType">Visibility</label>
