@@ -258,6 +258,17 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         this.localChanges.push(cloneDeep(caseValues));
         dataSet.setCanonicalCaseValues([caseValues]);
         return true;
+      },
+      // tslint:disable-next-line:no-any
+      comparator: function (valueA: any, valueB: any, nodeA: RowNode, nodeB: RowNode, descending: boolean) {
+        const floatA = parseFloat(valueA);
+        const floatB = parseFloat(valueB);
+        if (isNaN(floatA) || isNaN(floatB)) {
+          if (valueA < valueB) { return -1; }
+          if (valueA > valueB) { return 1; }
+          return 0;
+        }
+        return floatA - floatB;
       }
     });
   }
