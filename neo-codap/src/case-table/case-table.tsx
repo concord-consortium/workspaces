@@ -105,6 +105,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   gridElement: HTMLDivElement|null;
   headerElement: HTMLDivElement|null;
 
+  sortedRowNodes: RowNode[];
+
   // we don't need to refresh for changes the table already knows about
   localChanges: IInputCase[] = [];
 
@@ -124,6 +126,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     this.headerElement = null;
 
     this.updateGridState(dataSet);
+
+    this.sortedRowNodes = [];
   }
 
   onGridReady = (gridReadyParams: GridReadyEvent) => {
@@ -175,7 +179,14 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       width: 50,
       pinned: 'left',
       lockPosition: true,
-      valueGetter: 'String(node.rowIndex + 1)',
+      valueGetter: (params) => {
+        // if not yet sorted just return the row index
+        if (this.sortedRowNodes.length === 0) {
+          return params.node.rowIndex + 1;
+        }
+        // otherwise return the index after the last sort operation
+        return this.sortedRowNodes.indexOf(params.node) + 1;
+      },
       suppressMovable: true,
       suppressResize: true,
       suppressNavigable: true
@@ -258,6 +269,17 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         this.localChanges.push(cloneDeep(caseValues));
         dataSet.setCanonicalCaseValues([caseValues]);
         return true;
+      },
+      // tslint:disable-next-line:no-any
+      comparator: function (valueA: any, valueB: any, nodeA: RowNode, nodeB: RowNode, descending: boolean) {
+        const floatA = parseFloat(valueA);
+        const floatB = parseFloat(valueB);
+        if (isNaN(floatA) || isNaN(floatB)) {
+          if (valueA < valueB) { return -1; }
+          if (valueA > valueB) { return 1; }
+          return 0;
+        }
+        return floatA - floatB;
       }
     });
   }
@@ -517,6 +539,16 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     if (localRow) {
       rowNodes.splice(rowNodes.indexOf(localRow), 1);
       rowNodes.push(localRow);
+    }
+
+    // keep reference so we can keep index in ascending order
+    this.sortedRowNodes = rowNodes;
+    if (this.gridApi) {
+      // force update of the case index
+      this.gridApi.refreshCells({
+        columns: ['__CASE_INDEX__'],
+        force: true
+      });
     }
   }
 
