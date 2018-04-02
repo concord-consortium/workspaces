@@ -76,6 +76,10 @@ export class LogManager {
     }
   }
 
+  userId() {
+    return this.settings.tokens ? this.settings.tokens.portalJWT.user_id || this.settings.tokens.firebaseJWT.uid : undefined
+  }
+
   logEvent(eventName:string, eventValue:LogManagerEventValue, parameters:any|null) {
     const now = Date.now() + this.timeSkew,
           {session, runRemoteEndPoint} = this,
