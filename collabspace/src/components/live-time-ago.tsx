@@ -1,8 +1,5 @@
 import * as React from "react"
 
-const timeago = require("timeago.js")
-const timeagoInstance = timeago()
-
 export interface LiveTimeAgoProps {
   timestamp: number|object
 }
@@ -17,7 +14,7 @@ export class LiveTimeAgoComponent extends React.Component<LiveTimeAgoProps, Live
   constructor (props:LiveTimeAgoProps) {
     super(props);
     this.state = {
-      ago: timeagoInstance.format(this.props.timestamp)
+      ago: this.format(this.props.timestamp)
     }
   }
 
@@ -30,10 +27,33 @@ export class LiveTimeAgoComponent extends React.Component<LiveTimeAgoProps, Live
   }
 
   handleInterval = () => {
-    const ago = timeagoInstance.format(this.props.timestamp)
+    const ago = this.format(this.props.timestamp)
     if (ago !== this.state.ago) {
       this.setState({ago})
     }
+  }
+
+  format(timestamp:number|object):string {
+    if (typeof timestamp === "number") {
+      const pluralize = (n:number, s:string) => n === 1 ? s : `${s}s`
+      const now = Date.now()
+      const seconds = Math.round((now - timestamp) / 1000)
+      const minutes = Math.round(seconds/60)
+      const hours = Math.round(minutes/60)
+      const days = Math.round(hours/24)
+
+      if (seconds < 60) {
+        return "Just now"
+      }
+      if (minutes < 60) {
+        return `${minutes} ${pluralize(minutes, "minute")} ago`
+      }
+      if (hours < 24) {
+        return `${hours} ${pluralize(hours, "hour")} ago`
+      }
+      return `${days} ${pluralize(days, "day")} ago`
+    }
+    return ""
   }
 
   render() {
