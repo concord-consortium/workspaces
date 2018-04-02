@@ -19,14 +19,22 @@ import * as firebase from "firebase"
 import { PortalOffering, PortalTokens } from "./auth";
 import { getDocumentRef, getRelativeRefPath } from "./refs"
 import { NonPrivateWindowParams } from "../components/workspace";
+import { LogManager } from "../../../shared/log-manager"
+import { assign } from "lodash"
+
+export interface AddWindowLogParams {
+  name: string
+  params?: any
+}
 
 export interface AddWindowParams {
   url: string
   title: string
   ownerId?: string
-  iframeData?: any,
+  iframeData?: any
   dataSet?: FirebaseWindowDataSet
   createNewDataSet?: boolean
+  log?: AddWindowLogParams
 }
 
 export enum DragType { GrowLeft, GrowRight, GrowUp, GrowDown, GrowDownRight, GrowDownLeft, Position, None }
@@ -86,6 +94,7 @@ export class WindowManager {
   lastAttrsQuery: firebase.database.Query
   tokens: PortalTokens|null
   nonPrivateWindow: (nonPrivateWindowParams: NonPrivateWindowParams) => boolean
+  logManager: LogManager
 
   constructor (settings: WindowManagerSettings) {
     this.document = settings.document
@@ -139,6 +148,10 @@ export class WindowManager {
     else {
       this.lastAttrsQuery.off("child_added", this.handleAttrsRefChildAdded)
     }
+  }
+
+  setLogManager(logManager:LogManager) {
+    this.logManager = logManager
   }
 
   notifyStateChange() {
@@ -360,6 +373,11 @@ export class WindowManager {
           dataSetCreatorRef.set(window.id)
         }
         this.moveToTop(window, true)
+        debugger
+        if (this.logManager && params.log) {
+          const logParams = assign({}, {creator: this.logManager.userId(), private: !!ownerId}, params.log.params)
+          this.logManager.logEvent(params.log.name, window.id, logParams)
+        }
       })
       .catch((err) => {})
   }
@@ -530,7 +548,13 @@ export class WindowManager {
             return reject("Cannot find window in document")
           }
           const {dataSet, url} = firebaseWindow
-          const addWindowParams:AddWindowParams = {url, title, iframeData, dataSet}
+          const logParams: AddWindowLogParams = {
+            name: "Copied window",
+            params: {
+              copiedFrom: window.id
+            }
+          }
+          const addWindowParams:AddWindowParams = {url, title, iframeData, dataSet, log: logParams}
           if (ownerId) {
             addWindowParams.ownerId = ownerId
           }
@@ -559,7 +583,13 @@ export class WindowManager {
           else {
             const {dataSet, url} = attrs
             const done = () => {
-              this.add({url, title, iframeData, dataSet})
+              const logParams: AddWindowLogParams = {
+                name: "Copied window from publication",
+                params: {
+                  copiedFrom: windowId
+                }
+              }
+              this.add({url, title, iframeData, dataSet, log: logParams})
               resolve()
             }
             if (dataSet) {

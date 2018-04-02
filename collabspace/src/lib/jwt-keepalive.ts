@@ -78,13 +78,13 @@ export class JWTKeepalive {
     }
 
     if (this.startedAt + MAX_DURATION < rightNow) {
-      this.callback(tokens, true, "Your session has reached its maximum length.  Please login again.")
+      this.callback(tokens, true, "Your session has reached its maximum length.  Please log in again.")
       return
     }
 
     if (this.startedAt + DURATION_BEFORE_IDLE_CHECK < rightNow) {
       if (this.idle && (rightNow - this.idleAt > MAX_IDLE_DURATION)) {
-        this.callback(tokens, true, "Your session has been idle for too long.  Please login again.")
+        this.callback(tokens, true, "Your session has been idle for too long.  Please log in again.")
         return
       }
     }
@@ -102,7 +102,7 @@ export class JWTKeepalive {
         this.callback(newTokens, false, null)
       })
       .catch((err) => {
-        this.callback(tokens, true, "Unable to automatically refresh your login.  Please manually login again.")
+        this.callback(tokens, true, "Unable to automatically refresh your login.  Please manually log in again.")
       })
     this.startJWTRefreshTimer()
   }

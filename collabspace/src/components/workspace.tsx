@@ -9,7 +9,7 @@ import { WindowComponent } from "./window"
 import { MinimizedWindowComponent } from "./minimized-window"
 import { InlineEditorComponent } from "./inline-editor"
 import { SidebarComponent } from "./sidebar"
-import { WindowManager, WindowManagerState, DragType, OrderedWindow } from "../lib/window-manager"
+import { WindowManager, WindowManagerState, DragType, OrderedWindow, AddWindowLogParams } from "../lib/window-manager"
 import { v4 as uuidV4} from "uuid"
 import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
@@ -21,6 +21,11 @@ import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUse
 import { LogManager } from "../../../shared/log-manager"
 import { merge } from "lodash"
 import { LiveTimeAgoComponent } from "./live-time-ago"
+
+export interface AddWindowLogParamsParams {
+  ownerId?: string
+  copiedFrom?: string
+}
 
 export interface NonPrivateWindowParams {
   window?: Window
@@ -117,6 +122,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       nonPrivateWindow: this.nonPrivateWindow
     })
 
+    if (this.props.logManager) {
+      this.windowManager.setLogManager(this.props.logManager)
+    }
+
     this.infoRef = this.props.document.ref.child("info")
     this.infoRef.on("value", this.handleInfoChange)
 
@@ -152,6 +161,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  componentWillReceiveProps(nextProps:WorkspaceComponentProps) {
+    if (nextProps.logManager && (nextProps.logManager !== this.props.logManager)) {
+      this.windowManager.setLogManager(nextProps.logManager)
+    }
+  }
+
   componentWillUnmount() {
     this.windowManager.destroy()
 
@@ -174,10 +189,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   userId() {
-    if (this.props.portalUser) {
-      return `${this.props.portalUser.id}:${this.props.firebaseUser.uid}`
-    }
-    return this.props.firebaseUser.uid
+    return this.props.portalUser ? this.props.portalUser.id: this.props.firebaseUser.uid
   }
 
   nonPrivateWindow = (params: NonPrivateWindowParams) => {
@@ -343,7 +355,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     e.preventDefault()
     const [url, ...rest] = e.dataTransfer.getData("text/uri-list").split("\n")
     if (url) {
-      this.windowManager.add({url, title: "Untitled"})
+      this.windowManager.add({
+        url,
+        title: "Untitled",
+        log: {name: "Dropped window", params: {url}}
+      })
     }
   }
 
@@ -352,11 +368,27 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return `${location.origin}${location.pathname.replace("/index.html", "/")}${filename}`
   }
 
+  getAddWindowLogParams(params:AddWindowLogParamsParams) {
+    const addWindowParams:any = {
+      private: !!params.ownerId,
+      group: this.props.group,
+    }
+    if (params.copiedFrom) {
+      addWindowParams.copiedFrom = params.copiedFrom
+    }
+    return addWindowParams
+  }
+
   handleAddDrawingButton = () => {
     this.setState({
       showModal: "add-drawing",
       onModalOk: (title: string, ownerId?: string) => {
-        this.windowManager.add({url: this.constructRelativeUrl("drawing-tool-v2.html"), title, ownerId})
+        this.windowManager.add({
+          url: this.constructRelativeUrl("drawing-tool-v2.html"),
+          title,
+          ownerId,
+          log: {name: "Added drawing window", params: this.getAddWindowLogParams({ownerId})}
+        })
       }
     })
   }
@@ -365,7 +397,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     this.setState({
       showModal: "add-table",
       onModalOk: (title: string, ownerId?: string) => {
-        this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=table"), title, ownerId, createNewDataSet: true})
+        this.windowManager.add({
+          url: this.constructRelativeUrl("neo-codap.html?mode=table"),
+          title,
+          ownerId,
+          createNewDataSet: true,
+          log: {name: "Added table window", params: this.getAddWindowLogParams({ownerId})}
+        })
       }
     })
   }
@@ -374,7 +412,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     this.setState({
       showModal: "add-graph",
       onModalOk: (title: string, ownerId?: string) => {
-        this.windowManager.add({url: this.constructRelativeUrl("neo-codap.html?mode=graph"), title, ownerId})
+        this.windowManager.add({
+          url: this.constructRelativeUrl("neo-codap.html?mode=graph"),
+          title,
+          ownerId,
+          log: {name: "Added graph window", params: this.getAddWindowLogParams({ownerId})}
+        })
       }
     })
   }
@@ -515,6 +558,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                   publishRequest
                 )
               }
+            }
+
+            if (this.props.logManager) {
+              this.props.logManager.logEvent("Published", null, {
+                publisher: this.userId(),
+                windowIds: windowIdsToPublish,
+                group: this.props.group
+              })
             }
 
             donePublishing()
