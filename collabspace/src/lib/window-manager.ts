@@ -373,7 +373,6 @@ export class WindowManager {
           dataSetCreatorRef.set(window.id)
         }
         this.moveToTop(window, true)
-        debugger
         if (this.logManager && params.log) {
           const logParams = assign({}, {creator: this.logManager.userId(), private: !!ownerId}, params.log.params)
           this.logManager.logEvent(params.log.name, window.id, logParams)

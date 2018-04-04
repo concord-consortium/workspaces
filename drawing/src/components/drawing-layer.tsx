@@ -86,6 +86,7 @@ export interface DrawingLayerViewProps {
   firebaseRef: firebase.database.Reference
   events: EventEmitter
   imageSetItems: ImageSetItem[]
+  backgroundUrl: string|null
 }
 
 export interface DrawingLayerViewState {
@@ -1611,9 +1612,18 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     )
   }
 
+  renderBackgroundUrl() {
+    const {backgroundUrl} = this.props
+    if (!backgroundUrl) {
+      return null
+    }
+    return <img src={backgroundUrl} className="background-image" />
+  }
+
   render() {
     return (
       <div className="drawing-layer" onMouseDown={this.handleMouseDown} onClick={this.handleClick}>
+        {this.renderBackgroundUrl()}
         {this.renderSVG()}
         {this.renderObjects((object) => object.type === "text")}
       </div>

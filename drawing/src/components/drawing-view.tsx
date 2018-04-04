@@ -11,6 +11,7 @@ export type DrawingMode = "drawing" | "editing"
 export interface DrawingViewProps {
   firebaseRef: firebase.database.Reference
   imageSetUrl: string|null
+  backgroundUrl: string|null
   readonly?: boolean
   captureScreenCallback?: Function|null
 }
@@ -99,7 +100,13 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
     return (
       <div>
         <div className="workspace" ref="workspace" style={{left: TOOLBAR_WIDTH}}>
-          <DrawingLayerView firebaseRef={this.props.firebaseRef} readonly={this.props.readonly} events={this.events} imageSetItems={this.state.imageSetItems} />
+          <DrawingLayerView
+            firebaseRef={this.props.firebaseRef}
+            readonly={this.props.readonly}
+            events={this.events}
+            imageSetItems={this.state.imageSetItems}
+            backgroundUrl={this.props.backgroundUrl}
+          />
         </div>
         <ToolbarView events={this.events} imageSetItems={this.state.imageSetItems} />
         {this.props.readonly ? <div className="read-only-blocker" /> : null}

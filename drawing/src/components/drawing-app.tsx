@@ -56,7 +56,7 @@ export class DrawingApp extends React.Component<DrawingAppProps, DrawingAppState
       return <div className="loading">Authenticating...</div>
     }
     if (this.state.drawingRef) {
-      return <DrawingView firebaseRef={this.state.drawingRef} imageSetUrl={this.state.imageSetUrl} />
+      return <DrawingView firebaseRef={this.state.drawingRef} imageSetUrl={this.state.imageSetUrl} backgroundUrl={null} />
     }
     return <div className="loading">Loading...</div>
   }

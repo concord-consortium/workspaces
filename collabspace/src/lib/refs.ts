@@ -104,3 +104,7 @@ export const getRelativeRefPath = (ref:firebase.database.Reference) => {
   return ref.toString().substring(ref.root.toString().length)
 }
 
+export const getUploadsStoragePath = (offering:PortalOffering|null, uploadId?:string) => {
+  const prefix = offering ? `${getClassPath(offering)}/uploads` : 'uploads'
+  return uploadId ? `${prefix}/${uploadId}` : prefix
+}
