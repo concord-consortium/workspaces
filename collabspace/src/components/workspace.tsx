@@ -21,6 +21,7 @@ import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUse
 import { LogManager } from "../../../shared/log-manager"
 import { merge } from "lodash"
 import { LiveTimeAgoComponent } from "./live-time-ago"
+import { UploadImageDialogComponent } from "./upload-image-dialog"
 
 export interface AddWindowLogParamsParams {
   ownerId?: string
@@ -62,6 +63,7 @@ export interface WorkspaceComponentState extends WindowManagerState {
   showModal: "copy"|"add-drawing"|"add-table"|"add-graph"|null
   onModalOk: ((title: string, ownerId?:string|null) => void) |null
   copyWindow: Window|null
+  showUploadImageDialog: boolean
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -97,7 +99,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       visibleSupportIds: [],
       showModal: null,
       onModalOk: null,
-      copyWindow: null
+      copyWindow: null,
+      showUploadImageDialog: false
     }
   }
 
@@ -367,6 +370,26 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const {location} = window
     return `${location.origin}${location.pathname.replace("/index.html", "/")}${filename}`
   }
+
+  handleUploadImageButton = () => {
+    this.setState({showUploadImageDialog: true});
+  }
+
+  handleHideUploadImageDialog = () => {
+    this.setState({showUploadImageDialog: false});
+  }
+
+  handleAddUploadedImage = (title: string, imageUrl:string, isPrivate: boolean) => {
+    const ownerId = isPrivate ? this.userId() : undefined
+    this.setState({showUploadImageDialog: false});
+    this.windowManager.add({
+      url: this.constructRelativeUrl(`drawing-tool-v2.html?backgroundUrl=${encodeURIComponent(imageUrl)}`),
+      title,
+      ownerId,
+      log: {name: "Added annotated drawing window", params: this.getAddWindowLogParams({ownerId})}
+    })
+  }
+
 
   getAddWindowLogParams(params:AddWindowLogParamsParams) {
     const addWindowParams:any = {
@@ -870,6 +893,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       <div className="buttons">
         <div className="left-buttons">
           <button type="button" onClick={this.handleAddDrawingButton}><i className="icon icon-pencil" /> Add Drawing</button>
+          <button type="button" onClick={this.handleUploadImageButton}><i className="icon icon-file-picture" /> Upload Image</button>
           <button type="button" onClick={this.handleAddCaseTable}><i className="icon icon-table2" /> Add Table</button>
           <button type="button" onClick={this.handleAddGraph}><i className="icon icon-stats-dots" /> Add Graph</button>
           </div>
@@ -1081,6 +1105,18 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
+  renderUploadImageDialog() {
+    if (!this.state.showUploadImageDialog) {
+      return null
+    }
+    return <UploadImageDialogComponent
+              offering={this.props.portalOffering}
+              onAddUploadedImage={this.handleAddUploadedImage}
+              onCancelUploadedImage={this.handleHideUploadImageDialog}
+              enableVisibilityOptions={!this.props.isTemplate}
+            />
+  }
+
   render() {
     return (
       <div className="workspace" onDrop={this.handleDrop} onDragOver={this.handleDragOver}>
@@ -1089,8 +1125,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderWindowArea()}
         {this.renderVisibleSupports()}
         {this.renderSidebarComponent()}
-        {this.renderModal()}
         {this.renderArtifact()}
+        {this.renderModal()}
+        {this.renderUploadImageDialog()}
         {this.renderReadonlyBlocker()}
       </div>
     )

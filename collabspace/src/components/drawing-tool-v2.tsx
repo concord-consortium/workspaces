@@ -12,6 +12,7 @@ export interface DrawingToolComponentState {
   drawingRef: firebase.database.Reference|null
   imageSetUrl: string|null
   captureScreenCallback: Function|null
+  backgroundUrl: string|null
 }
 
 export class DrawingToolComponent extends React.Component<DrawingToolComponentProps, DrawingToolComponentState> {
@@ -24,6 +25,7 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
       readonly: false,
       drawingRef: null,
       imageSetUrl: this.getImageSetUrl(),
+      backgroundUrl: this.getBackgroundUrl(),
       captureScreenCallback: null
     }
   }
@@ -37,6 +39,10 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
       }
     } catch (e) {}
     return queryString.parse(search).drawingImageSet
+  }
+
+  getBackgroundUrl() {
+    return queryString.parse(window.location.search).backgroundUrl
   }
 
   componentDidMount() {
@@ -73,7 +79,13 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
 
   render() {
     if (this.state.drawingRef) {
-      return <DrawingView readonly={this.state.readonly} firebaseRef={this.state.drawingRef} imageSetUrl={this.state.imageSetUrl} captureScreenCallback={this.state.captureScreenCallback} />
+      return <DrawingView
+                readonly={this.state.readonly}
+                firebaseRef={this.state.drawingRef}
+                imageSetUrl={this.state.imageSetUrl}
+                backgroundUrl={this.state.backgroundUrl}
+                captureScreenCallback={this.state.captureScreenCallback}
+              />
     }
     return <div className="loading">Loading...</div>
   }
