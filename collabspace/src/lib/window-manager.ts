@@ -95,6 +95,7 @@ export class WindowManager {
   tokens: PortalTokens|null
   nonPrivateWindow: (nonPrivateWindowParams: NonPrivateWindowParams) => boolean
   logManager: LogManager
+  listenOnlyForTitleAttrChanges: boolean
 
   constructor (settings: WindowManagerSettings) {
     this.document = settings.document
@@ -120,10 +121,14 @@ export class WindowManager {
 
     // make sure the windows map is populated before checking the ordering
     this.attrsRef.once("value", (snapshot) => {
+      this.listenOnlyForTitleAttrChanges = false
       this.handleAttrsRef(snapshot)
 
+      // listen to attrs changes always since we allow title updates when this.synChanges is false
+      this.listenOnlyForTitleAttrChanges = !this.syncChanges
+      this.attrsRef.on("value", this.handleAttrsRef)
+
       if (this.syncChanges) {
-        this.attrsRef.on("value", this.handleAttrsRef)
         this.orderRef.on("value", this.handleOrderRef)
         this.minimizedOrderRef.on("value", this.handleMinimizedOrderRef)
       }
@@ -140,8 +145,9 @@ export class WindowManager {
   }
 
   destroy() {
+    this.attrsRef.off("value", this.handleAttrsRef)
+
     if (this.syncChanges) {
-      this.attrsRef.off("value", this.handleAttrsRef)
       this.orderRef.off("value", this.handleOrderRef)
       this.minimizedOrderRef.off("value", this.handleMinimizedOrderRef)
     }
@@ -203,7 +209,12 @@ export class WindowManager {
         const window = this.windows[id]
         const attrs = attrsMap[id]
         if (attrs) {
-          if (window) {
+          if (this.listenOnlyForTitleAttrChanges) {
+            if (window) {
+              window.setLocalTitle(attrs.title)
+            }
+          }
+          else if (window) {
             window.setAttrs(attrs, false)
             updatedWindows[id] = window
           }
@@ -217,7 +228,9 @@ export class WindowManager {
       })
     }
 
-    this.windows = updatedWindows
+    if (!this.listenOnlyForTitleAttrChanges) {
+      this.windows = updatedWindows
+    }
 
     // NOTE: there is no state change notification here on purpose as
     // the window manager state is only concerned with the order of the windows.
@@ -471,7 +484,7 @@ export class WindowManager {
   changeTitle(window:Window, newTitle:string) {
     const {attrs} = window
     attrs.title = newTitle
-    window.setAttrs(attrs, this.syncChanges)
+    window.setAttrs(attrs, true)
   }
 
   windowLoaded(window:Window, element:HTMLIFrameElement) {
