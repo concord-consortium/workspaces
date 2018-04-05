@@ -1215,6 +1215,23 @@ a {
   }
 }
 
+.learning-log {
+  position: fixed;
+  top: $header-height;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: #fff;
+
+  .learning-log-workspace {
+    position: fixed;
+    top: $header-height + $toolbar-height;
+    right: 0;
+    bottom: 0;
+    left: 0;
+  }
+}
+
 /* icons */
 
 @font-face {
@@ -1259,4 +1276,7 @@ a {
 }
 .icon-file-picture:before {
   content: "\e927";
+}
+.icon-profile:before {
+  content: "\e923";
 }

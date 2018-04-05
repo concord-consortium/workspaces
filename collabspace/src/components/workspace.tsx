@@ -22,6 +22,7 @@ import { LogManager } from "../../../shared/log-manager"
 import { merge } from "lodash"
 import { LiveTimeAgoComponent } from "./live-time-ago"
 import { UploadImageDialogComponent } from "./upload-image-dialog"
+import { LearningLogComponent } from "./learning-log"
 
 export interface AddWindowLogParamsParams {
   ownerId?: string
@@ -64,6 +65,7 @@ export interface WorkspaceComponentState extends WindowManagerState {
   onModalOk: ((title: string, ownerId?:string|null) => void) |null
   copyWindow: Window|null
   showUploadImageDialog: boolean
+  showLearningLog: boolean
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -100,7 +102,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       showModal: null,
       onModalOk: null,
       copyWindow: null,
-      showUploadImageDialog: false
+      showUploadImageDialog: false,
+      showLearningLog: false
     }
   }
 
@@ -480,6 +483,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         this.windowManager.copyWindow(copyWindow, title, ownerId)
       }
     })
+  }
+
+  handleToggleLearningLogButton = () => {
+    this.setState({showLearningLog: !this.state.showLearningLog})
   }
 
   handlePublishButton = () => {
@@ -889,6 +896,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const editActivityUrl = documentInfo && documentInfo.portalEditUrl
     const showDemoButton = this.props.isTemplate && !document.isReadonly
     const showPublishButton = !this.props.isTemplate && !document.isReadonly
+    const showLearningLogButton = !this.props.isTemplate
     return (
       <div className="buttons">
         <div className="left-buttons">
@@ -901,6 +909,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
           {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
+          {showLearningLogButton ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Learning Log</button> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}><i className="icon icon-newspaper" /> Publish All</button> : null}
         </div>
       </div>
@@ -1117,6 +1126,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
             />
   }
 
+  renderLearningLog() {
+    const {portalTokens, portalUser} = this.props
+    if (!this.state.showLearningLog || !portalTokens || !portalUser) {
+      return null
+    }
+    return <LearningLogComponent portalTokens={portalTokens} portalUser={portalUser} onClose={this.handleToggleLearningLogButton} />
+  }
+
   render() {
     return (
       <div className="workspace" onDrop={this.handleDrop} onDragOver={this.handleDragOver}>
@@ -1128,6 +1145,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderArtifact()}
         {this.renderModal()}
         {this.renderUploadImageDialog()}
+        {this.renderLearningLog()}
         {this.renderReadonlyBlocker()}
       </div>
     )
