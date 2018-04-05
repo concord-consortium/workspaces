@@ -119,5 +119,12 @@ export class Window {
     }
   }
 
+  setLocalTitle(title: string) {
+    this.attrs.title = title
+    if (this.onAttrsChanged) {
+      this.onAttrsChanged(this.attrs)
+    }
+  }
+
 
 }

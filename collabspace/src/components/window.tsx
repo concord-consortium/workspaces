@@ -210,7 +210,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       <div className="window" ref="window" key={window.id} style={windowStyle}>
         <div className={titlebarClass} onMouseDown={this.handleDragWindow}>
           <div className="title" style={{width: titleWidth}}>
-            {this.props.isTemplate ? <InlineEditorComponent text={title} changeText={this.handleChangeTitle} width={titleWidth} /> : <div className="static">{title}</div>}
+            <InlineEditorComponent text={title} changeText={this.handleChangeTitle} width={titleWidth} />
             { privateWindow ? " [PRIVATE]" : null}
           </div>
           {this.renderButtons()}
