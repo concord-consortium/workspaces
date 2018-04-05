@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { onSnapshot, getSnapshot, types } from 'mobx-state-tree';
 import { ISerializedActionCall } from 'mobx-state-tree/dist/middlewares/on-action';
 import TableHeaderMenu from './table-header-menu';
 import { addAttributeToDataSet, addCanonicalCasesToDataSet,
@@ -6,7 +7,7 @@ import { addAttributeToDataSet, addCanonicalCasesToDataSet,
 import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
 import { CellComp, CellEditingStartedEvent, CellEditingStoppedEvent, ColDef, Column,
-          ColumnApi, GridApi, GridReadyEvent, RowRenderer, RowNode } from 'ag-grid';
+          ColumnApi, GridApi, GridReadyEvent, RowRenderer, RowNode, SortChangedEvent } from 'ag-grid';
 import { ValueGetterParams, ValueFormatterParams, ValueSetterParams } from 'ag-grid/dist/lib/entities/colDef';
 import { assign, cloneDeep, findIndex, isEqual, sortedIndexBy } from 'lodash';
 import 'ag-grid/dist/styles/ag-grid.css';
@@ -16,6 +17,24 @@ import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemory
 import { Strings } from '../strings';
 import { emitCaseTableEvent } from './case-table-events';
 
+export const CaseTableComponentSortModelData = types.model('CaseTableComponentSortModelData', {
+  colId: types.string,
+  sort: types.string
+});
+export type ICaseTableSortModelData = typeof CaseTableComponentSortModelData.Type;
+
+export const CaseTableComponentData = types.model('CaseTableComponentData',
+  {
+    sortModel: types.array(CaseTableComponentSortModelData)
+  })
+  .actions(self => ({
+    // tslint:disable-next-line:no-any
+    setSortModel(sortModel: any) {
+      self.sortModel = sortModel;
+    }
+  }));
+export type ICaseTableComponentData = typeof CaseTableComponentData.Type;
+
 interface IPos {
   left: number;
   top: number;
@@ -23,6 +42,7 @@ interface IPos {
 
 interface ICaseTableProps {
   dataSet?: IDataSet;
+  caseTableComponentData?: ICaseTableComponentData|null;
   onSampleData?: (name: string) => void;
   strings: Strings;
 }
@@ -133,6 +153,15 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   onGridReady = (gridReadyParams: GridReadyEvent) => {
     this.gridApi = gridReadyParams.api;
     this.gridColumnApi = gridReadyParams.columnApi;
+
+    const {caseTableComponentData} = this.props;
+    if (caseTableComponentData) {
+      this.gridApi.setSortModel(getSnapshot(caseTableComponentData.sortModel));
+
+      onSnapshot(caseTableComponentData, (snapshot: ICaseTableComponentData) => {
+        this.gridApi.setSortModel(snapshot.sortModel);
+      });
+    }
   }
 
   getRowNodeId = (data: { id: string }) => data.id;
@@ -552,6 +581,17 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
+  handleSortChanged = (event: SortChangedEvent) => {
+    const { caseTableComponentData } = this.props;
+    if (caseTableComponentData) {
+      const currentSortModel = getSnapshot(caseTableComponentData.sortModel);
+      const newSortModel = event.api.getSortModel();
+      if (!isEqual(currentSortModel, newSortModel)) {
+        caseTableComponentData.setSortModel(newSortModel);
+      }
+    }
+  }
+
   componentWillMount() {
     window.addEventListener('keyup', this.handleKeyUp);
   }
@@ -643,6 +683,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           onCellEditingStopped={this.handleCellEditingStopped}
           enableSorting={true}
           postSort={this.handlePostSort}
+          onSortChanged={this.handleSortChanged}
           onViewportChanged={() => this.handleSetAddAttributePos()}
         />
       </div>

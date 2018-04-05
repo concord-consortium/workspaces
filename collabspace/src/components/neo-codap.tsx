@@ -8,6 +8,8 @@ import * as firebase from "firebase";
 import sizeMe from "react-sizeme";
 const html2canvas = require("html2canvas");
 import * as queryString from 'query-string';
+import { IAppComponentData, AppComponentData, createDefaultAppComponentData } from "../../../neo-codap/src/app-data";
+import { applySnapshot, getSnapshot, onSnapshot } from "mobx-state-tree";
 
 interface ISizeMeSize {
   width:number|null;
@@ -22,6 +24,7 @@ interface NeoCodapState {
   mode: string
   readonly: boolean
   dataSet?: IDataSet
+  appComponentData?: IAppComponentData
   loadedWorkspaceDataSets: boolean
   workspaceDataSets: WorkspaceDataSet[]
 }
@@ -47,24 +50,9 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
     this.workspaceClient = new WorkspaceClient({
       init: (req) => {
         this.setState({readonly: req.readonly}, () => {
+          this.loadAppComponentData();
           if (req.type === "collabspace") {
-            let dataSetRef = this.workspaceClient.getDataSetRef()
-            if (!dataSetRef && (this.state.mode === "graph")) {
-              this.cancelListDataSets = this.workspaceClient.listDataSets((workspaceDataSets) => {
-                if (workspaceDataSets.length === 1) {
-                  this.handleSelectedWorkspaceDataSet(workspaceDataSets[0])
-                }
-                else {
-                  this.setState({workspaceDataSets, loadedWorkspaceDataSets: true})
-                }
-              })
-            }
-            else {
-              dataSetRef = dataSetRef || this.workspaceClient.createDataSetRef()
-              if (dataSetRef) {
-                this.loadDataSet(dataSetRef)
-              }
-            }
+            this.determineDataSet();
           }
         })
         return {}
@@ -98,6 +86,64 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
         })
       }
     })
+  }
+
+  componentWillUnmount() {
+    this.workspaceClient.dataRef.off()
+  }
+
+  loadAppComponentData() {
+    const {dataRef} = this.workspaceClient
+    dataRef.once("value", (snapshot) => {
+      // ensure there is initial data
+      const appComponentData = createDefaultAppComponentData()
+      let initialAppComponentData:IAppComponentData|null = snapshot.val()
+      if (initialAppComponentData) {
+        applySnapshot(appComponentData, initialAppComponentData)
+      }
+      else {
+        dataRef.set(getSnapshot(appComponentData))
+      }
+
+      // sync local changes to the data to Firebase
+      let localChange = true
+      onSnapshot(appComponentData, (updatedAppData) => {
+        if (localChange) {
+          dataRef.set(updatedAppData)
+        }
+      })
+
+      this.setState({appComponentData}, () => {
+
+        // listen for changes at Firebase to update the local state
+        dataRef.on("value", (snapshot) => {
+          const newAppComponentData:IAppComponentData = (snapshot && snapshot.val()) || getSnapshot(createDefaultAppComponentData())
+          localChange = false
+          applySnapshot(appComponentData, newAppComponentData)
+          localChange = true
+        })
+      })
+    })
+  }
+
+  determineDataSet() {
+    let dataSetRef = this.workspaceClient.getDataSetRef()
+    if (!dataSetRef && (this.state.mode === "graph")) {
+      this.cancelListDataSets = this.workspaceClient.listDataSets((workspaceDataSets) => {
+        if (workspaceDataSets.length === 1) {
+          this.handleSelectedWorkspaceDataSet(workspaceDataSets[0])
+        }
+        else {
+          this.setState({workspaceDataSets, loadedWorkspaceDataSets: true})
+        }
+      })
+    }
+    else {
+      dataSetRef = dataSetRef || this.workspaceClient.createDataSetRef()
+      if (dataSetRef) {
+        this.loadDataSet(dataSetRef)
+      }
+    }
   }
 
   loadDataSet(dataSetRef: firebase.database.Reference) {
@@ -137,7 +183,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   }
 
   render() {
-    const { dataSet } = this.state
+    const { dataSet, appComponentData } = this.state
     if (!dataSet) {
       return (
         <div className="neo-codap-wrapper centered">
@@ -150,6 +196,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
       <div className="neo-codap-wrapper">
         <NeoCodapApp
           dataSet={dataSet}
+          appComponentData={appComponentData}
           onDOMNodeRef={(ref: HTMLElement | null) => this.appDOMNodeRef = ref}
           inCollabSpace={true}
         />

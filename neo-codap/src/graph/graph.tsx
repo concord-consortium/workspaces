@@ -7,6 +7,28 @@ import { ICase, IDataSet, IDerivationSpec } from '../data-manager/data-manager';
 import { Menu, MenuItem, Popover, Position } from '@blueprintjs/core';
 import { assign, find, map, uniq, range } from 'lodash';
 import './graph.css';
+import { getSnapshot, onSnapshot, types } from 'mobx-state-tree';
+
+// NOTE: the attribute names in this model should also exist in IGraphData
+//       as objects of both types are merged when calling createGraphData()
+export const GraphComponentData = types.model('GraphComponentData',
+  {
+    xAttrID: types.maybe(types.string),
+    yAttrID: types.maybe(types.string),
+    legendAttrID: types.maybe(types.string)
+  })
+  .actions(self => ({
+    setXAttrID(xAttrID: string|null) {
+      self.xAttrID = xAttrID;
+    },
+    setYAttrID(yAttrID: string|null) {
+      self.yAttrID = yAttrID;
+    },
+    setLegendAttrID(legendAttrID: string|null) {
+      self.legendAttrID = legendAttrID;
+    },
+  }));
+export type IGraphComponentData = typeof GraphComponentData.Type;
 
 interface ISizeMeSize {
     width: number|null;
@@ -16,13 +38,14 @@ interface ISizeMeSize {
 interface IGraphProps {
     size: ISizeMeSize;
     dataSet: IDataSet;
+    graphComponentData?: IGraphComponentData|null;
 }
 
 interface IGraphData {
     dataSet?: IDataSet;
-    xAttrID?: string;
-    yAttrID?: string;
-    legendAttrID?: string;
+    xAttrID?: string|null;
+    yAttrID?: string|null;
+    legendAttrID?: string|null;
     legendAttrType?: ILegendAttrType;
 }
 
@@ -78,6 +101,13 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                                 legendMenuIsOpen: false,
                                 legendHeight: 0
                             });
+
+        const {graphComponentData} = this.props;
+        if (graphComponentData) {
+            onSnapshot(graphComponentData, (snapshot: IGraphComponentData) => {
+                this.setState(this.createGraphData(this.props.dataSet, snapshot));
+            });
+        }
 
         this.attachHandlers(this.props.dataSet);
     }
@@ -206,7 +236,10 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         if (!srcDataSet) { return {}; }
 
         // client-specified attributes override state attributes
-        const graphData = assign({}, this.state ? this.state : {} as IGraphData, attrs);
+        const {graphComponentData} = this.props;
+        const componentData: IGraphData = graphComponentData ? getSnapshot(graphComponentData) : {};
+        const stateData = this.state ? this.state : {} as IGraphData;
+        const graphData = assign({}, componentData, stateData, attrs);
         let { xAttrID, yAttrID, legendAttrID, legendAttrType } = graphData,
             xAttr: IAttribute, yAttr: IAttribute, legendAttr: IAttribute,
             attrIDs: string[] = [];
@@ -373,16 +406,26 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
               attrID = idMatch && idMatch[1];
         if (axis && attrID) {
             let attrs: IGraphData = {};
+            const { graphComponentData } = this.props;
             switch (axis) {
                 case 'x':
                     attrs.xAttrID = attrID;
+                    if (graphComponentData) {
+                        graphComponentData.setXAttrID(attrID);
+                    }
                     break;
                 case 'y':
                     attrs.yAttrID = attrID;
+                    if (graphComponentData) {
+                        graphComponentData.setYAttrID(attrID);
+                    }
                     break;
                 case 'legend':
                 default:
                     attrs.legendAttrID = attrID;
+                    if (graphComponentData) {
+                        graphComponentData.setLegendAttrID(attrID);
+                    }
                     break;
             }
             this.setState(this.createGraphData(this.props.dataSet, attrs));
