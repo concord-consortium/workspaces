@@ -280,7 +280,7 @@ export class Document {
               firebaseDocument.data.datasets = updatedDataSets
             }
 
-            const {attrs} = firebaseDocument.data.windows
+            const {attrs} = firebaseDocument.data.windows ? firebaseDocument.data.windows : {attrs:null}
             if (attrs) {
               Object.keys(attrs).forEach((windowId) => {
                 const windowAttrs = attrs[windowId]
