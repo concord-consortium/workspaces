@@ -241,7 +241,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                   const portalUser = this.userLookup.lookup(id)
                   const status = users[id].connected ? "" : " (disconnected)"
                   const className = users[id].connected ? "user" : "user disconnected"
-                  return <span className={className} title={`${portalUser ? portalUser.fullName : `Unknown User`}${status}`}>{portalUser ? portalUser.initials : "?"}</span>
+                  return <span key={id} className={className} title={`${portalUser ? portalUser.fullName : `Unknown User`}${status}`}>{portalUser ? portalUser.initials : "?"}</span>
                 })}
               </div>
             )
