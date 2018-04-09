@@ -449,9 +449,17 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   handleCreateDemoButton = () => {
+    // name the class so the fake "my classes" endpoint works
+    const demoId = uuidV4()
+    const {documentInfo} = this.state
+    if (documentInfo) {
+      const now = new Date()
+      const className = `${documentInfo.name}: ${now.toDateString()}`
+      firebase.database().ref("demo/classNames").child(demoId).set(className)
+    }
     const hashParams:AppHashParams = {
       template: this.props.document.getTemplateHashParam(),
-      demo: uuidV4()
+      demo: demoId
     }
     window.open(`#${queryString.stringify(hashParams)}`)
   }
@@ -909,7 +917,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
           {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
-          {showLearningLogButton ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Learning Log</button> : null}
+          {showLearningLogButton ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Artifacts List</button> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}><i className="icon icon-newspaper" /> Publish All</button> : null}
         </div>
       </div>
@@ -1127,11 +1135,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderLearningLog() {
-    const {portalTokens, portalUser} = this.props
-    if (!this.state.showLearningLog || !portalTokens || !portalUser) {
+    const {portalTokens, portalUser, portalOffering} = this.props
+    if (!this.state.showLearningLog || !portalTokens || !portalUser || !portalOffering) {
       return null
     }
-    return <LearningLogComponent portalTokens={portalTokens} portalUser={portalUser} onClose={this.handleToggleLearningLogButton} />
+    return <LearningLogComponent portalTokens={portalTokens} portalUser={portalUser} onClose={this.handleToggleLearningLogButton} portalOffering={portalOffering} />
   }
 
   render() {

@@ -256,7 +256,6 @@ exports.demoGetFakeClassInfo = functions.https.onRequest((request, response) => 
   });
 });
 
-
 exports.demoGetFakeOffering = functions.https.onRequest((request, response) => {
   cors(request, response, () => {
     getDemoUserFromBearerToken(request, response, (err, user) => {
@@ -269,6 +268,36 @@ exports.demoGetFakeOffering = functions.https.onRequest((request, response) => {
 
       response.json({
         clazz_info_url: `${demoInfo.rootUrl}demoGetFakeClassInfo?demo=${classHash}`
+      });
+    });
+  });
+});
+
+exports.demoGetFakeMyClasses = functions.https.onRequest((request, response) => {
+  cors(request, response, () => {
+    getDemoUserFromBearerToken(request, response, (err, user) => {
+      if (err) {
+        sendError(response, err, 403);
+        return;
+      }
+
+      return admin.database().ref('demo/classNames').once('value', (snapshot) => {
+        const classNames = snapshot.val() || {};
+        const classes = [];
+
+        console.log(classNames);
+
+        Object.keys(classNames).forEach((classHash) => {
+          classes.push({
+            uri: `${demoInfo.rootUrl}demoGetFakeClassInfo?demo=${classHash}`,
+            name: classNames[classHash],
+            class_hash: classHash
+          });
+        });
+
+        response.json({
+          classes: classes
+        });
       });
     });
   });
