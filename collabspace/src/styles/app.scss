@@ -1230,11 +1230,6 @@ a {
   }
 
   .right-buttons {
-    input[type=text] {
-      padding: 2px;
-      margin-right: 10px;
-      width: 300px;
-    }
   }
 
   .learning-log-workspace {
@@ -1264,9 +1259,24 @@ a {
       }
     }
 
+    .learning-log-filters {
+      margin: 5px 0 5px 20px;
+
+      select {
+        margin: 5px 10px 5px 0;
+        padding: 5px;
+      }
+
+      input[type=text] {
+        padding: 5px;
+        margin-right: 10px;
+        width: 200px;
+      }
+    }
+
     .learning-log-table {
       position: absolute;
-      top: 20px;
+      top: 50px;
       left: 20px;
       right: 20px;
 
@@ -1278,6 +1288,12 @@ a {
         th {
           text-align: left;
           padding: 0 15px;
+
+          span {
+            margin-left: 3px;
+            min-width: 20px;
+            display: inline-block;
+          }
         }
 
         tbody {

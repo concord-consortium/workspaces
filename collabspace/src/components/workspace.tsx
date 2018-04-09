@@ -917,7 +917,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
           {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
-          {showLearningLogButton ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Artifacts List</button> : null}
+          {showLearningLogButton ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Artifacts Archive</button> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}><i className="icon icon-newspaper" /> Publish All</button> : null}
         </div>
       </div>

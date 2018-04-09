@@ -10,6 +10,57 @@ import escapeFirebaseKey from "../lib/escape-firebase-key"
 
 const isDemo = require("../../functions/demo-info").demoInfo.isDemo
 
+export type SortTableBy =
+  "Class" |
+  "Activity" |
+  "Artifact" |
+  "Published By" |
+  "Group" |
+  "Group Members" |
+  "Visibility" |
+  "Published"
+export type SortTableDir = "" | "asc" | "desc"
+export const SortDirOrder:SortTableDir[] = ["desc", "asc", ""]
+
+export interface LearningLogHeaderComponentProps {
+  header: SortTableBy
+  sortBy: SortTableBy
+  sortDir: SortTableDir
+  handleToggle: (sortBy: SortTableBy) => void
+}
+
+export interface LearningLogHeaderComponentState {
+}
+
+export class LearningLogHeaderComponent extends React.Component<LearningLogHeaderComponentProps, LearningLogHeaderComponentState> {
+
+  constructor (props:LearningLogHeaderComponentProps) {
+    super(props);
+    this.state = {
+    }
+  }
+
+  handleToggle = () => {
+    this.props.handleToggle(this.props.header)
+  }
+
+  renderArrow() {
+    const {header, sortBy, sortDir} = this.props
+    if (header === sortBy) {
+      switch (sortDir) {
+        case "asc": return <span>▲</span>
+        case "desc": return <span>▼</span>
+      }
+    }
+    return <span> </span>
+  }
+
+  render() {
+    return <th onClick={this.handleToggle}>{this.props.header}{this.renderArrow()}</th>
+  }
+}
+
+
 export interface UserMap {
   [key: string]: PortalUser
 }
@@ -36,15 +87,18 @@ export interface LearningLogTableRow {
   classHash: string
   className: string
   creator: PortalUser
+  sortCreator: string
   group: number
   groupMembers: PortalUser[]
+  sortGroupMembers: string
   publishedAt: number
   artifactName: string
   artifactId: string
   artifact: FirebaseArtifact
-  documentName: string
-  documentId: string
+  offeringId: number,
+  offeringName: string,
   ownerId?: string
+  sortVisibility: number
   publication: FirebasePublication
 }
 
@@ -62,6 +116,12 @@ export interface LearningLogComponentState {
   users: UserMap,
   tableRows: LearningLogTableRow[]
   selectedRow: LearningLogTableRow|null
+  sortBy: SortTableBy
+  sortDir: SortTableDir
+  filterClass: string
+  filterActivity: string|number
+  filterArtifact: string
+  filterPublishedBy: string
 }
 
 export class LearningLogComponent extends React.Component<LearningLogComponentProps, LearningLogComponentState> {
@@ -75,7 +135,13 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
       classes: [],
       users: {},
       tableRows: [],
-      selectedRow: null
+      selectedRow: null,
+      sortBy: "Published",
+      sortDir: "desc",
+      filterClass: "all",
+      filterActivity: "all",
+      filterArtifact: "all",
+      filterPublishedBy: "all"
     }
   }
 
@@ -193,20 +259,24 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
                 const multipleArtifacts = artifactIds.length > 1
                 artifactIds.forEach((artifactId) => {
                   const artifact = window.artifacts[artifactId]
+                  const creator = this.lookupUser(publication.creator)
 
                   const tableRow:LearningLogTableRow = {
                     classHash: classData.info.classHash,
                     className: classData.info.name,
                     creator: this.lookupUser(publication.creator),
+                    sortCreator: creator.fullName.toLowerCase(),
                     group: publication.group,
                     groupMembers,
+                    sortGroupMembers: groupMembers.map((user) => user.initials).join(" "),
                     publishedAt: publication.createdAt as number,
                     artifact,
                     artifactName: multipleArtifacts ? `${window.title}: ${artifact.title}` : window.title,
                     artifactId: artifactId,
-                    documentName: offering.name,
-                    documentId: publication.documentId,
+                    offeringId: publication.offeringId,
+                    offeringName: offering.name,
                     ownerId: window.ownerId,
+                    sortVisibility: window.ownerId ? 1 : 0,
                     publication
                   }
                   tableRows.push(tableRow)
@@ -218,7 +288,47 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
       }
     })
 
-    tableRows.sort((a, b) => b.publishedAt - a.publishedAt)
+    this.handleSortTable(tableRows)
+  }
+
+  handleSortTable = (tableRows?: LearningLogTableRow[]) => {
+    const {sortBy, sortDir} = this.state
+
+    tableRows = tableRows || this.state.tableRows
+
+    tableRows.sort((a, b) => {
+      let sortResult = 0
+      switch (sortBy) {
+        case "Class":
+          sortResult = b.className.localeCompare(a.className)
+          break
+        case "Activity":
+          sortResult = b.offeringName.localeCompare(a.offeringName)
+          break
+        case "Artifact":
+          sortResult = b.artifactName.localeCompare(a.artifactName)
+          break
+        case "Published By":
+          sortResult = b.sortCreator.localeCompare(a.sortCreator)
+          break
+        case "Group":
+          sortResult = b.group - a.group
+          break
+        case "Group Members":
+          sortResult = b.sortGroupMembers.localeCompare(a.sortGroupMembers)
+          break
+        case "Visibility":
+          sortResult = b.sortVisibility - a.sortVisibility
+          break
+        case "Published":
+          sortResult = b.publishedAt - a.publishedAt
+          break
+      }
+      if (sortResult === 0) {
+        sortResult = b.publishedAt - a.publishedAt
+      }
+      return sortDir === "asc" ? -sortResult : sortResult
+    })
 
     this.setState({tableRows})
   }
@@ -244,8 +354,100 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
     this.setState({selectedRow})
   }
 
+  handleToggleSort = (newSortBy: SortTableBy) => {
+    const {sortBy, sortDir} = this.state
+    const newSortDir = SortDirOrder[(SortDirOrder.indexOf(sortDir) + 1) % SortDirOrder.length]
+    if (sortBy === newSortBy) {
+      if (newSortDir === "") {
+        this.setState({sortBy: "Published", sortDir: "desc"}, this.handleSortTable)
+      }
+      else {
+        this.setState({sortDir: newSortDir}, this.handleSortTable)
+      }
+    }
+    else {
+      this.setState({sortBy: newSortBy, sortDir: "desc"}, this.handleSortTable)
+    }
+  }
+
+  handleFilterClasses = (e:React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({filterClass: e.target.value})
+  }
+
+  handleFilterActivities = (e:React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({filterActivity: e.target.value})
+  }
+
+  handleFilterArtifacts = (e:React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({filterArtifact: e.target.value})
+  }
+
+  handleFilterPublisher = (e:React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({filterPublishedBy: e.target.value})
+  }
+
+  getUniqueOptions(callback: (tableRow:LearningLogTableRow, list:any[]) => undefined|{value: string|number, name: string}) {
+    const {tableRows} = this.state
+    const list:any[] = []
+    const options:JSX.Element[] = []
+    this.state.tableRows.forEach((tableRow) => {
+      const item = callback(tableRow, list)
+      if (item) {
+        list.push(item.value)
+        options.push(<option key={item.value} value={item.value}>{item.name}</option>)
+      }
+    })
+    return options
+  }
+
+  renderFilters() {
+    const {classes, users, loadingClasses} = this.state
+
+    if (loadingClasses) {
+      return null
+    }
+
+    const activityOptions = this.getUniqueOptions((row, list) => {
+      if (list.indexOf(row.offeringId) === -1) {
+        return {value: row.offeringId, name: row.offeringName}
+      }
+    })
+    const artifactOptions = this.getUniqueOptions((row, list) => {
+      if (list.indexOf(row.artifactName) === -1) {
+        return {value: row.artifactName, name: row.artifactName}
+      }
+    })
+    const publisherOptions = this.getUniqueOptions((row, list) => {
+      if (list.indexOf(row.creator.id) === -1) {
+        return {value: row.creator.id, name: row.creator.fullName}
+      }
+    })
+
+    return (
+      <div className="learning-log-filters">
+        <select onChange={this.handleFilterClasses}>
+          <option value="all">All Classes</option>
+          {classes.map((clazz) => <option key={clazz.info.classHash} value={clazz.info.classHash}>{clazz.info.name}</option>)}
+        </select>
+        <select onChange={this.handleFilterActivities}>
+          <option value="all">All Activities</option>
+          {activityOptions}
+        </select>
+        <select onChange={this.handleFilterArtifacts}>
+          <option value="all">All Artifacts</option>
+          {artifactOptions}
+        </select>
+        <select onChange={this.handleFilterPublisher}>
+          <option value="all">All Publishers</option>
+          {publisherOptions}
+        </select>
+        <input type="text" placeholder="Search ..." ref={(search) => this.search = search} onChange={this.handleSearch} />
+      </div>
+    )
+  }
+
   renderWorkspace() {
-    const {error, loadingClasses, tableRows, selectedRow} = this.state
+    const {error, loadingClasses, tableRows, selectedRow, sortBy, sortDir, filterClass, filterActivity, filterArtifact, filterPublishedBy} = this.state
     if (error) {
       return <div className="centered"><div className="error">{error.toString()}</div></div>
     }
@@ -255,10 +457,13 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
 
     const searchRegEx = this.search ? new RegExp(this.search.value.trim(), "i") : null
     const filteredRows = tableRows.filter((tableRow) => {
-      if (searchRegEx !== null) {
-        return searchRegEx.test(tableRow.className) || searchRegEx.test(tableRow.artifactName) || searchRegEx.test(tableRow.documentName) || searchRegEx.test(tableRow.creator.fullName)
-      }
-      return true
+      const classMatch = (filterClass === "all") || (tableRow.classHash == filterClass)
+      const activityMatch = (filterActivity === "all") || (tableRow.offeringId == filterActivity)
+      const artifactMatch = (filterArtifact === "all") || (tableRow.artifactName == filterArtifact)
+      const publishedByMatch = (filterPublishedBy === "all") || (tableRow.creator.id == filterPublishedBy)
+      const searchMatch = (searchRegEx === null) || searchRegEx.test(tableRow.className) || searchRegEx.test(tableRow.artifactName) || searchRegEx.test(tableRow.offeringName) || searchRegEx.test(tableRow.creator.fullName)
+      console.log(classMatch, activityMatch, artifactMatch, publishedByMatch, searchMatch)
+      return classMatch && activityMatch && artifactMatch && publishedByMatch && searchMatch
     })
 
     return (
@@ -266,14 +471,14 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
         <table>
           <thead>
             <tr>
-              <th>Class</th>
-              <th>Activity</th>
-              <th>Artifact</th>
-              <th>Publisher</th>
-              <th>Group</th>
-              <th>Group Members</th>
-              <th>Visibility</th>
-              <th>Published</th>
+              <LearningLogHeaderComponent header="Class" sortBy={sortBy} sortDir={sortDir} handleToggle={this.handleToggleSort} />
+              <LearningLogHeaderComponent header="Activity" sortBy={sortBy} sortDir={sortDir} handleToggle={this.handleToggleSort} />
+              <LearningLogHeaderComponent header="Artifact" sortBy={sortBy} sortDir={sortDir} handleToggle={this.handleToggleSort} />
+              <LearningLogHeaderComponent header="Published By" sortBy={sortBy} sortDir={sortDir} handleToggle={this.handleToggleSort} />
+              <LearningLogHeaderComponent header="Group" sortBy={sortBy} sortDir={sortDir} handleToggle={this.handleToggleSort} />
+              <LearningLogHeaderComponent header="Group Members" sortBy={sortBy} sortDir={sortDir} handleToggle={this.handleToggleSort} />
+              <LearningLogHeaderComponent header="Visibility" sortBy={sortBy} sortDir={sortDir} handleToggle={this.handleToggleSort} />
+              <LearningLogHeaderComponent header="Published" sortBy={sortBy} sortDir={sortDir} handleToggle={this.handleToggleSort} />
             </tr>
           </thead>
           <tbody>
@@ -288,11 +493,11 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
               return (
                 <tr key={tableRow.artifactId} onClick={() => this.handleSelectRow(tableRow)} className={classNames.join(" ")}>
                   <td>{tableRow.className}</td>
-                  <td>{tableRow.documentName}</td>
+                  <td>{tableRow.offeringName}</td>
                   <td>{tableRow.artifactName}</td>
                   <td><span className="initials" title={tableRow.creator.fullName}>{tableRow.creator.initials}</span></td>
                   <td>{tableRow.group}</td>
-                  <td>{tableRow.groupMembers.map((groupMember) => <span title={groupMember.fullName}>{groupMember.initials}</span>)}</td>
+                  <td>{tableRow.groupMembers.map((groupMember) => <span key={groupMember.id} title={groupMember.fullName}>{groupMember.initials}</span>)}</td>
                   <td>{tableRow.ownerId ? "Private" : "Public"}</td>
                   <td><LiveTimeAgoComponent timestamp={tableRow.publishedAt} /></td>
                 </tr>
@@ -338,15 +543,15 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
         <div className="toolbar">
           <div className="buttons">
             <div className="left-buttons">
-              <div className="learning-log-title">Artifacts List</div>
+              <div className="learning-log-title">Artifacts Archive</div>
             </div>
             <div className="right-buttons">
-              <input type="text" placeholder="Search ..." ref={(search) => this.search = search} onChange={this.handleSearch} />
-              <button type="button" onClick={this.handleHideLearningLogButton}><i className="icon icon-profile" /> Close Artifacts List</button>
+              <button type="button" onClick={this.handleHideLearningLogButton}><i className="icon icon-profile" /> Close Artifacts Archive</button>
             </div>
           </div>
         </div>
         <div className="learning-log-workspace">
+          {this.renderFilters()}
           {this.renderWorkspace()}
           {this.renderSelectedRow()}
         </div>
