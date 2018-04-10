@@ -515,6 +515,12 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
       return null
     }
 
+    /*
+                  <button onClick={() => alert("TODO: implement button action")}>Copy Into Current Document</button>
+              <button onClick={() => alert("TODO: implement button action")}>View In Original Document</button>
+
+    */
+
     return (
       <div className="learning-log-selected-row">
         <div className="learning-log-selected-row-background" />
@@ -527,8 +533,6 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
               <img src={selectedRow.artifact.url} />
             </div>
             <div className="learning-log-selected-row-modal-buttons">
-              <button onClick={() => alert("TODO: implement button action")}>Copy Into Current Document</button>
-              <button onClick={() => alert("TODO: implement button action")}>View In Original Document</button>
               <button onClick={() => this.handleSelectRow(null)}>Cancel</button>
             </div>
           </div>
