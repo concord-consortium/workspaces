@@ -137,6 +137,9 @@ export class WindowManager {
         this.lastAttrsQuery = this.attrsRef.limitToLast(1)
         this.lastAttrsQuery.on("child_added", this.handleAttrsRefChildAdded)
 
+        // listen to windows being removed (for private windows)
+        this.lastAttrsQuery.on("child_removed", this.handleAttrsRefChildRemoved)
+
         // just get the initial order
         this.orderRef.once("value", this.handleOrderRef)
         this.minimizedOrderRef.once("value", this.handleMinimizedOrderRef)
@@ -197,6 +200,13 @@ export class WindowManager {
       if (this.nonPrivateWindow({window})) {
         this.moveToTop(window)
       }
+    }
+  }
+
+  handleAttrsRefChildRemoved = (snapshot:firebase.database.DataSnapshot) => {
+    const window = snapshot.key ? this.windows[snapshot.key] : null
+    if (window) {
+      this.close(window)
     }
   }
 
