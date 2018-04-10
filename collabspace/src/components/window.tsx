@@ -156,6 +156,10 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     this.props.copyWindow(this.props.window)
   }
 
+  canClose() {
+    return this.props.isTemplate || !!this.props.window.attrs.ownerId
+  }
+
   renderIframeOverlay() {
     if (this.props.isTopWindow) {
       return null
@@ -168,7 +172,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       <div className="buttons" ref="buttons">
         <span onClick={this.handleMinimize} title="Minimize Window">-</span>
         <span onClick={this.handleMaximize} title={this.props.window.attrs.maximized ? "Unmaximize Window" : "Maximize Window"}>+</span>
-        {this.props.isTemplate ? <span onClick={this.handleClose} title="Close Window">x</span> : null}
+        {this.canClose() ? <span onClick={this.handleClose} title="Close Window">x</span> : null}
       </div>
     )
   }
@@ -199,7 +203,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     let windowStyle:any = maximized
       ? {top: 0, right: 0, bottom: 0, left: 0, zIndex: this.props.zIndex}
       : {top: attrs.top, width: attrs.width, left: attrs.left, height: attrs.height, zIndex: this.props.zIndex}
-    const titleWidth = attrs.width - (this.props.isTemplate ? 65 : 55)
+    const titleWidth = attrs.width - (this.canClose() ? 65 : 55)
     const privateWindow = !!attrs.ownerId
 
     if (minimized) {
