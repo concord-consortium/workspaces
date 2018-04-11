@@ -45,6 +45,7 @@ export interface IFrame {
   window: Window
   element: HTMLIFrameElement
   connected: boolean
+  inited: boolean
   phone: IFramePhoneParent
   dataRef: firebase.database.Reference
 }

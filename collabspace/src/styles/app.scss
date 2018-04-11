@@ -1229,9 +1229,6 @@ a {
     margin-top: 5px;
   }
 
-  .right-buttons {
-  }
-
   .learning-log-workspace {
     position: fixed;
     top: $header-height + $toolbar-height;
@@ -1392,6 +1389,26 @@ a {
   }
 }
 
+.progress-message-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  user-select: none;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .progress-message {
+    padding: 10px;
+    border: 1px solid #777;
+    background-color: #fff;
+    color: #000;
+  }
+}
+
 /* icons */
 
 @font-face {
@@ -1439,4 +1456,7 @@ a {
 }
 .icon-profile:before {
   content: "\e923";
+}
+.icon-camera:before {
+  content: "\e90f";
 }

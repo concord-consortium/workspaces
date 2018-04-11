@@ -49,6 +49,9 @@ export const WorkspaceClientInitResponseMessage = "WorkspaceClientInitResponse"
 export const WorkspaceClientPublishRequestMessage = "WorkspaceClientPublishRequest"
 export const WorkspaceClientPublishResponseMessage = "WorkspaceClientPublishResponse"
 
+export const WorkspaceClientSnapshotRequestMessage = "WorkspaceClientSnapshotRequest"
+export const WorkspaceClientSnapshotResponseMessage = "WorkspaceClientSnapshotResponse"
+
 export type WorkspaceClientInitRequest = WorkspaceClientCollabSpaceInitRequest | WorkspaceClientStandaloneInitRequest
 
 export interface WorkspaceClientCollabSpaceInitRequest {
@@ -85,9 +88,19 @@ export interface WorkspaceClientPublishRequest {
 export interface WorkspaceClientPublishResponse {
 }
 
+export interface WorkspaceClientSnapshotRequest {
+  snapshotPath: string
+}
+
+export interface WorkspaceClientSnapshotResponse {
+  snapshotUrl: string
+}
+
+
 export interface WorkspaceClientConfig {
   init(req: WorkspaceClientInitRequest): WorkspaceClientInitResponse|Promise<WorkspaceClientInitResponse>
   publish?(publication: WorkspaceClientPublication): WorkspaceClientPublishResponse|Promise<WorkspaceClientPublishResponse>
+  snapshot?(snapshot: WorkspaceClientSnapshot): WorkspaceClientSnapshotResponse|Promise<WorkspaceClientSnapshotResponse>
 }
 
 export class WorkspaceClient {
@@ -107,6 +120,7 @@ export class WorkspaceClient {
     this.phone = IFramePhoneFactory.getIFrameEndpoint()
     this.phone.addListener(WorkspaceClientInitRequestMessage, this.handleClientInit)
     this.phone.addListener(WorkspaceClientPublishRequestMessage, this.handleClientPublish)
+    this.phone.addListener(WorkspaceClientSnapshotRequestMessage, this.handleClientSnapshot)
     this.phone.initialize()
   }
 
@@ -133,11 +147,21 @@ export class WorkspaceClient {
   }
 
   handleClientPublish = (req:WorkspaceClientPublishRequest) => {
-    const publication = new WorkspaceClientPublication(this, req)
     if (this.config.publish) {
+      const publication = new WorkspaceClientPublication(this, req)
       const resp = this.config.publish(publication)
       Promise.resolve(resp).then((resp) => {
         this.phone.post(WorkspaceClientPublishResponseMessage, resp)
+      })
+    }
+  }
+
+  handleClientSnapshot = (req: WorkspaceClientSnapshotRequest) => {
+    if (this.config.snapshot) {
+      const snapshot = new WorkspaceClientSnapshot(this, req)
+      const resp = this.config.snapshot(snapshot)
+      Promise.resolve(resp).then((resp) => {
+        this.phone.post(WorkspaceClientSnapshotResponseMessage, resp)
       })
     }
   }
@@ -294,3 +318,49 @@ export class WorkspaceClientPublication {
     return this.saveArtifactBlob(options, blobId)
   }
 }
+
+export class WorkspaceClientSnapshot {
+  snapshotsPath: string
+
+  constructor (client: WorkspaceClient, req:WorkspaceClientSnapshotRequest) {
+    this.snapshotsPath = req.snapshotPath
+  }
+
+  fromElement(element: HTMLElement|null) {
+    return new Promise<WorkspaceClientSnapshotResponse>((resolve, reject) => {
+      if (!element) {
+        return reject("Nothing to snapshot!")
+      }
+
+      return html2canvas(element)
+        .then((canvas: HTMLCanvasElement) => {
+          return this.fromCanvas(canvas)
+            .then(resolve)
+            .catch(reject)
+        })
+        .catch(reject)
+    })
+  }
+
+  fromCanvas(canvas: HTMLCanvasElement) {
+    return new Promise<WorkspaceClientSnapshotResponse>((resolve, reject) => {
+      const blobSaver = (blob:Blob) => {
+        const blobStorageRef = firebase.storage().ref(this.snapshotsPath)
+        blobStorageRef
+          .put(blob, {contentType: "image/png"})
+          .then((snapshot) => blobStorageRef.getDownloadURL())
+          .then((snapshotUrl) => {
+            resolve({snapshotUrl})
+          })
+          .catch(reject)
+      }
+      try {
+        canvas.toBlob(blobSaver, "image/png");
+      }
+      catch (err) {
+        reject(err)
+      }
+    })
+  }
+}
+

@@ -50,10 +50,12 @@ export interface WindowComponentProps {
   isReadonly: boolean
   publishWindow: (window:Window|null) => void
   copyWindow: (window:Window) => void
+  snapshotWindow: (window:Window) => void
 }
 export interface WindowComponentState {
   editingTitle: boolean
   attrs: FirebaseWindowAttrs
+  canSnapshot: boolean
 }
 
 export class WindowComponent extends React.Component<WindowComponentProps, WindowComponentState> {
@@ -61,7 +63,8 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     super(props)
     this.state = {
       editingTitle: false,
-      attrs: props.window.attrs
+      attrs: props.window.attrs,
+      canSnapshot: false
     }
   }
 
@@ -145,7 +148,10 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   }
 
   handleIframeLoaded = (iframe:HTMLIFrameElement) => {
-    this.props.windowManager.windowLoaded(this.props.window, iframe)
+    const {window} = this.props
+    this.props.windowManager.windowLoaded(window, iframe, () => {
+      this.setState({canSnapshot: window.iframe.inited})
+    })
   }
 
   handlePublishWindow = () => {
@@ -154,6 +160,10 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
 
   handleCopyWindow = () => {
     this.props.copyWindow(this.props.window)
+  }
+
+  handleSnapshotWindow = () => {
+    this.props.snapshotWindow(this.props.window)
   }
 
   canClose() {
@@ -190,6 +200,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         <div className="sidebar-menu-inner">
           <i className="icon icon-newspaper" title="Publish Window" onClick={this.handlePublishWindow} />
           <i className="icon icon-copy" title="Copy Window" onClick={this.handleCopyWindow} />
+          {this.state.canSnapshot ? <i className="icon icon-camera" title="Take Snapshot" onClick={this.handleSnapshotWindow} /> : null}
         </div>
       </div>
     )

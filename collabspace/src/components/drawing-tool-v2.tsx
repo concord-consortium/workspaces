@@ -1,6 +1,6 @@
 import * as React from "react"
 import { DrawingView } from "../../../drawing/src/components/drawing-view"
-import { WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
+import { WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth, WorkspaceClientSnapshotResponse } from "../../../shared/workspace-client"
 import * as firebase from "firebase"
 import * as queryString from "query-string"
 
@@ -69,6 +69,23 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
                 .then((artifact) => resolve({}))
                 .catch(reject)
               }, "image/png")
+            }
+          }
+          this.setState({captureScreenCallback})
+        })
+      },
+
+      snapshot: (snapshot) => {
+        return new Promise<WorkspaceClientSnapshotResponse>((resolve, reject) => {
+          const captureScreenCallback = (err:any, canvas:HTMLCanvasElement) => {
+            this.setState({captureScreenCallback: null})
+            if (err) {
+              reject(err)
+            }
+            else {
+              snapshot.fromCanvas(canvas)
+                .then(resolve)
+                .catch(reject)
             }
           }
           this.setState({captureScreenCallback})

@@ -87,6 +87,10 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
             .catch(reject)
           }, "image/png")
         })
+      },
+
+      snapshot: (snapshot) => {
+        return snapshot.fromElement(this.drawingTool.canvas.getElement())
       }
     })
   }
