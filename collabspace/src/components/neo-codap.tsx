@@ -84,6 +84,10 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
               .catch(reject)
             })
         })
+      },
+
+      snapshot: (snapshot) => {
+        return snapshot.fromElement(this.appDOMNodeRef)
       }
     })
   }

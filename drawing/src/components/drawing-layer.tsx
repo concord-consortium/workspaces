@@ -98,6 +98,7 @@ export interface DrawingLayerViewState {
   svgWidth: number|string
   svgHeight: number|string
   imageDataUriCache: ImageDataUriMap
+  backgroundImageData: string|null
 }
 
 export interface BoundingBox {
@@ -1257,7 +1258,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       hoverObject: null,
       svgWidth: "100%",
       svgHeight: "100%",
-      imageDataUriCache: {}
+      imageDataUriCache: {},
+      backgroundImageData: null
     }
 
     this.commandManager = new CommandManager(this)
@@ -1277,6 +1279,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
     this.objects = {}
     this.addListeners()
+
+    this.loadBackgroundImageData(this.props.backgroundUrl)
   }
 
   componentWillMount() {
@@ -1290,6 +1294,24 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   emitSelectedObjects(selectedObjects: DrawingObject[]) {
     this.props.events.emit(Events.ObjectsSelected, selectedObjects)
+  }
+
+  loadBackgroundImageData(url: string|null) {
+    if (url) {
+      const img = new Image()
+      img.addEventListener("load", () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        const context = canvas.getContext('2d')
+        if (context) {
+          context.drawImage(img, 0, 0);
+          this.setState({backgroundImageData: canvas.toDataURL('image/png')})
+        }
+      })
+      img.crossOrigin="anonymous"
+      img.src = url
+    }
   }
 
   updateImageDataUriCache(imageSetItems:ImageSetItem[]) {
@@ -1613,11 +1635,11 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   }
 
   renderBackgroundUrl() {
-    const {backgroundUrl} = this.props
-    if (!backgroundUrl) {
+    const {backgroundImageData} = this.state
+    if (!backgroundImageData) {
       return null
     }
-    return <img src={backgroundUrl} className="background-image" />
+    return <img src={backgroundImageData} className="background-image" />
   }
 
   render() {

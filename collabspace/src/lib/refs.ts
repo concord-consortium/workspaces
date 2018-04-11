@@ -108,3 +108,9 @@ export const getUploadsStoragePath = (offering:PortalOffering|null, uploadId?:st
   const prefix = offering ? `${getClassPath(offering)}/uploads` : 'uploads'
   return uploadId ? `${prefix}/${uploadId}` : prefix
 }
+
+export const getSnapshotStoragePath = (offering:PortalOffering, id?:string) => {
+  const prefix = `snapshots/${getOfferingPath(offering)}`
+  return id ? `${prefix}/${id}` : prefix
+}
+

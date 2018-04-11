@@ -14,7 +14,7 @@ import { v4 as uuidV4} from "uuid"
 import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
-import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath } from "../lib/refs"
+import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
 import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
@@ -61,11 +61,12 @@ export interface WorkspaceComponentState extends WindowManagerState {
   supportsSeen: FirebaseSupportSeenUsersSupportMap|null
   showSupportsDropdown: boolean
   visibleSupportIds: string[]
-  showModal: "copy"|"add-drawing"|"add-table"|"add-graph"|null
+  showModal: "copy"|"add-drawing"|"add-table"|"add-graph"|"add-snapshot"|null
   onModalOk: ((title: string, ownerId?:string|null) => void) |null
   copyWindow: Window|null
   showUploadImageDialog: boolean
   showLearningLog: boolean
+  progressMessage: string|null
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -103,7 +104,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       onModalOk: null,
       copyWindow: null,
       showUploadImageDialog: false,
-      showLearningLog: false
+      showLearningLog: false,
+      progressMessage: null
     }
   }
 
@@ -613,6 +615,38 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       .catch(donePublishing)
   }
 
+  handleSnapshot = (window:Window) => {
+    const {portalOffering} = this.props
+    if (!portalOffering) {
+      return
+    }
+
+    this.setState({progressMessage: "Taking snapshot..."})
+
+    const snapshotId = uuidV4()
+    const snapshotsPath = getSnapshotStoragePath(portalOffering, snapshotId)
+
+    this.windowManager.snapshotWindow(window, snapshotsPath)
+      .then((snapshotUrl) => {
+        this.setState({
+          progressMessage: null,
+          showModal: "add-snapshot",
+          onModalOk: (title: string, ownerId?: string) => {
+            this.windowManager.add({
+              url: this.constructRelativeUrl(`drawing-tool-v2.html?backgroundUrl=${encodeURIComponent(snapshotUrl)}`),
+              title,
+              ownerId,
+              log: {name: "Added snapshot drawing window", params: this.getAddWindowLogParams({ownerId})}
+            })
+          }
+        })
+      })
+      .catch((err:any) => {
+        alert(err.toString())
+        this.setState({progressMessage: null})
+      })
+  }
+
   handlePromptToChangeGroup = () => {
     if (this.props.leaveGroup && confirm("Do you want to change your group?")) {
       this.props.leaveGroup()
@@ -948,6 +982,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                isReadonly={this.props.document.isReadonly}
                publishWindow={this.handlePublish}
                copyWindow={this.handleCopy}
+               snapshotWindow={this.handleSnapshot}
              />
     })
   }
@@ -1073,6 +1108,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         okButton = "Add"
         enableVisibiltyOptions = false
         break
+      case "add-snapshot":
+        title = "Untitled Snapshot"
+        titlebar = "Add Snapshot"
+        okButton = "Add"
+        break
     }
 
     let visibilityGroup:JSX.Element|null = null
@@ -1142,6 +1182,20 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return <LearningLogComponent portalTokens={portalTokens} portalUser={portalUser} onClose={this.handleToggleLearningLogButton} portalOffering={portalOffering} />
   }
 
+  renderProgressMessage() {
+    const {progressMessage} = this.state
+    if (progressMessage === null) {
+      return null
+    }
+    return (
+      <div className="progress-message-container">
+        <div className="progress-message">
+          <div className="progress">{progressMessage}</div>
+        </div>
+      </div>
+    )
+  }
+
   render() {
     return (
       <div className="workspace" onDrop={this.handleDrop} onDragOver={this.handleDragOver}>
@@ -1154,6 +1208,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderModal()}
         {this.renderUploadImageDialog()}
         {this.renderLearningLog()}
+        {this.renderProgressMessage()}
         {this.renderReadonlyBlocker()}
       </div>
     )

@@ -10,7 +10,11 @@ import { IFramePhoneLib,
   WorkspaceClientInitRequestMessage,
   WorkspaceClientInitResponseMessage,
   WorkspaceClientInitRequest,
-  WorkspaceClientInitResponse
+  WorkspaceClientInitResponse,
+  WorkspaceClientSnapshotRequestMessage,
+  WorkspaceClientSnapshotResponseMessage,
+  WorkspaceClientSnapshotRequest,
+  WorkspaceClientSnapshotResponse
  } from "../../../shared/workspace-client"
 
  const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
@@ -138,7 +142,7 @@ export class WindowManager {
         this.lastAttrsQuery.on("child_added", this.handleAttrsRefChildAdded)
 
         // listen to windows being removed (for private windows)
-        this.lastAttrsQuery.on("child_removed", this.handleAttrsRefChildRemoved)
+        this.attrsRef.on("child_removed", this.handleAttrsRefChildRemoved)
 
         // just get the initial order
         this.orderRef.once("value", this.handleOrderRef)
@@ -497,11 +501,12 @@ export class WindowManager {
     window.setAttrs(attrs, true)
   }
 
-  windowLoaded(window:Window, element:HTMLIFrameElement) {
+  windowLoaded(window:Window, element:HTMLIFrameElement, callback: () => void) {
     window.iframe = {
       window: window,
       element,
       connected: false,
+      inited: false,
       dataRef: this.document.getWindowsDataRef("iframeData").child(window.id),
       phone: IFramePhoneFactory.ParentEndpoint(element, () => {
         window.iframe.connected = true
@@ -521,7 +526,8 @@ export class WindowManager {
           tokens: this.tokens
         }
         window.iframe.phone.addListener(WorkspaceClientInitResponseMessage, (resp:WorkspaceClientInitResponse) => {
-          // TODO
+          window.iframe.inited = true
+          callback()
         })
         window.iframe.phone.post(WorkspaceClientInitRequestMessage, initRequest)
       })
@@ -637,6 +643,30 @@ export class WindowManager {
           }
         })
         .catch(reject)
+    })
+  }
+
+  snapshotWindow(window: Window, snapshotPath: string) {
+    return new Promise<string>((resolve, reject) => {
+      if (!window.iframe.inited) {
+        return reject("Window does not respond to snapshot requests")
+      }
+
+      const responseTimeout = setTimeout(() => {
+        reject("Window did not respond to snapshot request")
+      }, 5000)
+
+      const {phone} = window.iframe
+      const handleSnapshotResponse = (response: WorkspaceClientSnapshotResponse) => {
+        clearTimeout(responseTimeout)
+        resolve(response.snapshotUrl)
+        phone.removeListener(WorkspaceClientSnapshotResponseMessage)
+      }
+
+      phone.addListener(WorkspaceClientSnapshotResponseMessage, handleSnapshotResponse)
+
+      const request:WorkspaceClientSnapshotRequest = {snapshotPath}
+      phone.post(WorkspaceClientSnapshotRequestMessage, request)
     })
   }
 }
