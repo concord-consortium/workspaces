@@ -57,7 +57,6 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
           this.captureScreen()
             .then((canvas) => {
-              debugger
               publication.saveArtifact({title: "Drawing", canvas})
                 .then((artifact) => resolve({}))
                 .catch(reject)

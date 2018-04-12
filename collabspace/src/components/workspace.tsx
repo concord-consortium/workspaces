@@ -629,8 +629,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                 }
               })
 
-              debugger
-
               Promise.all(annotationImagePromises)
                 .then((annotationImages) => {
                   windowIdsToPublish.forEach((windowId, index) => {
