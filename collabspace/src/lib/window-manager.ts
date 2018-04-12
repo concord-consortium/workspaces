@@ -36,6 +36,7 @@ export interface AddWindowParams {
   title: string
   ownerId?: string
   iframeData?: any
+  annotations?: any
   dataSet?: FirebaseWindowDataSet
   createNewDataSet?: boolean
   log?: AddWindowLogParams
@@ -361,7 +362,7 @@ export class WindowManager {
 
   add(params:AddWindowParams) {
     //url: string, title:string, ownerId: string, iframeData?:any, dataSet?:FirebaseWindowDataSet) {
-    const {url, title, ownerId, iframeData, dataSet, createNewDataSet} = params
+    const {url, title, ownerId, iframeData, annotations, dataSet, createNewDataSet} = params
     const attrs:FirebaseWindowAttrs = {
       top: this.randInRange(50, 200),
       left: this.randInRange(50, 200),
@@ -394,7 +395,7 @@ export class WindowManager {
         attrs.dataSet = newDataSet
       }
     }
-    Window.CreateInFirebase({document: this.document, attrs}, iframeData)
+    Window.CreateInFirebase({document: this.document, attrs}, iframeData, annotations)
       .then((window) => {
         if (createNewDataSet && dataSetCreatorRef) {
           dataSetCreatorRef.set(window.id)
@@ -534,6 +535,10 @@ export class WindowManager {
     }
   }
 
+  getWindow(windowId:string) {
+    return this.windows[windowId]
+  }
+
   postToWindow(window:Window, message:string, request:object) {
     if (window.iframe && window.iframe.connected) {
       window.iframe.phone.post(message, request)
@@ -572,6 +577,7 @@ export class WindowManager {
           const windows:FirebaseWindows|null = snapshot.val()
           const firebaseWindow = windows && windows.attrs[window.id]
           const iframeData = windows && windows.iframeData && windows.iframeData[window.id] ? windows.iframeData[window.id] : undefined
+          const annotations = windows && windows.annotations && windows.annotations[window.id] ? windows.annotations[window.id] : undefined
           if (!firebaseWindow) {
             return reject("Cannot find window in document")
           }
@@ -582,7 +588,7 @@ export class WindowManager {
               copiedFrom: window.id
             }
           }
-          const addWindowParams:AddWindowParams = {url, title, iframeData, dataSet, log: logParams}
+          const addWindowParams:AddWindowParams = {url, title, iframeData, annotations, dataSet, log: logParams}
           if (ownerId) {
             addWindowParams.ownerId = ownerId
           }
@@ -604,6 +610,7 @@ export class WindowManager {
           const windows:FirebaseWindows|null = snapshot.val()
           const attrs = windows && windows.attrs && windows.attrs[windowId] ? windows.attrs[windowId] : null
           const iframeData = windows && windows.iframeData && windows.iframeData[windowId] ? windows.iframeData[windowId] : undefined
+          const annotations = windows && windows.annotations && windows.annotations[windowId] ? windows.annotations[windowId] : undefined
 
           if (!attrs) {
             return reject("Cannot find window in publication!")
@@ -617,7 +624,7 @@ export class WindowManager {
                   copiedFrom: windowId
                 }
               }
-              this.add({url, title, iframeData, dataSet, log: logParams})
+              this.add({url, title, iframeData, annotations, dataSet, log: logParams})
               resolve()
             }
             if (dataSet) {
@@ -646,7 +653,7 @@ export class WindowManager {
     })
   }
 
-  snapshotWindow(window: Window, snapshotPath: string) {
+  snapshotWindow(window: Window, snapshotPath: string, annotationImageDataUrl: string|null) {
     return new Promise<string>((resolve, reject) => {
       if (!window.iframe.inited) {
         return reject("Window does not respond to snapshot requests")
@@ -665,7 +672,7 @@ export class WindowManager {
 
       phone.addListener(WorkspaceClientSnapshotResponseMessage, handleSnapshotResponse)
 
-      const request:WorkspaceClientSnapshotRequest = {snapshotPath}
+      const request:WorkspaceClientSnapshotRequest = {snapshotPath, annotationImageDataUrl}
       phone.post(WorkspaceClientSnapshotRequestMessage, request)
     })
   }

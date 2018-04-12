@@ -4,8 +4,8 @@ import * as queryString from "query-string"
 import * as superagent from "superagent"
 
 import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap, FirebaseDocument } from "../lib/document"
-import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap } from "../lib/window"
-import { WindowComponent } from "./window"
+import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap, FirebaseAnnotationMap } from "../lib/window"
+import { WindowComponent, CaptureAnnotationCallbackMap } from "./window"
 import { MinimizedWindowComponent } from "./minimized-window"
 import { InlineEditorComponent } from "./inline-editor"
 import { SidebarComponent } from "./sidebar"
@@ -67,6 +67,7 @@ export interface WorkspaceComponentState extends WindowManagerState {
   showUploadImageDialog: boolean
   showLearningLog: boolean
   progressMessage: string|null
+  captureAnnotationsCallbacks: CaptureAnnotationCallbackMap
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -105,7 +106,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       copyWindow: null,
       showUploadImageDialog: false,
       showLearningLog: false,
-      progressMessage: null
+      progressMessage: null,
+      captureAnnotationsCallbacks: {}
     }
   }
 
@@ -485,6 +487,26 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleFilterCurrentUserAnnotations(firebaseDocument:FirebaseDocument, userId:string) {
+    if (firebaseDocument.data && firebaseDocument.data.windows && firebaseDocument.data.windows.annotations) {
+      const annotationsWindowMap = firebaseDocument.data.windows.annotations
+      Object.keys(annotationsWindowMap).forEach((windowId) => {
+        const annotations = annotationsWindowMap[windowId]
+        if (annotations) {
+          const filteredAnnotations:FirebaseAnnotationMap = {}
+          Object.keys(annotations).forEach((id) => {
+            const annotation = annotations[id]
+            if (!annotation.userId || (annotation.userId === userId)) {
+              annotation.userId = null
+              filteredAnnotations[id] = annotation
+            }
+          })
+          annotationsWindowMap[windowId] = filteredAnnotations
+        }
+      })
+    }
+  }
+
   handleCopy = (copyWindow:Window) => {
     this.setState({
       showModal: "copy",
@@ -519,8 +541,16 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
     this.setState({publishing: true})
 
+    const filterDocument = (firebaseDocument:FirebaseDocument) => {
+      const {portalUser} = this.props
+      this.handleSyncLocalWindowState(firebaseDocument)
+      if (portalUser) {
+        this.handleFilterCurrentUserAnnotations(firebaseDocument, portalUser.id)
+      }
+    }
+
     // copy the doc with local window state
-    this.props.document.copy(getDocumentPath(portalOffering), this.handleSyncLocalWindowState)
+    this.props.document.copy(getDocumentPath(portalOffering), filterDocument)
       .then((document) => {
 
         // open the doc to get the windows
@@ -560,6 +590,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                 if (attrs.ownerId) {
                   windows[windowId].ownerId = attrs.ownerId
                 }
+                if (windowIdsToPublish.indexOf(windowId) === -1) {
+                  windowIdsToPublish.push(windowId)
+                }
               }
             })
 
@@ -582,22 +615,31 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
               // and finally tell all the child windows so they can generate artifacts
               const publishRequest:WorkspaceClientPublishRequest = {
                 publicationsPath: getPublicationsPath(portalOffering, publicationId),
-                artifactStoragePath: getArtifactsStoragePath(portalOffering, publicationId)
+                artifactStoragePath: getArtifactsStoragePath(portalOffering, publicationId),
+                annotationImageDataUrl: null
               }
 
-              if (publishWindow) {
-                this.windowManager.postToWindowIds(
-                  windowIdsToPublish,
-                  WorkspaceClientPublishRequestMessage,
-                  publishRequest
-                )
-              }
-              else {
-                this.windowManager.postToAllWindows(
-                  WorkspaceClientPublishRequestMessage,
-                  publishRequest
-                )
-              }
+              const windowsToPublish:Window[] = []
+              const annotationImagePromises:Promise<string|null>[] = []
+              windowIdsToPublish.forEach((windowId) => {
+                const window = this.windowManager.getWindow(windowId)
+                if (window) {
+                  windowsToPublish.push(window)
+                  annotationImagePromises.push(this.captureAnnotationImage(window))
+                }
+              })
+
+              Promise.all(annotationImagePromises)
+                .then((annotationImages) => {
+                  windowIdsToPublish.forEach((windowId, index) => {
+                    const windowPublishRequest = merge({}, publishRequest, {annotationImageDataUrl: annotationImages[index]})
+                    this.windowManager.postToWindow(
+                      windowsToPublish[index],
+                      WorkspaceClientPublishRequestMessage,
+                      windowPublishRequest
+                    )
+                  })
+                })
             }
 
             if (this.props.logManager) {
@@ -623,28 +665,43 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
     this.setState({progressMessage: "Taking snapshot..."})
 
-    const snapshotId = uuidV4()
-    const snapshotsPath = getSnapshotStoragePath(portalOffering, snapshotId)
+    this.captureAnnotationImage(window)
+      .then((annotationImageDataUrl) => {
+        const snapshotId = uuidV4()
+        const snapshotsPath = getSnapshotStoragePath(portalOffering, snapshotId)
 
-    this.windowManager.snapshotWindow(window, snapshotsPath)
-      .then((snapshotUrl) => {
-        this.setState({
-          progressMessage: null,
-          showModal: "add-snapshot",
-          onModalOk: (title: string, ownerId?: string) => {
-            this.windowManager.add({
-              url: this.constructRelativeUrl(`drawing-tool-v2.html?backgroundUrl=${encodeURIComponent(snapshotUrl)}`),
-              title,
-              ownerId,
-              log: {name: "Added snapshot drawing window", params: this.getAddWindowLogParams({ownerId})}
+        this.windowManager.snapshotWindow(window, snapshotsPath, annotationImageDataUrl)
+          .then((snapshotUrl) => {
+            this.setState({
+              progressMessage: null,
+              showModal: "add-snapshot",
+              onModalOk: (title: string, ownerId?: string) => {
+                this.windowManager.add({
+                  url: this.constructRelativeUrl(`drawing-tool-v2.html?backgroundUrl=${encodeURIComponent(snapshotUrl)}`),
+                  title,
+                  ownerId,
+                  log: {name: "Added snapshot drawing window", params: this.getAddWindowLogParams({ownerId})}
+                })
+              }
             })
-          }
-        })
+          })
+          .catch((err:any) => {
+            alert(err.toString())
+            this.setState({progressMessage: null})
+          })
       })
-      .catch((err:any) => {
-        alert(err.toString())
-        this.setState({progressMessage: null})
-      })
+  }
+
+  captureAnnotationImage(window: Window) {
+    return new Promise<string|null>((resolve, reject) => {
+      const {captureAnnotationsCallbacks} = this.state
+      captureAnnotationsCallbacks[window.id] = (err, imageDataUrl) => {
+        delete captureAnnotationsCallbacks[window.id]
+        this.setState({captureAnnotationsCallbacks})
+        resolve(err ? null : imageDataUrl)
+      }
+      this.setState({captureAnnotationsCallbacks})
+    })
   }
 
   handlePromptToChangeGroup = () => {
@@ -967,7 +1024,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderAllWindows() {
-    const {allOrderedWindows, topWindow} = this.state
+    const {allOrderedWindows, topWindow, captureAnnotationsCallbacks} = this.state
+    const {document, isTemplate, portalUser} = this.props
     const userId = this.userId()
     const nonPrivateWindows = allOrderedWindows.filter((orderedWindow: OrderedWindow) => this.nonPrivateWindow({window: orderedWindow.window}))
     return nonPrivateWindows.map((orderedWindow) => {
@@ -978,11 +1036,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                isTopWindow={window === topWindow}
                zIndex={orderedWindow.order}
                windowManager={this.windowManager}
-               isTemplate={this.props.isTemplate}
-               isReadonly={this.props.document.isReadonly}
+               isTemplate={isTemplate}
+               isReadonly={document.isReadonly}
                publishWindow={this.handlePublish}
                copyWindow={this.handleCopy}
                snapshotWindow={this.handleSnapshot}
+               annotationsRef={document.getWindowsDataRef("annotations").child(window.id)}
+               portalUser={portalUser}
+               captureAnnotationsCallback={captureAnnotationsCallbacks[window.id]}
              />
     })
   }
