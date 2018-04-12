@@ -625,6 +625,15 @@ a {
           }
         }
 
+        .annotations {
+          position: absolute;
+          top: $titlebar-height;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          overflow: hidden;
+        }
+
         .iframe-overlay {
           cursor: pointer;
           opacity: 0;
@@ -692,11 +701,29 @@ a {
           font-size: 18px;
 
           .sidebar-menu-inner {
-            margin: 10px;
 
             .icon {
               display: block;
-              margin-top: 10px;
+              padding: 10px;
+            }
+
+            .annotation-tool-selected {
+              color: #f00;
+            }
+            .annotation-tool-disabled {
+              color: #aaa;
+            }
+
+
+            .annotation-tools {
+              border-top: 1px solid #fff;
+              border-bottom: 1px solid #fff;
+              padding: 0 0 5px 0;
+              background-color: #ccc;
+
+              .icon-mouse-pointer {
+                margin-left: 5px;
+              }
             }
           }
         }
@@ -1459,4 +1486,13 @@ a {
 }
 .icon-camera:before {
   content: "\e90f";
+}
+.icon-stack:before {
+  content: "\e92e";
+}
+.icon-mouse-pointer:before {
+  content: "\e900";
+}
+.icon-cross:before {
+  content: "\ea0f";
 }

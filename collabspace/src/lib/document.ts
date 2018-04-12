@@ -178,7 +178,7 @@ export class Document {
 
   // NOTE: the child should be a key in FirebaseWindow
   // TODO: figure out how to type check the child param in FirebaseWindow
-  getWindowsDataRef(child:"attrs"|"order"|"minimizedOrder"|"iframeData") {
+  getWindowsDataRef(child:"attrs"|"order"|"minimizedOrder"|"iframeData"|"annotations") {
     return this.getWindowsRef().child(child)
   }
 

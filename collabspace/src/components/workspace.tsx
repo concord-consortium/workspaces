@@ -968,6 +968,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   renderAllWindows() {
     const {allOrderedWindows, topWindow} = this.state
+    const {document, isTemplate, portalUser} = this.props
     const userId = this.userId()
     const nonPrivateWindows = allOrderedWindows.filter((orderedWindow: OrderedWindow) => this.nonPrivateWindow({window: orderedWindow.window}))
     return nonPrivateWindows.map((orderedWindow) => {
@@ -978,11 +979,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                isTopWindow={window === topWindow}
                zIndex={orderedWindow.order}
                windowManager={this.windowManager}
-               isTemplate={this.props.isTemplate}
-               isReadonly={this.props.document.isReadonly}
+               isTemplate={isTemplate}
+               isReadonly={document.isReadonly}
                publishWindow={this.handlePublish}
                copyWindow={this.handleCopy}
                snapshotWindow={this.handleSnapshot}
+               annotationsRef={document.getWindowsDataRef("annotations").child(window.id)}
+               portalUser={portalUser}
              />
     })
   }
