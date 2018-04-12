@@ -268,7 +268,7 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
     return (
       <div className="publication">
         <div className="publication-header clickable" onClick={this.handleToggle}>
-          #{index} <span className="initials" title={name}>{initials}</span> in group {group} <span className="ago"><LiveTimeAgoComponent timestamp={createdAt} /></span>
+          <span className="initials" title={name}>{initials}</span> in group {group} <span className="ago"><LiveTimeAgoComponent timestamp={createdAt} /></span>
         </div>
         {this.state.expanded ? this.renderExpanded() : null}
       </div>
