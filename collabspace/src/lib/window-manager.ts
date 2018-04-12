@@ -535,6 +535,10 @@ export class WindowManager {
     }
   }
 
+  getWindow(windowId:string) {
+    return this.windows[windowId]
+  }
+
   postToWindow(window:Window, message:string, request:object) {
     if (window.iframe && window.iframe.connected) {
       window.iframe.phone.post(message, request)

@@ -131,7 +131,12 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
 
   captureAnnotations(callback:Function) {
     const {annotationsElement} = this
-    if (annotationsElement) {
+    const {annontations} = this.state
+
+    if (!annotationsElement || (Object.keys(annontations).length === 0)) {
+      callback(null, null)
+    }
+    else {
       html2canvas(annotationsElement, {backgroundColor: null} as any)
       .then((canvas) => {
         callback(null, canvas.toDataURL("image/png"))
@@ -139,9 +144,6 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       .catch((e) => {
         callback(e)
       })
-    }
-    else {
-      callback(null, null)
     }
   }
 

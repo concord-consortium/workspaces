@@ -55,42 +55,50 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
 
       publish: (publication) => {
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
-          const captureScreenCallback = (err:any, canvas:HTMLCanvasElement) => {
-            this.setState({captureScreenCallback: null})
-            if (err) {
-              reject(err)
-            }
-            else {
-              canvas.toBlob((blob:Blob) => {
-                if (!blob) {
-                  return reject("Couldn't get drawing from canvas!")
-                }
-                publication.saveArtifact({title: "Drawing", blob})
+          this.captureScreen()
+            .then((canvas) => {
+              debugger
+              publication.saveArtifact({title: "Drawing", canvas})
                 .then((artifact) => resolve({}))
                 .catch(reject)
-              }, "image/png")
-            }
-          }
-          this.setState({captureScreenCallback})
+            })
+            .catch(reject)
         })
       },
 
       snapshot: (snapshot) => {
         return new Promise<WorkspaceClientSnapshotResponse>((resolve, reject) => {
-          const captureScreenCallback = (err:any, canvas:HTMLCanvasElement) => {
-            this.setState({captureScreenCallback: null})
-            if (err) {
-              reject(err)
-            }
-            else {
+          this.captureScreen()
+            .then((canvas) => {
               snapshot.fromCanvas(canvas)
                 .then(resolve)
                 .catch(reject)
-            }
-          }
-          this.setState({captureScreenCallback})
+            })
+            .catch(reject)
         })
       }
+    })
+  }
+
+  captureScreen() {
+    return new Promise<HTMLCanvasElement>((resolve, reject) => {
+      let captured = false
+      const captureScreenCallback = (err:any, canvas:HTMLCanvasElement) => {
+        if (captured) {
+          return
+        }
+
+        captured = true
+        this.setState({captureScreenCallback: null})
+
+        if (err) {
+          reject(err)
+        }
+        else {
+          resolve(canvas)
+        }
+      }
+      this.setState({captureScreenCallback})
     })
   }
 

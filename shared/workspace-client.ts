@@ -83,6 +83,7 @@ export interface WorkspaceClientInitResponse {
 export interface WorkspaceClientPublishRequest {
   publicationsPath: string
   artifactStoragePath: string
+  annotationImageDataUrl: string|null
 }
 
 export interface WorkspaceClientPublishResponse {
@@ -230,21 +231,22 @@ export class WorkspaceClient {
 
 export interface SaveArtifactOptions {
   title: string
-  blob: Blob
+  canvas: HTMLCanvasElement
   mimeType?: string
   extension?: string
-  thumbnailPNGBlob?: Blob
 }
 
 export class WorkspaceClientPublication {
   publicationsRef: firebase.database.Reference
   artifactsRef: firebase.database.Reference
   artifactsStoragePath: string
+  annotationImageDataUrl: string|null
 
   constructor (client: WorkspaceClient, req:WorkspaceClientPublishRequest) {
     this.publicationsRef = firebase.database().ref(req.publicationsPath)
     this.artifactsRef = this.publicationsRef.child("windows").child(client.windowId).child("artifacts")
     this.artifactsStoragePath = req.artifactStoragePath
+    this.annotationImageDataUrl = req.annotationImageDataUrl
   }
 
   createThumbnail(imageBlob:Blob) {
@@ -279,10 +281,10 @@ export class WorkspaceClientPublication {
     })
   }
 
-  saveArtifactBlob = (options: SaveArtifactOptions, blobId: string, thumbnailUrl?:string) => {
+  saveArtifactBlob = (options: SaveArtifactOptions, blobId: string, blob: Blob, thumbnailUrl?:string) => {
     return new Promise<FirebaseArtifact>((resolve, reject) => {
       let {extension} = options
-      const mimeType = options.mimeType || options.blob.type
+      const mimeType = options.mimeType || blob.type
       if (!extension) {
         const parts = mimeType.split("/")
         extension = parts[parts.length - 1]
@@ -291,7 +293,7 @@ export class WorkspaceClientPublication {
       const blobStoragePath:string = `${this.artifactsStoragePath}/${blobId}.${extension}`
       const blobStorageRef = firebase.storage().ref(blobStoragePath)
       blobStorageRef
-        .put(options.blob, {contentType: mimeType})
+        .put(blob, {contentType: mimeType})
         .then((snapshot) => blobStorageRef.getDownloadURL())
         .then((url) => {
           const artifact:FirebaseArtifact = {title: options.title, mimeType, url, thumbnailUrl}
@@ -302,21 +304,42 @@ export class WorkspaceClientPublication {
     })
   }
 
+  addAnnotations(canvas: HTMLCanvasElement) {
+    return new Promise<HTMLCanvasElement>((resolve, reject) => {
+      if (this.annotationImageDataUrl) {
+        const annotationImage = new Image()
+        annotationImage.addEventListener("load", () => {
+          const context = canvas.getContext("2d")
+          if (context) {
+            context.drawImage(annotationImage, 0, 0)
+          }
+          resolve(canvas)
+        })
+        annotationImage.src = this.annotationImageDataUrl
+      }
+      else {
+        resolve(canvas)
+      }
+    })
+  }
+
   saveArtifact(options: SaveArtifactOptions) {
     const blobId = uuidV4()
 
-    if (options.thumbnailPNGBlob) {
-      return this.saveThumbnail(options.thumbnailPNGBlob, blobId)
-        .then((thumbnailUrl) => this.saveArtifactBlob(options, blobId, thumbnailUrl))
-    }
-
-    if (options.blob.type.startsWith("image/")) {
-      return this.createThumbnail(options.blob)
-        .then((thumbnailBlob) => this.saveThumbnail(thumbnailBlob, blobId))
-        .then((thumbnailUrl) => this.saveArtifactBlob(options, blobId, thumbnailUrl))
-    }
-
-    return this.saveArtifactBlob(options, blobId)
+    return new Promise<FirebaseArtifact>((resolve, reject) => {
+      this.addAnnotations(options.canvas)
+        .then((canvas) => {
+          canvas.toBlob((blob) => {
+            if (blob) {
+              return this.createThumbnail(blob)
+                .then((thumbnailBlob) => this.saveThumbnail(thumbnailBlob, blobId))
+                .then((thumbnailUrl) => this.saveArtifactBlob(options, blobId, blob, thumbnailUrl))
+                .then(resolve)
+                .catch(reject)
+            }
+          }, "image/png")
+        })
+    })
   }
 }
 
@@ -345,33 +368,43 @@ export class WorkspaceClientSnapshot {
     })
   }
 
+  addAnnotations(canvas: HTMLCanvasElement) {
+    return new Promise<HTMLCanvasElement>((resolve, reject) => {
+      if (this.annotationImageDataUrl) {
+        const annotationImage = new Image()
+        annotationImage.addEventListener("load", () => {
+          const context = canvas.getContext("2d")
+          if (context) {
+            context.drawImage(annotationImage, 0, 0)
+          }
+          resolve(canvas)
+        })
+        annotationImage.src = this.annotationImageDataUrl
+      }
+      else {
+        resolve(canvas)
+      }
+    })
+  }
+
   fromCanvas(canvas: HTMLCanvasElement) {
     return new Promise<WorkspaceClientSnapshotResponse>((resolve, reject) => {
-      const blobSaver = (blob:Blob) => {
-        const blobStorageRef = firebase.storage().ref(this.snapshotsPath)
-        blobStorageRef
-          .put(blob, {contentType: "image/png"})
-          .then((snapshot) => blobStorageRef.getDownloadURL())
-          .then((snapshotUrl) => {
-            resolve({snapshotUrl})
-          })
-          .catch(reject)
-      }
       try {
-        if (this.annotationImageDataUrl) {
-          const annotationImage = new Image()
-          annotationImage.addEventListener("load", () => {
-            const context = canvas.getContext("2d")
-            if (context) {
-              context.drawImage(annotationImage, 0, 0)
-            }
-            canvas.toBlob(blobSaver, "image/png");
+        this.addAnnotations(canvas)
+          .then((canvas) => {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const blobStorageRef = firebase.storage().ref(this.snapshotsPath)
+                blobStorageRef
+                  .put(blob, {contentType: "image/png"})
+                  .then((snapshot) => blobStorageRef.getDownloadURL())
+                  .then((snapshotUrl) => {
+                    resolve({snapshotUrl})
+                  })
+                  .catch(reject)
+              }
+            }, "image/png");
           })
-          annotationImage.src = this.annotationImageDataUrl
-        }
-        else {
-          canvas.toBlob(blobSaver, "image/png");
-        }
       }
       catch (err) {
         reject(err)

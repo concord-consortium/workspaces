@@ -590,6 +590,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                 if (attrs.ownerId) {
                   windows[windowId].ownerId = attrs.ownerId
                 }
+                if (windowIdsToPublish.indexOf(windowId) === -1) {
+                  windowIdsToPublish.push(windowId)
+                }
               }
             })
 
@@ -612,22 +615,33 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
               // and finally tell all the child windows so they can generate artifacts
               const publishRequest:WorkspaceClientPublishRequest = {
                 publicationsPath: getPublicationsPath(portalOffering, publicationId),
-                artifactStoragePath: getArtifactsStoragePath(portalOffering, publicationId)
+                artifactStoragePath: getArtifactsStoragePath(portalOffering, publicationId),
+                annotationImageDataUrl: null
               }
 
-              if (publishWindow) {
-                this.windowManager.postToWindowIds(
-                  windowIdsToPublish,
-                  WorkspaceClientPublishRequestMessage,
-                  publishRequest
-                )
-              }
-              else {
-                this.windowManager.postToAllWindows(
-                  WorkspaceClientPublishRequestMessage,
-                  publishRequest
-                )
-              }
+              const windowsToPublish:Window[] = []
+              const annotationImagePromises:Promise<string|null>[] = []
+              windowIdsToPublish.forEach((windowId) => {
+                const window = this.windowManager.getWindow(windowId)
+                if (window) {
+                  windowsToPublish.push(window)
+                  annotationImagePromises.push(this.captureAnnotationImage(window))
+                }
+              })
+
+              debugger
+
+              Promise.all(annotationImagePromises)
+                .then((annotationImages) => {
+                  windowIdsToPublish.forEach((windowId, index) => {
+                    const windowPublishRequest = merge({}, publishRequest, {annotationImageDataUrl: annotationImages[index]})
+                    this.windowManager.postToWindow(
+                      windowsToPublish[index],
+                      WorkspaceClientPublishRequestMessage,
+                      windowPublishRequest
+                    )
+                  })
+                })
             }
 
             if (this.props.logManager) {
@@ -684,7 +698,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return new Promise<string|null>((resolve, reject) => {
       const {captureAnnotationsCallbacks} = this.state
       captureAnnotationsCallbacks[window.id] = (err, imageDataUrl) => {
-        debugger
         delete captureAnnotationsCallbacks[window.id]
         this.setState({captureAnnotationsCallbacks})
         resolve(err ? null : imageDataUrl)
