@@ -5,8 +5,15 @@ import { Window, FirebaseWindowAttrs, FirebaseAnnotationMap, Annotation, PathAnn
 import { WindowManager, DragType } from "../lib/window-manager"
 import { v4 as uuidV4 } from "uuid"
 import { PortalUser } from "../lib/auth";
+import * as html2canvas from "html2canvas"
 
 export const TITLEBAR_HEIGHT = 22
+
+export type CaptureAnnotationCallback = (err: null, imageDataUrl: string|null) => void
+
+export interface CaptureAnnotationCallbackMap {
+  [key: string]: CaptureAnnotationCallback
+}
 
 export type AnnotationTool = "draw"
 
@@ -59,6 +66,7 @@ export interface WindowComponentProps {
   snapshotWindow: (window:Window) => void
   annotationsRef: firebase.database.Reference
   portalUser: PortalUser|null
+  captureAnnotationsCallback?: CaptureAnnotationCallback|null
 }
 export interface WindowComponentState {
   editingTitle: boolean
@@ -113,6 +121,28 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
 
     annotationsRef.off("child_added", this.handleAnnotationChildAdded)
     annotationsRef.off("child_removed", this.handleAnnotationChildRemoved)
+  }
+
+  componentWillReceiveProps(nextProps:WindowComponentProps) {
+    if (nextProps.captureAnnotationsCallback && (nextProps.captureAnnotationsCallback !== this.props.captureAnnotationsCallback)) {
+      this.captureAnnotations(nextProps.captureAnnotationsCallback)
+    }
+  }
+
+  captureAnnotations(callback:Function) {
+    const {annotationsElement} = this
+    if (annotationsElement) {
+      html2canvas(annotationsElement, {backgroundColor: null} as any)
+      .then((canvas) => {
+        callback(null, canvas.toDataURL("image/png"))
+      })
+      .catch((e) => {
+        callback(e)
+      })
+    }
+    else {
+      callback(null, null)
+    }
   }
 
   setSVGSize = () => {

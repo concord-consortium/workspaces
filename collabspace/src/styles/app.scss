@@ -454,7 +454,7 @@ a {
         overflow: auto;
 
         &.with-minimized {
-          bottom: $minimized-area-height;
+          bottom: $minimized-area-height + 1;
         }
       }
 

@@ -90,6 +90,7 @@ export interface WorkspaceClientPublishResponse {
 
 export interface WorkspaceClientSnapshotRequest {
   snapshotPath: string
+  annotationImageDataUrl: string|null
 }
 
 export interface WorkspaceClientSnapshotResponse {
@@ -321,9 +322,11 @@ export class WorkspaceClientPublication {
 
 export class WorkspaceClientSnapshot {
   snapshotsPath: string
+  annotationImageDataUrl: string|null
 
   constructor (client: WorkspaceClient, req:WorkspaceClientSnapshotRequest) {
     this.snapshotsPath = req.snapshotPath
+    this.annotationImageDataUrl = req.annotationImageDataUrl
   }
 
   fromElement(element: HTMLElement|null) {
@@ -355,7 +358,20 @@ export class WorkspaceClientSnapshot {
           .catch(reject)
       }
       try {
-        canvas.toBlob(blobSaver, "image/png");
+        if (this.annotationImageDataUrl) {
+          const annotationImage = new Image()
+          annotationImage.addEventListener("load", () => {
+            const context = canvas.getContext("2d")
+            if (context) {
+              context.drawImage(annotationImage, 0, 0)
+            }
+            canvas.toBlob(blobSaver, "image/png");
+          })
+          annotationImage.src = this.annotationImageDataUrl
+        }
+        else {
+          canvas.toBlob(blobSaver, "image/png");
+        }
       }
       catch (err) {
         reject(err)

@@ -649,7 +649,7 @@ export class WindowManager {
     })
   }
 
-  snapshotWindow(window: Window, snapshotPath: string) {
+  snapshotWindow(window: Window, snapshotPath: string, annotationImageDataUrl: string|null) {
     return new Promise<string>((resolve, reject) => {
       if (!window.iframe.inited) {
         return reject("Window does not respond to snapshot requests")
@@ -668,7 +668,7 @@ export class WindowManager {
 
       phone.addListener(WorkspaceClientSnapshotResponseMessage, handleSnapshotResponse)
 
-      const request:WorkspaceClientSnapshotRequest = {snapshotPath}
+      const request:WorkspaceClientSnapshotRequest = {snapshotPath, annotationImageDataUrl}
       phone.post(WorkspaceClientSnapshotRequestMessage, request)
     })
   }
