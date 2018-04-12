@@ -3,7 +3,6 @@ import { FirebaseWindows } from "./window"
 import { PortalInfo, PortalOffering, PortalUser, PortalUserConnectionStatusMap } from "./auth"
 import { getUserTemplatePath, getOfferingRef, getDocumentPath } from "./refs"
 
-
 export interface FirebaseDataSetCreatorMap {
   [key: string]: string
 }

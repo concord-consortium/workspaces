@@ -1,7 +1,7 @@
 import * as React from "react"
 import * as firebase from "firebase"
 import { InlineEditorComponent } from "./inline-editor"
-import { Window, FirebaseWindowAttrs } from "../lib/window"
+import { Window, FirebaseWindowAttrs, FirebaseAnnotationMap, Annotation, PathAnnotation, PathAnnotationPoint } from "../lib/window"
 import { WindowManager, DragType } from "../lib/window-manager"
 import { v4 as uuidV4 } from "uuid"
 import { PortalUser } from "../lib/auth";
@@ -9,24 +9,6 @@ import { PortalUser } from "../lib/auth";
 export const TITLEBAR_HEIGHT = 22
 
 export type AnnotationTool = "draw"
-
-export interface AnnotationMap {
-  [key: string]: Annotation
-}
-
-export type Annotation = PathAnnotation
-
-export interface PathAnnotationPoint {
-  x: number
-  y: number
-}
-
-export interface PathAnnotation {
-  type: "path"
-  id: string
-  userId: string
-  points: PathAnnotationPoint[]
-}
 
 export interface WindowIframeComponentProps {
   src: string | undefined
@@ -86,7 +68,7 @@ export interface WindowComponentState {
   annotationTool: AnnotationTool
   annotationSVGWidth: number|string
   annotationSVGHeight: number|string
-  annontations: AnnotationMap,
+  annontations: FirebaseAnnotationMap,
   currentAnnotation: Annotation|null
 }
 
@@ -140,7 +122,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   handleAnnotationChildAdded = (snapshot:firebase.database.DataSnapshot) => {
     const {portalUser} = this.props
     const annotation:Annotation|null = snapshot.val()
-    if (annotation && snapshot.key && portalUser && (annotation.userId === portalUser.id)) {
+    if (annotation && snapshot.key && portalUser && (!annotation.userId || (annotation.userId === portalUser.id))) {
       const {annontations} = this.state
       annontations[snapshot.key] = annotation
       this.setState({annontations})
@@ -150,7 +132,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   handleAnnotationChildRemoved = (snapshot:firebase.database.DataSnapshot) => {
     const {portalUser} = this.props
     const annotation:Annotation|null = snapshot.val()
-    if (annotation && snapshot.key && portalUser && (annotation.userId === portalUser.id)) {
+    if (annotation && snapshot.key && portalUser && (!annotation.userId || (annotation.userId === portalUser.id))) {
       const {annontations} = this.state
       delete annontations[snapshot.key]
       this.setState({annontations})
@@ -253,12 +235,19 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
 
   handleClearAnnotations = () => {
     if (confirm("Are you sure you want to clear the annotations in this window?")) {
-      const {annontations} = this.state
-      const updates:any = {}
-      Object.keys(annontations).forEach((key) => {
-        updates[key] = null
-      })
-      this.setState({annontations: {}}, () => this.props.annotationsRef.update(updates))
+      const {portalUser} = this.props
+      if (portalUser) {
+        const {annontations} = this.state
+        const updates:any = {}
+        Object.keys(annontations).forEach((key) => {
+          const annotation = annontations[key]
+          if (annotation.userId === portalUser.id) {
+            updates[key] = null
+            delete annontations[key]
+          }
+        })
+        this.setState({annontations: annontations}, () => this.props.annotationsRef.update(updates))
+      }
     }
   }
 
@@ -382,7 +371,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   }
 
   render() {
-    const {window, isTopWindow, isTemplate} = this.props
+    const {window, isTopWindow, isTemplate, isReadonly} = this.props
     const {attrs} = window
     const {title, maximized, minimized, url} = attrs
     const titlebarClass = `titlebar${isTopWindow ? " top" : ""}`
@@ -418,7 +407,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         {!maximized ? <div className="bottom-drag" onMouseDown={this.handleDragBottom} /> : null}
         {!maximized ? <div className="bottom-left-drag" onMouseDown={this.handleDragBottomLeft} /> : null}
         {!maximized ? <div className="bottom-right-drag" onMouseDown={this.handleDragBottomRight} /> : null}
-        {isTopWindow && !maximized && !isTemplate ? this.renderSidebarMenu(windowStyle.width + 1) : null}
+        {isTopWindow && !maximized && !isTemplate && !isReadonly ? this.renderSidebarMenu(windowStyle.width + 1) : null}
       </div>
     )
   }

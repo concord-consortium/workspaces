@@ -3,6 +3,28 @@ import { IFramePhoneParent } from "../../../shared/workspace-client"
 import { FirebaseOrderMap } from "./window-manager"
 import * as firebase from "firebase"
 
+export interface FirebaseAnnotationWindowMap {
+  [key: string]: FirebaseAnnotationMap
+}
+
+export interface FirebaseAnnotationMap {
+  [key: string]: Annotation
+}
+
+export type Annotation = PathAnnotation
+
+export interface PathAnnotationPoint {
+  x: number
+  y: number
+}
+
+export interface PathAnnotation {
+  type: "path"
+  id: string
+  userId: string|null
+  points: PathAnnotationPoint[]
+}
+
 export interface FirebaseWindowDataSet {
   documentId: string
   dataSetId: string
@@ -39,7 +61,7 @@ export interface FirebaseWindows {
   order: FirebaseOrderMap
   minimizedOrder: FirebaseOrderMap
   iframeData: FirebaseIFrameDataMap
-  annotations: FirebaseAnnotationsMap
+  annotations: FirebaseAnnotationWindowMap
 }
 
 export interface WindowMap {

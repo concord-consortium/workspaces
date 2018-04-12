@@ -4,7 +4,7 @@ import * as queryString from "query-string"
 import * as superagent from "superagent"
 
 import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap, FirebaseDocument } from "../lib/document"
-import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap } from "../lib/window"
+import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap, FirebaseAnnotationMap } from "../lib/window"
 import { WindowComponent } from "./window"
 import { MinimizedWindowComponent } from "./minimized-window"
 import { InlineEditorComponent } from "./inline-editor"
@@ -485,6 +485,26 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleFilterCurrentUserAnnotations(firebaseDocument:FirebaseDocument, userId:string) {
+    if (firebaseDocument.data && firebaseDocument.data.windows && firebaseDocument.data.windows.annotations) {
+      const annotationsWindowMap = firebaseDocument.data.windows.annotations
+      Object.keys(annotationsWindowMap).forEach((windowId) => {
+        const annotations = annotationsWindowMap[windowId]
+        if (annotations) {
+          const filteredAnnotations:FirebaseAnnotationMap = {}
+          Object.keys(annotations).forEach((id) => {
+            const annotation = annotations[id]
+            if (!annotation.userId || (annotation.userId === userId)) {
+              annotation.userId = null
+              filteredAnnotations[id] = annotation
+            }
+          })
+          annotationsWindowMap[windowId] = filteredAnnotations
+        }
+      })
+    }
+  }
+
   handleCopy = (copyWindow:Window) => {
     this.setState({
       showModal: "copy",
@@ -519,8 +539,16 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
     this.setState({publishing: true})
 
+    const filterDocument = (firebaseDocument:FirebaseDocument) => {
+      const {portalUser} = this.props
+      this.handleSyncLocalWindowState(firebaseDocument)
+      if (portalUser) {
+        this.handleFilterCurrentUserAnnotations(firebaseDocument, portalUser.id)
+      }
+    }
+
     // copy the doc with local window state
-    this.props.document.copy(getDocumentPath(portalOffering), this.handleSyncLocalWindowState)
+    this.props.document.copy(getDocumentPath(portalOffering), filterDocument)
       .then((document) => {
 
         // open the doc to get the windows
