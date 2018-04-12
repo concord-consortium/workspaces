@@ -366,10 +366,11 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
 
   renderSidebarMenu(left: number) {
     const {annotating, inited} = this.state
+    const isPublic = !this.props.window.attrs.ownerId
     return (
       <div className="sidebar-menu" style={{left}}>
         <div className="sidebar-menu-inner">
-          {inited ? <i className="icon icon-newspaper" title="Publish Window" onClick={this.handlePublishWindow} /> : null}
+          {inited && isPublic ? <i className="icon icon-newspaper" title="Publish Window" onClick={this.handlePublishWindow} /> : null}
           {inited ? <i className="icon icon-copy" title="Copy Window" onClick={this.handleCopyWindow} /> : null}
           <i className={`icon icon-stack ${annotating ? "annotation-tool-selected" : ""}`} title="Annotate Window" onClick={this.handleToggleAnnotateWindow} />
           {this.renderAnnotationTools()}

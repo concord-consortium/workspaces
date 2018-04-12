@@ -402,6 +402,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
 
   renderFilters() {
     const {classes, users, loadingClasses} = this.state
+    const {portalUser} = this.props
 
     if (loadingClasses) {
       return null
@@ -422,6 +423,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
         return {value: row.creator.id, name: row.creator.fullName}
       }
     })
+    publisherOptions.unshift(<option value={portalUser.id}>Me ({portalUser.fullName})</option>)
 
     return (
       <div className="learning-log-filters">
