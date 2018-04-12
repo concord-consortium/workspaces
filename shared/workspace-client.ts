@@ -3,6 +3,7 @@ import * as firebase from "firebase"
 import { v4 as uuidV4 } from "uuid"
 import { PortalTokens } from "../collabspace/src/lib/auth";
 import { FirebaseWindowAttrsMap, FirebaseWindowDataSet } from "../collabspace/src/lib/window"
+import * as html2canvas from "html2canvas"
 
 const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
 

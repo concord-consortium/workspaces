@@ -6,10 +6,10 @@ import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishRespo
 import { loadDataSetFromFirebase } from "../../../shared/firebase-dataset";
 import * as firebase from "firebase";
 import sizeMe from "react-sizeme";
-const html2canvas = require("html2canvas");
 import * as queryString from 'query-string';
 import { IAppComponentData, AppComponentData, createDefaultAppComponentData } from "../../../neo-codap/src/app-data";
 import { applySnapshot, getSnapshot, onSnapshot } from "mobx-state-tree";
+import * as html2canvas from "html2canvas"
 
 interface ISizeMeSize {
   width:number|null;

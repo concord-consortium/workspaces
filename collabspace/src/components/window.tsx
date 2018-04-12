@@ -308,7 +308,9 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
           this.setState({currentAnnotation: annotation})
         }
         const handleDrawDone = (e:MouseEvent) => {
-          this.props.annotationsRef.push(annotation)
+          if (annotation.points.length > 0) {
+            this.props.annotationsRef.push(annotation)
+          }
           this.setState({currentAnnotation: null})
 
           window.removeEventListener("mousemove", handleDrawMove)
@@ -380,9 +382,12 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   renderAnnotation(annotation:Annotation) {
     switch (annotation.type) {
       case "path":
-        const [first, ...rest] = annotation.points
-        const d = `M${first.x} ${first.y} ${rest.map((p) => `L${p.x} ${p.y}`).join(" ")}`
-        return <path key={annotation.id} d={d} stroke="#f00" strokeWidth="2" fill="none" />
+        const [first, ...rest] = annotation.points || []
+        if (first) {
+          const d = `M${first.x} ${first.y} ${rest.map((p) => `L${p.x} ${p.y}`).join(" ")}`
+          return <path key={annotation.id} d={d} stroke="#f00" strokeWidth="2" fill="none" />
+        }
+        break
     }
     return null
   }
@@ -393,7 +398,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     const currentAnnotationElement = currentAnnotation ? this.renderAnnotation(currentAnnotation) : null
     const annotationElements = Object.keys(annontations).map<JSX.Element|null>((key) => this.renderAnnotation(annontations[key]))
     return (
-      <div className="annotations" ref={(el) => this.annotationsElement = el} style={{pointerEvents: pointerEvents}} onMouseDown={this.handleAnnotationMouseDown}>
+      <div className="annotations" ref={(el) => this.annotationsElement = el} style={{pointerEvents: pointerEvents, width: annotationSVGWidth, height: annotationSVGHeight}} onMouseDown={this.handleAnnotationMouseDown}>
         <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={annotationSVGWidth} height={annotationSVGHeight}>
           {annotationElements}
           {currentAnnotationElement}
