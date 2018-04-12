@@ -1,4 +1,8 @@
 [
-  {"src": "coin-25px.png", "width": 25, "height": 25, "title": "Coin"},
-  {"src": "pouch-30px.png", "width": 30, "height": 37, "title": "Pouch"}
+  {"src": "coin-25px.png",  "width": 25, "height": 25, "title": "Coin"},
+  {"src": "pouch-30px.png", "width": 30, "height": 37, "title": "Pouch"},
+  {"src": "plus.png",       "width": 25, "height": 25, "title": "Plus"},
+  {"src": "equals.png",     "width": 25, "height": 25, "title": "Equals"},
+  {"src": "lparen.png",     "width": 25, "height": 25, "title": "Left Parenthesis"},
+  {"src": "rparen.png",     "width": 25, "height": 25, "title": "Right Parenthesis"}
 ]
