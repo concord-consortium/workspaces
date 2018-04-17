@@ -1324,7 +1324,6 @@ a {
           tr:hover,
           tr.even:hover {
             background-color: #ddd;
-            text-decoration: underline;
           }
 
           tr.selected-row {
@@ -1416,6 +1415,10 @@ a {
   }
 }
 
+.favorite-star {
+  color: #FFD76E;
+}
+
 .progress-message-container {
   position: fixed;
   top: 0;
@@ -1495,4 +1498,10 @@ a {
 }
 .icon-cross:before {
   content: "\ea0f";
+}
+.icon-star-empty:before {
+  content: "\e9d7";
+}
+.icon-star-full:before {
+  content: "\e9d9";
 }

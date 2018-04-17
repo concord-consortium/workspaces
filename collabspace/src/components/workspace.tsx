@@ -14,7 +14,7 @@ import { v4 as uuidV4} from "uuid"
 import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
-import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath } from "../lib/refs"
+import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath, getFavoritesRef } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
 import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
@@ -23,6 +23,22 @@ import { merge } from "lodash"
 import { LiveTimeAgoComponent } from "./live-time-ago"
 import { UploadImageDialogComponent } from "./upload-image-dialog"
 import { LearningLogComponent } from "./learning-log"
+
+export type ToggleFavoritesOptions = ToggleFavoritesOptionsByOffering | ToggleFavoritesOptionsByClass
+
+export interface ToggleFavoritesOptionsByOffering {
+  type: "offering"
+  offering: PortalOffering
+  publicationId: string
+  windowId: string
+}
+
+export interface ToggleFavoritesOptionsByClass {
+  type: "class"
+  classHash: string
+  publicationId: string
+  windowId: string
+}
 
 export interface AddWindowLogParamsParams {
   ownerId?: string
@@ -822,6 +838,23 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleToggleFavorite = (options: ToggleFavoritesOptions) => {
+    const {portalUser, portalOffering} = this.props
+    if (portalUser && portalOffering) {
+      const {publicationId, windowId} = options
+      let ref: firebase.database.Reference
+      if (options.type === "offering") {
+        ref = getFavoritesRef(options.offering.domain, options.offering.classInfo.classHash, portalUser.id, publicationId, windowId)
+      }
+      else {
+        ref = getFavoritesRef(portalOffering.domain, options.classHash, portalUser.id, publicationId, windowId)
+      }
+      ref.once("value", (snapshot) => {
+        ref.set(snapshot.val() ? null : true)
+      })
+    }
+  }
+
   renderDocumentInfo() {
     const {documentInfo} = this.state
     if (!documentInfo) {
@@ -1096,6 +1129,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
              toggleViewArtifact={this.handleToggleViewArtifact}
              publishing={this.state.publishing}
              windowManager={this.windowManager}
+             toggleFavorite={this.handleToggleFavorite}
            />
   }
 
@@ -1240,7 +1274,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     if (!this.state.showLearningLog || !portalTokens || !portalUser || !portalOffering) {
       return null
     }
-    return <LearningLogComponent portalTokens={portalTokens} portalUser={portalUser} onClose={this.handleToggleLearningLogButton} portalOffering={portalOffering} />
+    return <LearningLogComponent
+              portalTokens={portalTokens}
+              portalUser={portalUser}
+              onClose={this.handleToggleLearningLogButton}
+              portalOffering={portalOffering}
+              toggleFavorite={this.handleToggleFavorite}
+            />
   }
 
   renderProgressMessage() {
