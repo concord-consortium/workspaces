@@ -3,7 +3,7 @@ import * as firebase from "firebase"
 import { Window } from "../lib/window"
 import { WindowManager } from "../lib/window-manager"
 import { PortalInfo, PortalOffering, PortalUser, getPortalJWTWithBearerToken, PortalTokens } from "../lib/auth"
-import { getPublicationsRef, getArtifactsRef } from "../lib/refs"
+import { getPublicationsRef, getArtifactsRef, getFavoritesRef } from "../lib/refs"
 import { FirebasePublication, FirebasePublicationWindow, FirebaseArtifact } from "../lib/document"
 import { WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
@@ -13,6 +13,30 @@ import { MAX_GROUPS } from "./app"
 import { LiveTimeAgoComponent } from "./live-time-ago"
 
 const demoId = queryString.parse(window.location.search).demo
+
+export interface FirebaseFavorites {
+  users: FirebaseUserFavoritesMap
+}
+
+export interface FirebaseUserFavoritesMap {
+  [key: string]: FirebaseUserFavorites
+}
+
+export interface FirebaseUserFavorites {
+  publications: FirebaseUserFavoritesPublicationMap
+}
+
+export interface FirebaseUserFavoritesPublicationMap {
+  [key: string]: FirebaseUserFavoritesPublication
+}
+
+export interface FirebaseUserFavoritesPublication {
+  windows: FirebaseUserFavoritesPublicationWindowMap
+}
+
+export interface FirebaseUserFavoritesPublicationWindowMap {
+  [key: string]: boolean
+}
 
 export interface FirebasePublicationItem {
   id: string
@@ -64,6 +88,8 @@ export interface SidebarPublicationWindowComponentProps {
   portalOffering: PortalOffering
   windowManager: WindowManager
   creatorName: string
+  favorites: FirebaseUserFavoritesPublicationMap
+  toggleFavorite: (offering:PortalOffering, publicationId: string, windowId: string) => void
 }
 export interface SidebarPublicationWindowComponentState {
   artifactItems: FirebaseArtifactItem[]
@@ -103,6 +129,10 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
       .catch((err:any) => alert(err.toString()))
   }
 
+  handleToggleFavorite = () => {
+    this.props.toggleFavorite(this.props.portalOffering, this.props.publicationId, this.props.windowId)
+  }
+
   renderArtifacts() {
     const {artifactItems} = this.state
     if (artifactItems.length === 0) {
@@ -121,10 +151,17 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
     )
   }
 
+  renderFavoriteStar() {
+    const {favorites} = this.props
+    const starred = favorites[this.props.publicationId] && favorites[this.props.publicationId].windows[this.props.windowId]
+    const className = starred ? "icon icon-star-full favorite-star" : "icon icon-star-empty"
+    return <i className={className} onClick={this.handleToggleFavorite} />
+  }
+
   render() {
     return (
       <div className="window">
-        <div className="window-title">{this.props.window.title}</div>
+        <div className="window-title">{this.renderFavoriteStar()} {this.props.window.title}</div>
         {this.renderArtifacts()}
         <div className="window-actions">
           <div onClick={this.handleCopyIntoDocument} className="clickable">Copy Into Your Document</div>
@@ -142,6 +179,8 @@ export interface SidebarPublicationComponentProps {
   portalTokens: PortalTokens
   windowManager: WindowManager
   expandAll: boolean
+  favorites: FirebaseUserFavoritesPublicationMap
+  toggleFavorite: (offering:PortalOffering, publicationId: string, windowId: string) => void
 }
 export interface SidebarPublicationComponentState {
   expanded: boolean
@@ -198,6 +237,8 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
             toggleViewArtifact={this.props.toggleViewArtifact}
             portalOffering={this.props.portalOffering}
             windowManager={this.props.windowManager}
+            favorites={this.props.favorites}
+            toggleFavorite={this.props.toggleFavorite}
           />
         )
       }
@@ -284,6 +325,7 @@ export interface SidebarComponentProps {
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
   publishing: boolean
   windowManager: WindowManager
+  toggleFavorite: (offering:PortalOffering, publicationId: string, windowId: string) => void
 }
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
@@ -293,11 +335,13 @@ export interface SidebarComponentState {
   filterSearch: string
   filterSearchTrimmed: string
   expandAll: boolean
+  favorites: FirebaseUserFavoritesPublicationMap
 }
 
 export class SidebarComponent extends React.Component<SidebarComponentProps, SidebarComponentState> {
   publicationsRef: firebase.database.Reference
   userLookup: UserLookup
+  favoritesRef: firebase.database.Reference
 
   constructor (props:SidebarComponentProps) {
     super(props)
@@ -308,19 +352,23 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
       filterOffering: "all",
       filterSearch: "",
       filterSearchTrimmed: "",
-      expandAll: false
+      expandAll: false,
+      favorites: {}
     }
     this.publicationsRef = getPublicationsRef(this.props.portalOffering)
+    this.favoritesRef = getFavoritesRef(this.props.portalOffering, this.props.portalUser.id).child("publications")
 
     this.userLookup = new UserLookup(this.props.portalOffering.classInfo)
   }
 
   componentWillMount() {
     this.publicationsRef.on("child_added", this.handlePublicationAdded)
+    this.favoritesRef.on("value", this.handleFavoritesRef)
   }
 
   componentWillUnmount() {
     this.publicationsRef.off("child_added", this.handlePublicationAdded)
+    this.favoritesRef.off("value", this.handleFavoritesRef)
   }
 
   handlePublicationAdded = (snapshot:firebase.database.DataSnapshot) => {
@@ -334,6 +382,13 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
       }
       publicationItems.unshift(publicationItem)
       this.setState({publicationItems})
+    }
+  }
+
+  handleFavoritesRef = (snapshot:firebase.database.DataSnapshot|null) => {
+    if (snapshot) {
+      const favorites:FirebaseUserFavoritesPublicationMap = snapshot.val() || {}
+      this.setState({favorites})
     }
   }
 
@@ -479,6 +534,8 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
                    portalTokens={this.props.portalTokens}
                    windowManager={this.props.windowManager}
                    expandAll={this.state.expandAll}
+                   toggleFavorite={this.props.toggleFavorite}
+                   favorites={this.state.favorites}
                  />
         })}
       </div>

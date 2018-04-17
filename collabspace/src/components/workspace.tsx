@@ -14,7 +14,7 @@ import { v4 as uuidV4} from "uuid"
 import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
-import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath } from "../lib/refs"
+import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath, getFavoritesRef } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
 import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
@@ -822,6 +822,16 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleToggleFavorite = (offering:PortalOffering, publicationId: string, windowId: string) => {
+    const {portalUser} = this.props
+    if (portalUser) {
+      const ref = getFavoritesRef(offering, portalUser.id, publicationId, windowId)
+      ref.once("value", (snapshot) => {
+        ref.set(snapshot.val() ? null : true)
+      })
+    }
+  }
+
   renderDocumentInfo() {
     const {documentInfo} = this.state
     if (!documentInfo) {
@@ -1096,6 +1106,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
              toggleViewArtifact={this.handleToggleViewArtifact}
              publishing={this.state.publishing}
              windowManager={this.windowManager}
+             toggleFavorite={this.handleToggleFavorite}
            />
   }
 
@@ -1240,7 +1251,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     if (!this.state.showLearningLog || !portalTokens || !portalUser || !portalOffering) {
       return null
     }
-    return <LearningLogComponent portalTokens={portalTokens} portalUser={portalUser} onClose={this.handleToggleLearningLogButton} portalOffering={portalOffering} />
+    return <LearningLogComponent
+              portalTokens={portalTokens}
+              portalUser={portalUser}
+              onClose={this.handleToggleLearningLogButton}
+              portalOffering={portalOffering}
+              toggleFavorite={this.handleToggleFavorite}
+            />
   }
 
   renderProgressMessage() {

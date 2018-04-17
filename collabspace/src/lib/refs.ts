@@ -114,3 +114,17 @@ export const getSnapshotStoragePath = (offering:PortalOffering, id?:string) => {
   return id ? `${prefix}/${id}` : prefix
 }
 
+export const getFavoritesPath = (offering:PortalOffering, userId:string, publicationId?: string, windowId?:string) => {
+  const userPath = `${getClassPath(offering)}/favorites/users/${escapeFirebaseKey(userId)}`
+  if (publicationId) {
+    const publicationPath = `${userPath}/publications/${publicationId}`
+    return windowId ? `${publicationPath}/windows/${windowId}` : publicationPath
+  }
+  else {
+    return userPath
+  }
+}
+
+export const getFavoritesRef = (offering:PortalOffering, userId:string, publicationId?: string, windowId?:string) => {
+  return firebase.database().ref(getFavoritesPath(offering, userId, publicationId, windowId))
+}
