@@ -24,6 +24,22 @@ import { LiveTimeAgoComponent } from "./live-time-ago"
 import { UploadImageDialogComponent } from "./upload-image-dialog"
 import { LearningLogComponent } from "./learning-log"
 
+export type ToggleFavoritesOptions = ToggleFavoritesOptionsByOffering | ToggleFavoritesOptionsByClass
+
+export interface ToggleFavoritesOptionsByOffering {
+  type: "offering"
+  offering: PortalOffering
+  publicationId: string
+  windowId: string
+}
+
+export interface ToggleFavoritesOptionsByClass {
+  type: "class"
+  classHash: string
+  publicationId: string
+  windowId: string
+}
+
 export interface AddWindowLogParamsParams {
   ownerId?: string
   copiedFrom?: string
@@ -822,10 +838,17 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleToggleFavorite = (offering:PortalOffering, publicationId: string, windowId: string) => {
-    const {portalUser} = this.props
-    if (portalUser) {
-      const ref = getFavoritesRef(offering, portalUser.id, publicationId, windowId)
+  handleToggleFavorite = (options: ToggleFavoritesOptions) => {
+    const {portalUser, portalOffering} = this.props
+    if (portalUser && portalOffering) {
+      const {publicationId, windowId} = options
+      let ref: firebase.database.Reference
+      if (options.type === "offering") {
+        ref = getFavoritesRef(options.offering.domain, options.offering.classInfo.classHash, portalUser.id, publicationId, windowId)
+      }
+      else {
+        ref = getFavoritesRef(portalOffering.domain, options.classHash, portalUser.id, publicationId, windowId)
+      }
       ref.once("value", (snapshot) => {
         ref.set(snapshot.val() ? null : true)
       })

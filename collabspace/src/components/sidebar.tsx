@@ -11,8 +11,11 @@ import * as queryString from "query-string"
 import { UserLookup } from "../lib/user-lookup"
 import { MAX_GROUPS } from "./app"
 import { LiveTimeAgoComponent } from "./live-time-ago"
+import { ToggleFavoritesOptions } from "./workspace";
 
 const demoId = queryString.parse(window.location.search).demo
+
+type SidebarFilter = "offering" | "group" | "mine" | "search" | "favorites"
 
 export interface FirebaseFavorites {
   users: FirebaseUserFavoritesMap
@@ -89,7 +92,8 @@ export interface SidebarPublicationWindowComponentProps {
   windowManager: WindowManager
   creatorName: string
   favorites: FirebaseUserFavoritesPublicationMap
-  toggleFavorite: (offering:PortalOffering, publicationId: string, windowId: string) => void
+  toggleFavorite: (options: ToggleFavoritesOptions) => void
+  filter: SidebarFilter
 }
 export interface SidebarPublicationWindowComponentState {
   artifactItems: FirebaseArtifactItem[]
@@ -130,7 +134,13 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
   }
 
   handleToggleFavorite = () => {
-    this.props.toggleFavorite(this.props.portalOffering, this.props.publicationId, this.props.windowId)
+    const {publicationId, windowId} = this.props
+    this.props.toggleFavorite({
+      type: "offering",
+      offering: this.props.portalOffering,
+      publicationId,
+      windowId
+    })
   }
 
   renderArtifacts() {
@@ -151,17 +161,21 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
     )
   }
 
-  renderFavoriteStar() {
-    const {favorites} = this.props
-    const starred = favorites[this.props.publicationId] && favorites[this.props.publicationId].windows[this.props.windowId]
-    const className = starred ? "icon icon-star-full favorite-star" : "icon icon-star-empty"
+  renderFavoriteStar(favorited:boolean) {
+    const className = favorited ? "icon icon-star-full favorite-star" : "icon icon-star-empty"
     return <i className={className} onClick={this.handleToggleFavorite} />
   }
 
   render() {
+    const {favorites} = this.props
+    const favorited = favorites[this.props.publicationId] && favorites[this.props.publicationId].windows[this.props.windowId]
+    if ((this.props.filter === "favorites") && !favorited) {
+      return null
+    }
+
     return (
       <div className="window">
-        <div className="window-title">{this.renderFavoriteStar()} {this.props.window.title}</div>
+        <div className="window-title">{this.renderFavoriteStar(favorited)} {this.props.window.title}</div>
         {this.renderArtifacts()}
         <div className="window-actions">
           <div onClick={this.handleCopyIntoDocument} className="clickable">Copy Into Your Document</div>
@@ -180,7 +194,8 @@ export interface SidebarPublicationComponentProps {
   windowManager: WindowManager
   expandAll: boolean
   favorites: FirebaseUserFavoritesPublicationMap
-  toggleFavorite: (offering:PortalOffering, publicationId: string, windowId: string) => void
+  toggleFavorite: (options: ToggleFavoritesOptions) => void
+  filter: SidebarFilter
 }
 export interface SidebarPublicationComponentState {
   expanded: boolean
@@ -239,6 +254,7 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
             windowManager={this.props.windowManager}
             favorites={this.props.favorites}
             toggleFavorite={this.props.toggleFavorite}
+            filter={this.props.filter}
           />
         )
       }
@@ -300,18 +316,19 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
   }
 
   render() {
-    const {publicationItem} = this.props
+    const {publicationItem, favorites} = this.props
     const {publication, index} = publicationItem
     const {group, createdAt} = publication
     const user = this.props.userLookup.lookup(publication.creator)
     const name = user ? user.fullName : "Unknown Student"
     const initials = user ? user.initials : "?"
+    const expanded = this.state.expanded || ((this.props.filter === "favorites") && favorites[publicationItem.id])
     return (
       <div className="publication">
         <div className="publication-header clickable" onClick={this.handleToggle}>
           <span className="initials" title={name}>{initials}</span> in group {group} <span className="ago"><LiveTimeAgoComponent timestamp={createdAt} /></span>
         </div>
-        {this.state.expanded ? this.renderExpanded() : null}
+        {expanded ? this.renderExpanded() : null}
       </div>
     )
   }
@@ -325,11 +342,11 @@ export interface SidebarComponentProps {
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
   publishing: boolean
   windowManager: WindowManager
-  toggleFavorite: (offering:PortalOffering, publicationId: string, windowId: string) => void
+  toggleFavorite: (options: ToggleFavoritesOptions) => void
 }
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
-  filter: "offering" | "group" | "mine" | "search"
+  filter: SidebarFilter
   filterGroup: number
   filterOffering: string
   filterSearch: string
@@ -355,10 +372,11 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
       expandAll: false,
       favorites: {}
     }
-    this.publicationsRef = getPublicationsRef(this.props.portalOffering)
-    this.favoritesRef = getFavoritesRef(this.props.portalOffering, this.props.portalUser.id).child("publications")
+    const {portalOffering, portalUser} = this.props
+    this.publicationsRef = getPublicationsRef(portalOffering)
+    this.favoritesRef = getFavoritesRef(portalOffering.domain, portalOffering.classInfo.classHash, portalUser.id).child("publications")
 
-    this.userLookup = new UserLookup(this.props.portalOffering.classInfo)
+    this.userLookup = new UserLookup(portalOffering.classInfo)
   }
 
   componentWillMount() {
@@ -393,7 +411,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   }
 
   getFilteredPublicationItems() {
-    const {publicationItems, filter, filterGroup, filterOffering, filterSearch, filterSearchTrimmed} = this.state
+    const {publicationItems, filter, filterGroup, filterOffering, filterSearch, filterSearchTrimmed, favorites} = this.state
     const {portalOffering, portalUser, group} = this.props
     const canonicalSearch = filterSearchTrimmed.toLowerCase()
     return publicationItems.filter((publicationItem) => {
@@ -425,6 +443,8 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
             titleMatched = titleMatched || publicationWindow.title.toLowerCase().indexOf(canonicalSearch) !== -1
           })
           return titleMatched
+        case "favorites":
+          return !!favorites[publicationItem.id]
         default:
           return true
       }
@@ -436,7 +456,11 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   }
 
   renderExpandContract() {
-    return <div className="sidebar-header-expand" onClick={this.handleToggleExpandContract}>{this.state.expandAll ? "▼" : "▲"}</div>
+    const {filter, expandAll} = this.state
+    if (filter === "favorites") {
+      return null
+    }
+    return <div className="sidebar-header-expand" onClick={this.handleToggleExpandContract}>{expandAll ? "▼" : "▲"}</div>
   }
 
   renderFilterSelector() {
@@ -449,6 +473,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
         <span className={className("offering")} onClick={() => this.setState({filter: "offering"})}>Users</span>
         <span className={className("group")} onClick={() => this.setState({filter: "group"})}>Groups</span>
         <span className={className("search")} onClick={() => this.setState({filter: "search"})}>Search</span>
+        <span className={className("favorites")} onClick={() => this.setState({filter: "favorites"})}><i className="icon icon-star-full favorite-star" /></span>
       </div>
     )
   }
@@ -536,6 +561,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
                    expandAll={this.state.expandAll}
                    toggleFavorite={this.props.toggleFavorite}
                    favorites={this.state.favorites}
+                   filter={this.state.filter}
                  />
         })}
       </div>

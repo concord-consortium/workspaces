@@ -8,6 +8,7 @@ import { FirebaseFavorites } from "./sidebar"
 import * as queryString from "query-string"
 import * as superagent from "superagent"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
+import { ToggleFavoritesOptions } from "./workspace";
 
 const isDemo = require("../../functions/demo-info").demoInfo.isDemo
 
@@ -113,7 +114,7 @@ export interface LearningLogComponentProps {
   portalTokens: PortalTokens
   portalOffering: PortalOffering
   onClose: () => void
-  toggleFavorite: (offering:PortalOffering, publicationId: string, windowId: string) => void
+  toggleFavorite: (options: ToggleFavoritesOptions) => void
 }
 
 export interface LearningLogComponentState {
@@ -125,6 +126,7 @@ export interface LearningLogComponentState {
   selectedRow: LearningLogTableRow|null
   sortBy: SortTableBy
   sortDir: SortTableDir
+  filterFavorites: string
   filterClass: string
   filterActivity: string|number
   filterArtifact: string
@@ -145,6 +147,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
       selectedRow: null,
       sortBy: "Published",
       sortDir: "desc",
+      filterFavorites: "all",
       filterClass: "all",
       filterActivity: "all",
       filterArtifact: "all",
@@ -393,6 +396,10 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
     }
   }
 
+  handleFilterFavorites = (e:React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({filterFavorites: e.target.value})
+  }
+
   handleFilterClasses = (e:React.ChangeEvent<HTMLSelectElement>) => {
     this.setState({filterClass: e.target.value})
   }
@@ -412,7 +419,13 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
   handleToggleFavorite = (e: React.MouseEvent<HTMLElement>, tableRow: LearningLogTableRow) => {
     e.preventDefault()
     e.stopPropagation()
-    this.props.toggleFavorite(this.props.portalOffering, tableRow.publicationId, tableRow.windowId)
+    const {publicationId, windowId, classHash} = tableRow
+    this.props.toggleFavorite({
+      type: "class",
+      classHash,
+      publicationId,
+      windowId
+    })
   }
 
   getUniqueOptions(callback: (tableRow:LearningLogTableRow, list:any[]) => undefined|{value: string|number, name: string}) {
@@ -456,6 +469,10 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
 
     return (
       <div className="learning-log-filters">
+        <select onChange={this.handleFilterFavorites}>
+          <option value="all">All Rows</option>
+          <option value="favorites">Favorited Rows</option>
+        </select>
         <select onChange={this.handleFilterClasses}>
           <option value="all">All Classes</option>
           {classes.map((clazz) => <option key={clazz.info.classHash} value={clazz.info.classHash}>{clazz.info.name}</option>)}
@@ -483,7 +500,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
   }
 
   renderWorkspace() {
-    const {error, loadingClasses, tableRows, selectedRow, sortBy, sortDir, filterClass, filterActivity, filterArtifact, filterPublishedBy} = this.state
+    const {error, loadingClasses, tableRows, selectedRow, sortBy, sortDir, filterFavorites, filterClass, filterActivity, filterArtifact, filterPublishedBy} = this.state
     if (error) {
       return <div className="centered"><div className="error">{error.toString()}</div></div>
     }
@@ -493,12 +510,13 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
 
     const searchRegEx = this.search ? new RegExp(this.search.value.trim(), "i") : null
     const filteredRows = tableRows.filter((tableRow) => {
+      const favoritesMatch = (filterFavorites === "all") || tableRow.favorited
       const classMatch = (filterClass === "all") || (tableRow.classHash == filterClass)
       const activityMatch = (filterActivity === "all") || (tableRow.offeringId == filterActivity)
       const artifactMatch = (filterArtifact === "all") || (tableRow.artifactName == filterArtifact)
       const publishedByMatch = (filterPublishedBy === "all") || (tableRow.creator.id == filterPublishedBy)
       const searchMatch = (searchRegEx === null) || searchRegEx.test(tableRow.className) || searchRegEx.test(tableRow.artifactName) || searchRegEx.test(tableRow.offeringName) || searchRegEx.test(tableRow.creator.fullName)
-      return classMatch && activityMatch && artifactMatch && publishedByMatch && searchMatch
+      return favoritesMatch && classMatch && activityMatch && artifactMatch && publishedByMatch && searchMatch
     })
 
     return (

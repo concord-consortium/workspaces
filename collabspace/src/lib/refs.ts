@@ -114,8 +114,10 @@ export const getSnapshotStoragePath = (offering:PortalOffering, id?:string) => {
   return id ? `${prefix}/${id}` : prefix
 }
 
-export const getFavoritesPath = (offering:PortalOffering, userId:string, publicationId?: string, windowId?:string) => {
-  const userPath = `${getClassPath(offering)}/favorites/users/${escapeFirebaseKey(userId)}`
+export const getFavoritesPath = (domain: string, classHash: string, userId:string, publicationId?: string, windowId?:string) => {
+  const portalPath = isDemo(domain) ? "demo" : `portals/${escapeFirebaseKey(domain)}`
+  const classPath = `${portalPath}/classes/${classHash}`
+  const userPath = `${classPath}/favorites/users/${escapeFirebaseKey(userId)}`
   if (publicationId) {
     const publicationPath = `${userPath}/publications/${publicationId}`
     return windowId ? `${publicationPath}/windows/${windowId}` : publicationPath
@@ -125,6 +127,6 @@ export const getFavoritesPath = (offering:PortalOffering, userId:string, publica
   }
 }
 
-export const getFavoritesRef = (offering:PortalOffering, userId:string, publicationId?: string, windowId?:string) => {
-  return firebase.database().ref(getFavoritesPath(offering, userId, publicationId, windowId))
+export const getFavoritesRef = (domain: string, classHash: string, userId:string, publicationId?: string, windowId?:string) => {
+  return firebase.database().ref(getFavoritesPath(domain, classHash, userId, publicationId, windowId))
 }
