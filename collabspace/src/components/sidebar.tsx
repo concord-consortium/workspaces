@@ -94,6 +94,7 @@ export interface SidebarPublicationWindowComponentProps {
   favorites: FirebaseUserFavoritesPublicationMap
   toggleFavorite: (options: ToggleFavoritesOptions) => void
   filter: SidebarFilter
+  copyIntoDocument: (portalOffering: PortalOffering, publication: FirebasePublication, windowId: string, title: string) => void
 }
 export interface SidebarPublicationWindowComponentState {
   artifactItems: FirebaseArtifactItem[]
@@ -129,8 +130,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
 
   handleCopyIntoDocument = () => {
     const title = `${this.props.window.title} (by ${this.props.creatorName} in group ${this.props.publication.group})`
-    this.props.windowManager.copyWindowFromPublication(this.props.portalOffering, this.props.publication, this.props.windowId, title)
-      .catch((err:any) => alert(err.toString()))
+    this.props.copyIntoDocument(this.props.portalOffering, this.props.publication, this.props.windowId, title)
   }
 
   handleToggleFavorite = () => {
@@ -196,6 +196,7 @@ export interface SidebarPublicationComponentProps {
   favorites: FirebaseUserFavoritesPublicationMap
   toggleFavorite: (options: ToggleFavoritesOptions) => void
   filter: SidebarFilter
+  copyIntoDocument: (portalOffering: PortalOffering, publication: FirebasePublication, windowId: string, title: string) => void
 }
 export interface SidebarPublicationComponentState {
   expanded: boolean
@@ -255,6 +256,7 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
             favorites={this.props.favorites}
             toggleFavorite={this.props.toggleFavorite}
             filter={this.props.filter}
+            copyIntoDocument={this.props.copyIntoDocument}
           />
         )
       }
@@ -343,6 +345,7 @@ export interface SidebarComponentProps {
   publishing: boolean
   windowManager: WindowManager
   toggleFavorite: (options: ToggleFavoritesOptions) => void
+  copyIntoDocument: (portalOffering: PortalOffering, publication: FirebasePublication, windowId: string, title: string) => void
 }
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
@@ -562,6 +565,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
                    toggleFavorite={this.props.toggleFavorite}
                    favorites={this.state.favorites}
                    filter={this.state.filter}
+                   copyIntoDocument={this.props.copyIntoDocument}
                  />
         })}
       </div>

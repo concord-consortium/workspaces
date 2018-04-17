@@ -50,6 +50,12 @@ export interface NonPrivateWindowParams {
   ownerId?: string
 }
 
+export interface ModalWindowOptions {
+  type: "copy"|"add-drawing"|"add-table"|"add-graph"|"add-snapshot"|"copy-into-document",
+  title?: string
+  onOk?: (title: string, ownerId?:string) => void
+}
+
 export interface WorkspaceComponentProps {
   portalUser: PortalUser|null
   firebaseUser: firebase.User
@@ -77,9 +83,7 @@ export interface WorkspaceComponentState extends WindowManagerState {
   supportsSeen: FirebaseSupportSeenUsersSupportMap|null
   showSupportsDropdown: boolean
   visibleSupportIds: string[]
-  showModal: "copy"|"add-drawing"|"add-table"|"add-graph"|"add-snapshot"|null
-  onModalOk: ((title: string, ownerId?:string|null) => void) |null
-  copyWindow: Window|null
+  modalWindowOptions: ModalWindowOptions|null
   showUploadImageDialog: boolean
   showLearningLog: boolean
   progressMessage: string|null
@@ -117,9 +121,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       supportsSeen: null,
       showSupportsDropdown: false,
       visibleSupportIds: [],
-      showModal: null,
-      onModalOk: null,
-      copyWindow: null,
+      modalWindowOptions: null,
       showUploadImageDialog: false,
       showLearningLog: false,
       progressMessage: null,
@@ -427,43 +429,49 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   handleAddDrawingButton = () => {
     this.setState({
-      showModal: "add-drawing",
-      onModalOk: (title: string, ownerId?: string) => {
-        this.windowManager.add({
-          url: this.constructRelativeUrl("drawing-tool-v2.html"),
-          title,
-          ownerId,
-          log: {name: "Added drawing window", params: this.getAddWindowLogParams({ownerId})}
-        })
+      modalWindowOptions: {
+        type: "add-drawing",
+        onOk: (title, ownerId) => {
+          this.windowManager.add({
+            url: this.constructRelativeUrl("drawing-tool-v2.html"),
+            title,
+            ownerId,
+            log: {name: "Added drawing window", params: this.getAddWindowLogParams({ownerId})}
+          })
+        }
       }
     })
   }
 
   handleAddCaseTable = () => {
     this.setState({
-      showModal: "add-table",
-      onModalOk: (title: string, ownerId?: string) => {
-        this.windowManager.add({
-          url: this.constructRelativeUrl("neo-codap.html?mode=table"),
-          title,
-          ownerId,
-          createNewDataSet: true,
-          log: {name: "Added table window", params: this.getAddWindowLogParams({ownerId})}
-        })
+      modalWindowOptions: {
+        type: "add-table",
+        onOk: (title, ownerId) => {
+          this.windowManager.add({
+            url: this.constructRelativeUrl("neo-codap.html?mode=table"),
+            title,
+            ownerId,
+            createNewDataSet: true,
+            log: {name: "Added table window", params: this.getAddWindowLogParams({ownerId})}
+          })
+        }
       }
     })
   }
 
   handleAddGraph = () => {
     this.setState({
-      showModal: "add-graph",
-      onModalOk: (title: string, ownerId?: string) => {
-        this.windowManager.add({
-          url: this.constructRelativeUrl("neo-codap.html?mode=graph"),
-          title,
-          ownerId,
-          log: {name: "Added graph window", params: this.getAddWindowLogParams({ownerId})}
-        })
+      modalWindowOptions: {
+        type: "add-graph",
+        onOk: (title, ownerId) => {
+          this.windowManager.add({
+            url: this.constructRelativeUrl("neo-codap.html?mode=graph"),
+            title,
+            ownerId,
+            log: {name: "Added graph window", params: this.getAddWindowLogParams({ownerId})}
+          })
+        }
       }
     })
   }
@@ -525,10 +533,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   handleCopy = (copyWindow:Window) => {
     this.setState({
-      showModal: "copy",
-      copyWindow,
-      onModalOk: (title: string, ownerId: string) => {
-        this.windowManager.copyWindow(copyWindow, title, ownerId)
+      modalWindowOptions: {
+        type: "copy",
+        title: `Copy of ${copyWindow.attrs.title}`,
+        onOk: (title, ownerId) => {
+          this.windowManager.copyWindow(copyWindow, title, ownerId)
+        }
       }
     })
   }
@@ -690,14 +700,16 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           .then((snapshotUrl) => {
             this.setState({
               progressMessage: null,
-              showModal: "add-snapshot",
-              onModalOk: (title: string, ownerId?: string) => {
-                this.windowManager.add({
-                  url: this.constructRelativeUrl(`drawing-tool-v2.html?backgroundUrl=${encodeURIComponent(snapshotUrl)}`),
-                  title,
-                  ownerId,
-                  log: {name: "Added snapshot drawing window", params: this.getAddWindowLogParams({ownerId})}
-                })
+              modalWindowOptions: {
+                type: "add-snapshot",
+                onOk: (title, ownerId) => {
+                  this.windowManager.add({
+                    url: this.constructRelativeUrl(`drawing-tool-v2.html?backgroundUrl=${encodeURIComponent(snapshotUrl)}`),
+                    title,
+                    ownerId,
+                    log: {name: "Added snapshot drawing window", params: this.getAddWindowLogParams({ownerId})}
+                  })
+                }
               }
             })
           })
@@ -853,6 +865,19 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         ref.set(snapshot.val() ? null : true)
       })
     }
+  }
+
+  handleCopyIntoDocument = (portalOffering: PortalOffering, publication: FirebasePublication, windowId: string, title: string) => {
+    this.setState({
+      modalWindowOptions: {
+        type: "copy-into-document",
+        title,
+        onOk: (title, ownerId) => {
+          this.windowManager.copyWindowFromPublication(portalOffering, publication, windowId, title, ownerId)
+            .catch((err:any) => alert(err.toString()))
+        }
+      }
+    })
   }
 
   renderDocumentInfo() {
@@ -1130,6 +1155,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
              publishing={this.state.publishing}
              windowManager={this.windowManager}
              toggleFavorite={this.handleToggleFavorite}
+             copyIntoDocument={this.handleCopyIntoDocument}
            />
   }
 
@@ -1150,23 +1176,28 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderModalDialog() {
+    const {modalWindowOptions} = this.state
+    if (!modalWindowOptions) {
+      return null
+    }
+
     let titlebar = ""
-    let title = ""
+    let title = modalWindowOptions.title || ""
     let okButton = ""
     let content:JSX.Element|null = null
     let newWindowIsPrivate:HTMLInputElement|null
     let enableVisibiltyOptions = !this.props.isTemplate
 
     const handleOk = () => {
-      const {onModalOk} = this.state
-      if (onModalOk) {
+      const {onOk} = modalWindowOptions
+      if (onOk) {
         let newTitle = this.modalDialogNewWindowTitle ? this.modalDialogNewWindowTitle.value.trim() : ""
         if (newTitle.length == 0) {
           newTitle = title
         }
-        const ownerId = newWindowIsPrivate && newWindowIsPrivate.checked ? this.userId() : null
-        onModalOk(newTitle, ownerId)
-        this.setState({showModal: null})
+        const ownerId = newWindowIsPrivate && newWindowIsPrivate.checked ? this.userId() : undefined
+        onOk(newTitle, ownerId)
+        this.setState({modalWindowOptions: null})
       }
     }
 
@@ -1177,34 +1208,37 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
 
     const handleCancel = () => {
-      this.setState({showModal: null})
+      this.setState({modalWindowOptions: null})
     }
 
-    switch (this.state.showModal) {
+    switch (modalWindowOptions.type) {
+      case "copy-into-document":
+        titlebar = "Copy Into Your Document"
+        okButton = "Copy"
+        break
       case "copy":
-        title = this.state.copyWindow ? `Copy of ${this.state.copyWindow.attrs.title}` : ""
         titlebar = "Copy Window"
         okButton = "Copy"
         break
       case "add-drawing":
-        title = "Untitled Drawing"
+        title = title || "Untitled Drawing"
         titlebar = "Add Drawing"
         okButton = "Add"
         break
       case "add-table":
-        title = "Untitled Table"
+        title = title || "Untitled Table"
         titlebar = "Add Table"
         okButton = "Add"
         enableVisibiltyOptions = false
         break
       case "add-graph":
-        title = "Untitled Graph"
+        title = title || "Untitled Graph"
         titlebar = "Add Graph"
         okButton = "Add"
         enableVisibiltyOptions = false
         break
       case "add-snapshot":
-        title = "Untitled Snapshot"
+        title = title || "Untitled Snapshot"
         titlebar = "Add Snapshot"
         okButton = "Add"
         break
@@ -1244,7 +1278,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderModal() {
-    if (!this.state.showModal) {
+    if (!this.state.modalWindowOptions) {
       return null
     }
     return (

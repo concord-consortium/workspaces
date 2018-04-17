@@ -569,7 +569,7 @@ export class WindowManager {
     })
   }
 
-  copyWindow(window: Window, title: string, ownerId: string|null) {
+  copyWindow(window: Window, title: string, ownerId?: string) {
     return new Promise<void>((resolve, reject) => {
       const windowsRef = this.document.getWindowsRef()
       windowsRef.once("value")
@@ -599,7 +599,7 @@ export class WindowManager {
     })
   }
 
-  copyWindowFromPublication(portalOffering:PortalOffering, publication:FirebasePublication, windowId: string, title:string) {
+  copyWindowFromPublication(portalOffering:PortalOffering, publication:FirebasePublication, windowId: string, title:string, ownerId?:string) {
     return new Promise<void>((resolve, reject) => {
       // open the publication document
       const documentDataRef = getDocumentRef(portalOffering, this.document.id).child("data")
@@ -624,7 +624,7 @@ export class WindowManager {
                   copiedFrom: windowId
                 }
               }
-              this.add({url, title, iframeData, annotations, dataSet, log: logParams})
+              this.add({url, title, iframeData, annotations, dataSet, log: logParams, ownerId})
               resolve()
             }
             if (dataSet) {
