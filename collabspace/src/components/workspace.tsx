@@ -91,6 +91,10 @@ export interface WorkspaceComponentState extends WindowManagerState {
   progressMessage: string|null
   captureAnnotationsCallbacks: CaptureAnnotationCallbackMap
   isReadonly: boolean
+  posterView: {
+    enabled: boolean
+    editable: boolean
+  }
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -109,6 +113,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const {portalOffering, group, portalUser, document} = props
 
     this.userLookup = new UserLookup(portalOffering ? portalOffering.classInfo : undefined)
+
+    const posterView = {
+      enabled: group === "poster",
+      editable: !!(portalUser && (portalUser.type === "teacher"))
+    }
 
     this.state = {
       documentInfo: null,
@@ -129,7 +138,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       showLearningLog: false,
       progressMessage: null,
       captureAnnotationsCallbacks: {},
-      isReadonly: (props.isTemplate && document.isReadonly) || !!((group === "poster") && portalUser && (portalUser.type !== "teacher"))
+      isReadonly: (props.isTemplate && document.isReadonly) || (posterView.enabled && !posterView.editable),
+      posterView
     }
   }
 
@@ -149,7 +159,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       onStateChanged: (newState) => {
         this.setState(newState)
       },
-      syncChanges: this.props.isTemplate || (this.props.group === "poster"),
+      syncChanges: this.props.isTemplate || this.state.posterView.enabled,
       tokens: this.props.portalTokens,
       nonPrivateWindow: this.nonPrivateWindow
     })
@@ -983,9 +993,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderGroupInfo() {
+    const {posterView} = this.state
     const {portalOffering, group} = this.props
 
-    if (group === "poster") {
+    if (posterView.enabled) {
       return (
         <div className="group-info"><div className="group-name"><i className="icon icon-map2" /> Poster View</div></div>
       )
@@ -1051,13 +1062,16 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderReadonlyTemplateToolbar() {
-    return (
-      <div className="readonly-message">View only.  You do not have edit access to this template.</div>
-    )
   }
 
   renderReadonlyToolbar() {
-    return this.props.isTemplate ? this.renderReadonlyTemplateToolbar() : this.renderPublicationToolbar()
+    if (this.state.posterView.enabled) {
+      return <div className="readonly-message">View only.  Only teachers can edit the poster.</div>
+    }
+    if (this.props.isTemplate) {
+      return <div className="readonly-message">View only.  You do not have edit access to this template.</div>
+    }
+    return this.renderPublicationToolbar()
   }
 
   getPosterViewUrl() {
@@ -1092,17 +1106,16 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   renderToolbarButtons() {
     const {document, group, portalUser} = this.props
-    const {documentInfo, isReadonly} = this.state
-    const isPosterView = group == "poster"
+    const {documentInfo, isReadonly, posterView} = this.state
     const isTeacher = portalUser && (portalUser.type === "teacher")
-    const showLeftButtons = !isReadonly && (!isPosterView || isTeacher)
+    const showLeftButtons = !isReadonly && (!posterView.enabled || isTeacher)
     const showCreateActivityButton = documentInfo && documentInfo.portalUrl && !documentInfo.portalEditUrl && !isReadonly
     const showEditActivityButton = documentInfo && documentInfo.portalUrl && documentInfo.portalEditUrl && !isReadonly && this.props.isTemplate
     const editActivityUrl = documentInfo && documentInfo.portalEditUrl
     const showDemoButton = this.props.isTemplate && !isReadonly
-    const showPublishButton = !isPosterView && !this.props.isTemplate && !isReadonly
-    const showLearningLogButton = !this.props.isTemplate && (!isPosterView || isTeacher)
-    const showPosterViewButton = !isPosterView
+    const showPublishButton = !posterView.enabled && !this.props.isTemplate && !isReadonly
+    const showLearningLogButton = !this.props.isTemplate && (!posterView.enabled || isTeacher)
+    const showPosterViewButton = !posterView.enabled
     const posterViewUrl = showPosterViewButton ? this.getPosterViewUrl() : null
 
     return (
@@ -1129,7 +1142,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderAllWindows() {
-    const {allOrderedWindows, topWindow, captureAnnotationsCallbacks, isReadonly} = this.state
+    const {allOrderedWindows, topWindow, captureAnnotationsCallbacks, isReadonly, posterView} = this.state
     const {document, isTemplate, portalUser} = this.props
     const userId = this.userId()
     const nonPrivateWindows = allOrderedWindows.filter((orderedWindow: OrderedWindow) => this.nonPrivateWindow({window: orderedWindow.window}))
@@ -1149,6 +1162,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                annotationsRef={document.getWindowsDataRef("annotations").child(window.id)}
                portalUser={portalUser}
                captureAnnotationsCallback={captureAnnotationsCallbacks[window.id]}
+               allowAnnotations={!posterView.enabled}
              />
     })
   }
