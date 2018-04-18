@@ -85,6 +85,36 @@ export class GroupListComponent extends React.Component<GroupListComponentProps,
       )
     }
 
+    const groupRows:JSX.Element[] = []
+    groupKeys.forEach((groupKey) => {
+      if (groupKey === "poster") {
+        return
+      }
+      const group = groups[groupKey]
+      const {classInfoUrl, id} = this.props.portalOffering
+      const existingParams:AuthQueryParams = queryString.parse(window.location.search)
+
+      const params:AuthQueryParams = {
+        portalJWT: this.props.portalTokens.rawPortalJWT,
+        classInfoUrl,
+        offeringId: id,
+        group: groupKey,
+        demo: existingParams.demo
+      }
+      const hashParams = {
+        template:  Document.StringifyTemplateHashParam(template.userId, template.templateId)
+      }
+      const href = `index.html?${queryString.stringify(params)}#${queryString.stringify(hashParams)}`
+
+      groupRows.push(
+        <tr key={groupKey}>
+          <td>{groupKey}</td>
+          <td>{this.renderUsers(group)}</td>
+          <td><a href={href} className="button" target="_blank">Join Group</a></td>
+        </tr>
+      )
+    })
+
     return (
       <div className="group-table">
         <table>
@@ -96,31 +126,7 @@ export class GroupListComponent extends React.Component<GroupListComponentProps,
             </tr>
           </thead>
           <tbody>
-            {groupKeys.map((groupKey) => {
-              const group = groups[parseInt(groupKey)]
-              const {classInfoUrl, id} = this.props.portalOffering
-              const existingParams:AuthQueryParams = queryString.parse(window.location.search)
-
-              const params:AuthQueryParams = {
-                portalJWT: this.props.portalTokens.rawPortalJWT,
-                classInfoUrl,
-                offeringId: id,
-                group: groupKey,
-                demo: existingParams.demo
-              }
-              const hashParams = {
-                template:  Document.StringifyTemplateHashParam(template.userId, template.templateId)
-              }
-              const href = `index.html?${queryString.stringify(params)}#${queryString.stringify(hashParams)}`
-
-              return (
-                <tr key={groupKey}>
-                  <td>{groupKey}</td>
-                  <td>{this.renderUsers(group)}</td>
-                  <td><a href={href} className="button" target="_blank">Join Group</a></td>
-                </tr>
-              )
-            })}
+            {groupRows}
           </tbody>
         </table>
       </div>

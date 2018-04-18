@@ -353,6 +353,43 @@ export const collabSpaceAuth = () => {
                   }
                 })
               }
+              else if (user_type === "learner") {
+                // learner joining group via open poster view
+                const portalLearnerJWT:PortalStudentJWT = decodedJWT
+                return getClassInfo(portalLearnerJWT.class_info_url, portalJWT)
+                  .then((classInfo) => {
+                    let user:PortalUser|null = null
+                    classInfo.students.forEach((student) => {
+                      if (student.id === decodedJWT.user_id) {
+                        user = student
+                      }
+                    })
+                    if (!user) {
+                      reject("Student not found in class roster")
+                    }
+
+                    const domainParser = document.createElement("a")
+                    domainParser.href = decodedJWT.domain
+
+                    resolve({
+                      user: user,
+                      offering: {
+                        id: portalLearnerJWT.offering_id,
+                        domain: isDemo(domain) ? "demo" : domainParser.host,
+                        classInfo: classInfo,
+                        isDemo: isDemo(domain),
+                        classInfoUrl: portalLearnerJWT.class_info_url
+                      },
+                      tokens: {
+                        domain,
+                        rawPortalJWT: portalJWT,
+                        portalJWT: portalUserJWT,
+                        rawFirebaseJWT,
+                        firebaseJWT
+                      }
+                    })
+                  })
+              }
               else if (user_type === "teacher") {
                 // teacher joining group via dashboard
                 const {classInfoUrl , offeringId} = queryParams
@@ -369,7 +406,7 @@ export const collabSpaceAuth = () => {
                       }
                     })
                     if (!user) {
-                      reject("Teaching not found in class roster")
+                      reject("Teacher not found in class roster")
                     }
 
                     const domainParser = document.createElement("a")

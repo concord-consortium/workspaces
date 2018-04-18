@@ -69,7 +69,7 @@ export interface WorkspaceComponentProps {
   groupRef: firebase.database.Reference|null
   supportsRef: firebase.database.Reference|null
   supportsSeenRef: firebase.database.Reference|null
-  group: number|null
+  group: string|null
   leaveGroup?: () => void
   publication: FirebasePublication|null
   logManager: LogManager|null
@@ -981,25 +981,33 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderGroupInfo() {
-    const {portalOffering} = this.props
-    const {groupUsers} = this.state
-    if (!groupUsers || !portalOffering) {
-      return null
+    const {portalOffering, group} = this.props
+
+    if (group === "poster") {
+      return (
+        <div className="group-info"><div className="group-name">Poster View</div></div>
+      )
     }
-    const users:JSX.Element[] = []
-    Object.keys(groupUsers).forEach((id) => {
-      const groupUser = groupUsers[id]
-      const portalUser = this.userLookup.lookup(id)
-      if (portalUser) {
-        const {connected} = groupUser
-        const className = `group-user ${groupUser.connected ? `connected ${portalUser.type}` : "disconnected"}`
-        const titleSuffix = groupUser.connected ? `connected` : `disconnected`
-        users.push(<div key={id} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
+    else {
+      const {groupUsers} = this.state
+      if (!groupUsers || !portalOffering) {
+        return null
       }
-    })
-    return (
-      <div className="group-info"><div className="group-name clickable" onClick={this.handlePromptToChangeGroup} title="Click to leave group">Group {this.props.group}</div>{users}</div>
-    )
+      const users:JSX.Element[] = []
+      Object.keys(groupUsers).forEach((id) => {
+        const groupUser = groupUsers[id]
+        const portalUser = this.userLookup.lookup(id)
+        if (portalUser) {
+          const {connected} = groupUser
+          const className = `group-user ${groupUser.connected ? `connected ${portalUser.type}` : "disconnected"}`
+          const titleSuffix = groupUser.connected ? `connected` : `disconnected`
+          users.push(<div key={id} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
+        }
+      })
+      return (
+        <div className="group-info"><div className="group-name clickable" onClick={this.handlePromptToChangeGroup} title="Click to leave group">Group {this.props.group}</div>{users}</div>
+      )
+    }
   }
 
   renderHeader() {
@@ -1050,28 +1058,60 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return this.props.isTemplate ? this.renderReadonlyTemplateToolbar() : this.renderPublicationToolbar()
   }
 
+  getPosterViewUrl() {
+    const {portalTokens, portalUser, portalOffering} = this.props
+    if (portalTokens) {
+      const queryParams = queryString.parse(window.location.search)
+      const urlParams:any = {
+        portalJWT: portalTokens.rawPortalJWT,
+        group: "poster"
+      }
+      if (queryParams.demo) {
+        urlParams.demo = queryParams.demo
+      }
+      if (portalOffering && portalUser && (portalUser.type === "teacher")) {
+        urlParams.classInfoUrl = portalOffering.classInfoUrl
+        urlParams.offeringId = portalOffering.id
+      }
+      return `?${queryString.stringify(urlParams)}${window.location.hash}`
+    }
+  }
+
+  renderLeftToolbarButtons() {
+    return (
+      <div className="left-buttons">
+        <button type="button" onClick={this.handleAddDrawingButton}><i className="icon icon-pencil" /> Add Drawing</button>
+        <button type="button" onClick={this.handleUploadImageButton}><i className="icon icon-file-picture" /> Upload Image</button>
+        <button type="button" onClick={this.handleAddCaseTable}><i className="icon icon-table2" /> Add Table</button>
+        <button type="button" onClick={this.handleAddGraph}><i className="icon icon-stats-dots" /> Add Graph</button>
+      </div>
+    )
+  }
+
   renderToolbarButtons() {
-    const {document} = this.props
+    const {document, group, portalUser} = this.props
     const {documentInfo} = this.state
+    const isPosterView = group == "poster"
+    const isTeacher = portalUser && (portalUser.type === "teacher")
+    const showLeftButtons = !document.isReadonly && (!isPosterView || isTeacher)
     const showCreateActivityButton = documentInfo && documentInfo.portalUrl && !documentInfo.portalEditUrl && !document.isReadonly
     const showEditActivityButton = documentInfo && documentInfo.portalUrl && documentInfo.portalEditUrl && !document.isReadonly && this.props.isTemplate
     const editActivityUrl = documentInfo && documentInfo.portalEditUrl
     const showDemoButton = this.props.isTemplate && !document.isReadonly
-    const showPublishButton = !this.props.isTemplate && !document.isReadonly
-    const showLearningLogButton = !this.props.isTemplate
+    const showPublishButton = !isPosterView && !this.props.isTemplate && !document.isReadonly
+    const showLearningLogButton = !this.props.isTemplate && (!isPosterView || isTeacher)
+    const showPosterViewButton = !isPosterView
+    const posterViewUrl = showPosterViewButton ? this.getPosterViewUrl() : null
+
     return (
       <div className="buttons">
-        <div className="left-buttons">
-          <button type="button" onClick={this.handleAddDrawingButton}><i className="icon icon-pencil" /> Add Drawing</button>
-          <button type="button" onClick={this.handleUploadImageButton}><i className="icon icon-file-picture" /> Upload Image</button>
-          <button type="button" onClick={this.handleAddCaseTable}><i className="icon icon-table2" /> Add Table</button>
-          <button type="button" onClick={this.handleAddGraph}><i className="icon icon-stats-dots" /> Add Graph</button>
-          </div>
+        {showLeftButtons ? this.renderLeftToolbarButtons() : null}
         <div className="right-buttons">
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
           {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
           {showLearningLogButton ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Artifacts Archive</button> : null}
+          {showPosterViewButton && posterViewUrl ? <a className="button" href={posterViewUrl} target="_blank"><i className="icon icon-map2" /> Open Poster View</a> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}><i className="icon icon-newspaper" /> Publish All</button> : null}
         </div>
       </div>
