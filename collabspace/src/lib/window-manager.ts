@@ -21,8 +21,8 @@ import { IFramePhoneLib,
 
 import * as firebase from "firebase"
 import { PortalOffering, PortalTokens } from "./auth";
-import { getDocumentRef, getRelativeRefPath } from "./refs"
-import { NonPrivateWindowParams } from "../components/workspace";
+import { getDocumentRef, getRelativeRefPath, getDocumentRefByClass } from "./refs"
+import { NonPrivateWindowParams, PublicationWindowOptions } from "../components/workspace";
 import { LogManager } from "../../../shared/log-manager"
 import { assign } from "lodash"
 
@@ -599,11 +599,19 @@ export class WindowManager {
     })
   }
 
-  copyWindowFromPublication(portalOffering:PortalOffering, publication:FirebasePublication, windowId: string, title:string, ownerId?:string) {
+  copyWindowFromPublication(portalOffering: PortalOffering, options: PublicationWindowOptions, title:string, ownerId?:string) {
     return new Promise<void>((resolve, reject) => {
+      const {windowId} = options
       // open the publication document
       const documentDataRef = getDocumentRef(portalOffering, this.document.id).child("data")
-      const publicationDataRef = getDocumentRef(portalOffering, publication.documentId).child("data")
+      // TODO:
+      let publicationDataRef:firebase.database.Reference
+      if (options.type === "offering") {
+        publicationDataRef = getDocumentRef(options.offering, options.documentId).child("data")
+      }
+      else {
+        publicationDataRef = getDocumentRefByClass(portalOffering.domain, options.classHash, options.documentId).child("data")
+      }
       const documentWindowsRef = publicationDataRef.child("windows")
       documentWindowsRef.once("value")
         .then((snapshot) => {

@@ -11,7 +11,7 @@ import * as queryString from "query-string"
 import { UserLookup } from "../lib/user-lookup"
 import { MAX_GROUPS } from "./app"
 import { LiveTimeAgoComponent } from "./live-time-ago"
-import { ToggleFavoritesOptions } from "./workspace";
+import { PublicationWindowOptions } from "./workspace";
 
 const demoId = queryString.parse(window.location.search).demo
 
@@ -92,9 +92,9 @@ export interface SidebarPublicationWindowComponentProps {
   windowManager: WindowManager
   creatorName: string
   favorites: FirebaseUserFavoritesPublicationMap
-  toggleFavorite: (options: ToggleFavoritesOptions) => void
+  toggleFavorite: (options: PublicationWindowOptions) => void
   filter: SidebarFilter
-  copyIntoDocument: (portalOffering: PortalOffering, publication: FirebasePublication, windowId: string, title: string) => void
+  copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
 }
 export interface SidebarPublicationWindowComponentState {
   artifactItems: FirebaseArtifactItem[]
@@ -129,17 +129,25 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
   }
 
   handleCopyIntoDocument = () => {
+    const {publicationId, windowId, publication} = this.props
     const title = `${this.props.window.title} (by ${this.props.creatorName} in group ${this.props.publication.group})`
-    this.props.copyIntoDocument(this.props.portalOffering, this.props.publication, this.props.windowId, title)
+    this.props.copyIntoDocument({
+      type: "offering",
+      offering: this.props.portalOffering,
+      publicationId,
+      windowId,
+      documentId: publication.documentId
+    }, title)
   }
 
   handleToggleFavorite = () => {
-    const {publicationId, windowId} = this.props
+    const {publicationId, windowId, publication} = this.props
     this.props.toggleFavorite({
       type: "offering",
       offering: this.props.portalOffering,
       publicationId,
-      windowId
+      windowId,
+      documentId: publication.documentId
     })
   }
 
@@ -194,9 +202,9 @@ export interface SidebarPublicationComponentProps {
   windowManager: WindowManager
   expandAll: boolean
   favorites: FirebaseUserFavoritesPublicationMap
-  toggleFavorite: (options: ToggleFavoritesOptions) => void
+  toggleFavorite: (options: PublicationWindowOptions) => void
   filter: SidebarFilter
-  copyIntoDocument: (portalOffering: PortalOffering, publication: FirebasePublication, windowId: string, title: string) => void
+  copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
 }
 export interface SidebarPublicationComponentState {
   expanded: boolean
@@ -344,8 +352,8 @@ export interface SidebarComponentProps {
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
   publishing: boolean
   windowManager: WindowManager
-  toggleFavorite: (options: ToggleFavoritesOptions) => void
-  copyIntoDocument: (portalOffering: PortalOffering, publication: FirebasePublication, windowId: string, title: string) => void
+  toggleFavorite: (options: PublicationWindowOptions) => void
+  copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
 }
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
