@@ -466,9 +466,9 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     this.setState({expandAll: !this.state.expandAll})
   }
 
-  renderExpandContract() {
+  renderExpandContract(publicationItems: FirebasePublicationItem[]) {
     const {filter, expandAll} = this.state
-    if (filter === "favorites") {
+    if ((filter === "favorites") || (publicationItems.length === 0)) {
       return null
     }
     return <div className="sidebar-header-expand" onClick={this.handleToggleExpandContract}>{expandAll ? "▼" : "▲"}</div>
@@ -481,10 +481,10 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     //<span className={className("mine")} onClick={() => this.setState({filter: "mine"})}>Mine</span>
     return (
       <div className="filter-selector">
-        <span className={className("offering")} onClick={() => this.setState({filter: "offering"})}>Users</span>
-        <span className={className("group")} onClick={() => this.setState({filter: "group"})}>Groups</span>
-        <span className={className("search")} onClick={() => this.setState({filter: "search"})}>Search</span>
-        <span className={className("favorites")} onClick={() => this.setState({filter: "favorites"})}><i className="icon icon-star-full favorite-star" /></span>
+        <span className={className("offering")} onClick={() => this.setState({filter: "offering"})}><i className="icon icon-user" title="Users" /></span>
+        <span className={className("group")} onClick={() => this.setState({filter: "group"})}><i className="icon icon-users" title="Groups" /></span>
+        <span className={className("favorites")} onClick={() => this.setState({filter: "favorites"})}><i className="icon icon-star-full favorite-star" title="Favorites" /></span>
+        <span className={className("search")} onClick={() => this.setState({filter: "search"})}><i className="icon icon-search" title="Search" /></span>
       </div>
     )
   }
@@ -549,8 +549,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     )
   }
 
-  renderPublications() {
-    const publicationItems = this.getFilteredPublicationItems()
+  renderPublications(publicationItems: FirebasePublicationItem[]) {
     if (publicationItems.length === 0) {
       if ((this.state.filter !== "search") || (this.state.filterSearchTrimmed.length > 0)) {
         return <div className="none-found">No publications were found</div>
@@ -581,17 +580,18 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   }
 
   render() {
+    const publicationItems = this.getFilteredPublicationItems()
     return (
       <div className="sidebar">
         <div className="sidebar-header">
           <i className="icon icon-newspaper" />
           Publications
-          {this.renderExpandContract()}
+          {this.renderExpandContract(publicationItems)}
         </div>
         {this.renderFilterSelector()}
         {this.renderFilter()}
         {this.renderPublishing()}
-        {this.renderPublications()}
+        {this.renderPublications(publicationItems)}
       </div>
     )
   }

@@ -769,13 +769,13 @@ a {
       .filter-selector {
         text-align: center;
         padding: 10px;
-        font-size: 12px;
+        font-size: 14px;
         border-top: 1px solid #fff;
         border-bottom: 1px solid #fff;
 
         span {
           padding: 3px;
-          margin: 0 3px;
+          margin: 0 5px;
         }
 
         .selected-filter {
@@ -1504,4 +1504,13 @@ a {
 }
 .icon-star-full:before {
   content: "\e9d9";
+}
+.icon-user:before {
+  content: "\e971";
+}
+.icon-users:before {
+  content: "\e972";
+}
+.icon-search:before {
+  content: "\e986";
 }
