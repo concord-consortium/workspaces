@@ -24,8 +24,16 @@ export const getPortalPath = (offering:PortalOffering) => {
   return isDemo(offering.domain) ? "demo" : `portals/${escapeFirebaseKey(offering.domain)}`
 }
 
+export const getPortalPathByClass = (domain: string) => {
+  return isDemo(domain) ? "demo" : `portals/${escapeFirebaseKey(domain)}`
+}
+
 export const getClassPath = (offering:PortalOffering) => {
   return `${getPortalPath(offering)}/classes/${offering.classInfo.classHash}`
+}
+
+export const getClassPathByClass = (domain: string, classHash: string) => {
+  return `${getPortalPathByClass(domain)}/classes/${classHash}`
 }
 
 export const getOfferingPath = (offering:PortalOffering) => {
@@ -44,7 +52,6 @@ export const getClassOfferingsRef = (offering:PortalOffering) => {
   return firebase.database().ref(getClassOfferingsPath(offering))
 }
 
-
 export const getDocumentPath = (offering:PortalOffering, documentId?:string) => {
   const prefix = `${getClassPath(offering)}/documents`
   return documentId ? `${prefix}/${documentId}` : prefix
@@ -52,6 +59,15 @@ export const getDocumentPath = (offering:PortalOffering, documentId?:string) => 
 
 export const getDocumentRef = (offering:PortalOffering, documentId?:string) => {
     return firebase.database().ref(getDocumentPath(offering, documentId))
+}
+
+export const getDocumentPathByClass = (domain: string, classHash: string, documentId?:string) => {
+  const prefix = `${getClassPathByClass(domain, classHash)}/documents`
+  return documentId ? `${prefix}/${documentId}` : prefix
+}
+
+export const getDocumentRefByClass = (domain: string, classHash: string, documentId?:string) => {
+    return firebase.database().ref(getDocumentPathByClass(domain, classHash, documentId))
 }
 
 export const getPublicationsPath = (offering:PortalOffering, publicationId?:string) => {
@@ -115,8 +131,7 @@ export const getSnapshotStoragePath = (offering:PortalOffering, id?:string) => {
 }
 
 export const getFavoritesPath = (domain: string, classHash: string, userId:string, publicationId?: string, windowId?:string) => {
-  const portalPath = isDemo(domain) ? "demo" : `portals/${escapeFirebaseKey(domain)}`
-  const classPath = `${portalPath}/classes/${classHash}`
+  const classPath = getClassPathByClass(domain, classHash)
   const userPath = `${classPath}/favorites/users/${escapeFirebaseKey(userId)}`
   if (publicationId) {
     const publicationPath = `${userPath}/publications/${publicationId}`

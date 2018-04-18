@@ -24,20 +24,22 @@ import { LiveTimeAgoComponent } from "./live-time-ago"
 import { UploadImageDialogComponent } from "./upload-image-dialog"
 import { LearningLogComponent } from "./learning-log"
 
-export type ToggleFavoritesOptions = ToggleFavoritesOptionsByOffering | ToggleFavoritesOptionsByClass
+export type PublicationWindowOptions = PublicationWindowOptionsByOffering | PublicationWindowOptionsByClass
 
-export interface ToggleFavoritesOptionsByOffering {
+export interface PublicationWindowOptionsByOffering {
   type: "offering"
   offering: PortalOffering
   publicationId: string
   windowId: string
+  documentId: string
 }
 
-export interface ToggleFavoritesOptionsByClass {
+export interface PublicationWindowOptionsByClass {
   type: "class"
   classHash: string
   publicationId: string
   windowId: string
+  documentId: string
 }
 
 export interface AddWindowLogParamsParams {
@@ -850,7 +852,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleToggleFavorite = (options: ToggleFavoritesOptions) => {
+  handleToggleFavorite = (options: PublicationWindowOptions) => {
     const {portalUser, portalOffering} = this.props
     if (portalUser && portalOffering) {
       const {publicationId, windowId} = options
@@ -867,17 +869,20 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
-  handleCopyIntoDocument = (portalOffering: PortalOffering, publication: FirebasePublication, windowId: string, title: string) => {
-    this.setState({
-      modalWindowOptions: {
-        type: "copy-into-document",
-        title,
-        onOk: (title, ownerId) => {
-          this.windowManager.copyWindowFromPublication(portalOffering, publication, windowId, title, ownerId)
-            .catch((err:any) => alert(err.toString()))
+  handleCopyIntoDocument = (options: PublicationWindowOptions, title: string) => {
+    const {portalOffering} = this.props
+    if (portalOffering) {
+      this.setState({
+        modalWindowOptions: {
+          type: "copy-into-document",
+          title,
+          onOk: (title, ownerId) => {
+            this.windowManager.copyWindowFromPublication(portalOffering, options, title, ownerId)
+              .catch((err:any) => alert(err.toString()))
+          }
         }
-      }
-    })
+      })
+    }
   }
 
   renderDocumentInfo() {
@@ -1314,6 +1319,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
               onClose={this.handleToggleLearningLogButton}
               portalOffering={portalOffering}
               toggleFavorite={this.handleToggleFavorite}
+              copyIntoDocument={this.handleCopyIntoDocument}
             />
   }
 
@@ -1340,9 +1346,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderVisibleSupports()}
         {this.renderSidebarComponent()}
         {this.renderArtifact()}
-        {this.renderModal()}
         {this.renderUploadImageDialog()}
         {this.renderLearningLog()}
+        {this.renderModal()}
         {this.renderProgressMessage()}
         {this.renderReadonlyBlocker()}
       </div>

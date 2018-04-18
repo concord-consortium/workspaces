@@ -8,7 +8,7 @@ import { FirebaseFavorites } from "./sidebar"
 import * as queryString from "query-string"
 import * as superagent from "superagent"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
-import { ToggleFavoritesOptions } from "./workspace";
+import { PublicationWindowOptions } from "./workspace";
 
 const isDemo = require("../../functions/demo-info").demoInfo.isDemo
 
@@ -114,7 +114,8 @@ export interface LearningLogComponentProps {
   portalTokens: PortalTokens
   portalOffering: PortalOffering
   onClose: () => void
-  toggleFavorite: (options: ToggleFavoritesOptions) => void
+  toggleFavorite: (options: PublicationWindowOptions) => void
+  copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
 }
 
 export interface LearningLogComponentState {
@@ -419,13 +420,29 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
   handleToggleFavorite = (e: React.MouseEvent<HTMLElement>, tableRow: LearningLogTableRow) => {
     e.preventDefault()
     e.stopPropagation()
-    const {publicationId, windowId, classHash} = tableRow
+    const {publicationId, windowId, classHash, publication} = tableRow
     this.props.toggleFavorite({
       type: "class",
       classHash,
       publicationId,
-      windowId
+      windowId,
+      documentId: publication.documentId
     })
+  }
+
+  handleCopyIntoCurrentDocument = () => {
+    const {selectedRow} = this.state
+    if (selectedRow) {
+      this.handleSelectRow(null)
+      const {classHash, publicationId, windowId, publication} = selectedRow
+      this.props.copyIntoDocument({
+        type: "class",
+        classHash,
+        publicationId,
+        windowId,
+        documentId: publication.documentId
+      }, selectedRow.artifactName)
+    }
   }
 
   getUniqueOptions(callback: (tableRow:LearningLogTableRow, list:any[]) => undefined|{value: string|number, name: string}) {
@@ -571,7 +588,6 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
     }
 
     /*
-                  <button onClick={() => alert("TODO: implement button action")}>Copy Into Current Document</button>
               <button onClick={() => alert("TODO: implement button action")}>View In Original Document</button>
 
     */
@@ -588,6 +604,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
               <img src={selectedRow.artifact.url} />
             </div>
             <div className="learning-log-selected-row-modal-buttons">
+              <button onClick={() => this.handleCopyIntoCurrentDocument()}>Copy Into Current Document</button>
               <button onClick={() => this.handleSelectRow(null)}>Cancel</button>
             </div>
           </div>
