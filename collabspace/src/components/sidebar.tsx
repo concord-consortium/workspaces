@@ -200,8 +200,8 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
         <div className="window-title">{this.renderFavoriteStar(favorited)} {this.props.window.title}</div>
         {this.renderArtifacts()}
         <div className="window-actions">
-          <div onClick={this.handleCopyIntoDocument} className="clickable">Copy Into Your Document</div>
-          {group !== "poster" ? <div onClick={this.handleCopyIntoPoster} className="clickable">Copy Into Poster View</div> : null}
+          {group !== "poster" ? <div onClick={this.handleCopyIntoDocument} className="clickable">Copy Into Your Document</div> : null}
+          <div onClick={this.handleCopyIntoPoster} className="clickable">Copy Into Poster View</div>
         </div>
       </div>
     )
@@ -423,7 +423,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   handlePublicationAdded = (snapshot:firebase.database.DataSnapshot) => {
     const {publicationItems} = this.state
     const publication:FirebasePublication = snapshot.val()
-    if (publication.offeringId === this.props.portalOffering.id) {
+    if (publication.offeringId == this.props.portalOffering.id) {
       const publicationItem:FirebasePublicationItem = {
         index: publicationItems.length + 1,
         id: snapshot.key as string,
