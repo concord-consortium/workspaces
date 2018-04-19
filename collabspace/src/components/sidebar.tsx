@@ -95,6 +95,8 @@ export interface SidebarPublicationWindowComponentProps {
   toggleFavorite: (options: PublicationWindowOptions) => void
   filter: SidebarFilter
   copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
+  copyIntoPoster: (options: PublicationWindowOptions, title: string) => void
+  group: string
 }
 export interface SidebarPublicationWindowComponentState {
   artifactItems: FirebaseArtifactItem[]
@@ -140,6 +142,18 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
     }, title)
   }
 
+  handleCopyIntoPoster = () => {
+    const {publicationId, windowId, publication} = this.props
+    const title = `${this.props.window.title} (by ${this.props.creatorName} in group ${this.props.publication.group})`
+    this.props.copyIntoPoster({
+      type: "offering",
+      offering: this.props.portalOffering,
+      publicationId,
+      windowId,
+      documentId: publication.documentId
+    }, title)
+  }
+
   handleToggleFavorite = () => {
     const {publicationId, windowId, publication} = this.props
     this.props.toggleFavorite({
@@ -175,7 +189,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
   }
 
   render() {
-    const {favorites} = this.props
+    const {favorites, group} = this.props
     const favorited = favorites[this.props.publicationId] && favorites[this.props.publicationId].windows[this.props.windowId]
     if ((this.props.filter === "favorites") && !favorited) {
       return null
@@ -187,6 +201,7 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
         {this.renderArtifacts()}
         <div className="window-actions">
           <div onClick={this.handleCopyIntoDocument} className="clickable">Copy Into Your Document</div>
+          {group !== "poster" ? <div onClick={this.handleCopyIntoPoster} className="clickable">Copy Into Poster View</div> : null}
         </div>
       </div>
     )
@@ -205,6 +220,8 @@ export interface SidebarPublicationComponentProps {
   toggleFavorite: (options: PublicationWindowOptions) => void
   filter: SidebarFilter
   copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
+  copyIntoPoster: (options: PublicationWindowOptions, title: string) => void
+  group: string
 }
 export interface SidebarPublicationComponentState {
   expanded: boolean
@@ -265,6 +282,8 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
             toggleFavorite={this.props.toggleFavorite}
             filter={this.props.filter}
             copyIntoDocument={this.props.copyIntoDocument}
+            copyIntoPoster={this.props.copyIntoPoster}
+            group={this.props.group}
           />
         )
       }
@@ -354,6 +373,7 @@ export interface SidebarComponentProps {
   windowManager: WindowManager
   toggleFavorite: (options: PublicationWindowOptions) => void
   copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
+  copyIntoPoster: (options: PublicationWindowOptions, title: string) => void
 }
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
@@ -573,6 +593,8 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
                    favorites={this.state.favorites}
                    filter={this.state.filter}
                    copyIntoDocument={this.props.copyIntoDocument}
+                   copyIntoPoster={this.props.copyIntoPoster}
+                   group={this.props.group}
                  />
         })}
       </div>

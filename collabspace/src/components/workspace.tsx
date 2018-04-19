@@ -53,7 +53,7 @@ export interface NonPrivateWindowParams {
 }
 
 export interface ModalWindowOptions {
-  type: "copy"|"add-drawing"|"add-table"|"add-graph"|"add-snapshot"|"copy-into-document",
+  type: "copy"|"add-drawing"|"add-table"|"add-graph"|"add-snapshot"|"copy-into-document"|"copy-into-poster",
   title?: string
   onOk?: (title: string, ownerId?:string) => void
 }
@@ -73,6 +73,7 @@ export interface WorkspaceComponentProps {
   leaveGroup?: () => void
   publication: FirebasePublication|null
   logManager: LogManager|null
+  posterDocument?: Document
 }
 export interface WorkspaceComponentState extends WindowManagerState {
   documentInfo: FirebaseDocumentInfo|null
@@ -203,8 +204,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.addEventListener("mousemove", this.handleWindowMouseMove, true)
     window.addEventListener("mouseup", this.handleWindowMouseUp, true)
 
-    const {portalOffering} = this.props
-    if (portalOffering) {
+    const {portalOffering, group} = this.props
+    if (portalOffering && (group === "poster")) {
       this.posterAnnotationsRef = getPosterAnnotationsRef(portalOffering)
       this.posterAnnotationsRef.on("child_added", this.handlePosterAnnotationChildAdded)
       this.posterAnnotationsRef.on("child_removed", this.handlePosterAnnotationChildRemoved)
@@ -981,6 +982,22 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  handleCopyIntoPoster = (options: PublicationWindowOptions, title: string) => {
+    const {portalOffering, posterDocument} = this.props
+    if (portalOffering && posterDocument) {
+      this.setState({
+        modalWindowOptions: {
+          type: "copy-into-poster",
+          title,
+          onOk: (title, ownerId) => {
+            this.windowManager.copyWindowFromPublication(portalOffering, options, title, ownerId, posterDocument)
+              .catch((err:any) => alert(err.toString()))
+          }
+        }
+      })
+    }
+  }
+
   renderDocumentInfo() {
     const {documentInfo} = this.state
     if (!documentInfo) {
@@ -1245,7 +1262,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                annotationsRef={document.getWindowsDataRef("annotations").child(window.id)}
                portalUser={portalUser}
                captureAnnotationsCallback={captureAnnotationsCallbacks[window.id]}
-               allowAnnotations={!posterView.enabled}
+               inPosterView={posterView.enabled}
              />
     })
   }
@@ -1300,6 +1317,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
              windowManager={this.windowManager}
              toggleFavorite={this.handleToggleFavorite}
              copyIntoDocument={this.handleCopyIntoDocument}
+             copyIntoPoster={this.handleCopyIntoPoster}
            />
   }
 
@@ -1359,6 +1377,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       case "copy-into-document":
         titlebar = "Copy Into Your Document"
         okButton = "Copy"
+        break
+      case "copy-into-poster":
+        titlebar = "Copy Into Poster View"
+        okButton = "Copy"
+        enableVisibiltyOptions = false
         break
       case "copy":
         titlebar = "Copy Window"
