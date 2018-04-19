@@ -21,7 +21,7 @@ export interface PathAnnotationPoint {
 export interface PathAnnotation {
   type: "path"
   id: string
-  userId: string|null
+  userId?: string|null
   points: PathAnnotationPoint[]
 }
 

@@ -4,7 +4,7 @@ import * as queryString from "query-string"
 import * as superagent from "superagent"
 
 import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap, FirebaseDocument } from "../lib/document"
-import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap, FirebaseAnnotationMap } from "../lib/window"
+import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap, FirebaseAnnotationMap, Annotation, PathAnnotationPoint } from "../lib/window"
 import { WindowComponent, CaptureAnnotationCallbackMap } from "./window"
 import { MinimizedWindowComponent } from "./minimized-window"
 import { InlineEditorComponent } from "./inline-editor"
@@ -14,7 +14,7 @@ import { v4 as uuidV4} from "uuid"
 import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
-import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath, getFavoritesRef } from "../lib/refs"
+import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath, getFavoritesRef, getPosterAnnotationsRef } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
 import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
@@ -95,6 +95,9 @@ export interface WorkspaceComponentState extends WindowManagerState {
     enabled: boolean
     editable: boolean
   }
+  posterAnnotations: FirebaseAnnotationMap
+  currentPosterAnnotation: Annotation|null
+  annotatingPoster: boolean
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -102,10 +105,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   connectedRef: firebase.database.Reference|null
   userRef: firebase.database.Reference|null
   groupUsersRef: firebase.database.Reference|null
+  posterAnnotationsRef: firebase.database.Reference|null
   windowManager: WindowManager
   userOnDisconnect: firebase.database.OnDisconnect|null
   userLookup: UserLookup
   modalDialogNewWindowTitle: HTMLInputElement|null
+  posterAnnotationsElement: HTMLDivElement|null
 
   constructor (props:WorkspaceComponentProps) {
     super(props)
@@ -139,7 +144,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       progressMessage: null,
       captureAnnotationsCallbacks: {},
       isReadonly: (props.isTemplate && document.isReadonly) || (posterView.enabled && !posterView.editable),
-      posterView
+      posterView,
+      posterAnnotations: {},
+      currentPosterAnnotation: null,
+      annotatingPoster: false
     }
   }
 
@@ -194,6 +202,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.addEventListener("mousedown", this.handleWindowMouseDown)
     window.addEventListener("mousemove", this.handleWindowMouseMove, true)
     window.addEventListener("mouseup", this.handleWindowMouseUp, true)
+
+    const {portalOffering} = this.props
+    if (portalOffering) {
+      this.posterAnnotationsRef = getPosterAnnotationsRef(portalOffering)
+      this.posterAnnotationsRef.on("child_added", this.handlePosterAnnotationChildAdded)
+      this.posterAnnotationsRef.on("child_removed", this.handlePosterAnnotationChildRemoved)
+    }
   }
 
   componentDidUpdate() {
@@ -228,6 +243,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.removeEventListener("mousedown", this.handleWindowMouseDown)
     window.removeEventListener("mousemove", this.handleWindowMouseMove, true)
     window.removeEventListener("mouseup", this.handleWindowMouseUp, true)
+
+    if (this.posterAnnotationsRef) {
+      this.posterAnnotationsRef.off("child_added", this.handlePosterAnnotationChildAdded)
+      this.posterAnnotationsRef.off("child_removed", this.handlePosterAnnotationChildRemoved)
+    }
   }
 
   userId() {
@@ -237,6 +257,70 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   nonPrivateWindow = (params: NonPrivateWindowParams) => {
     const ownerId = params.ownerId || (params.window ? params.window.attrs.ownerId : undefined)
     return !ownerId || (ownerId === this.userId())
+  }
+
+  handlePosterAnnotationChildAdded = (snapshot:firebase.database.DataSnapshot) => {
+    const {portalUser} = this.props
+    const annotation:Annotation|null = snapshot.val()
+    if (annotation && snapshot.key) {
+      const {posterAnnotations} = this.state
+      posterAnnotations[snapshot.key] = annotation
+      this.setState({posterAnnotations})
+    }
+  }
+
+  handlePosterAnnotationChildRemoved = (snapshot:firebase.database.DataSnapshot) => {
+    const {portalUser} = this.props
+    const annotation:Annotation|null = snapshot.val()
+    if (annotation && snapshot.key) {
+      const {posterAnnotations} = this.state
+      delete posterAnnotations[snapshot.key]
+      this.setState({posterAnnotations})
+    }
+  }
+
+  handleToggleAnnotatePoster = () => {
+    const {annotatingPoster} = this.state
+    this.setState({annotatingPoster: !annotatingPoster})
+  }
+
+  handleClearPosterAnnotations = () => {
+    const {posterAnnotationsRef} = this
+    if (posterAnnotationsRef && confirm("Are you sure you want to clear the poster annotations?")) {
+      posterAnnotationsRef.set(null)
+    }
+  }
+
+  handlePosterAnnotationMouseDown = (e:React.MouseEvent<HTMLDivElement>) => {
+    const {posterAnnotationsElement, posterAnnotationsRef} = this
+    if (!posterAnnotationsElement || !posterAnnotationsRef) {
+      return
+    }
+    const boundingRect = posterAnnotationsElement.getBoundingClientRect()
+
+    const annotation:Annotation = {type: "path", id: uuidV4(), points: []}
+    const getPoint = (e:React.MouseEvent<HTMLDivElement>|MouseEvent) => {
+      return {x: e.clientX - boundingRect.left, y: e.clientY - boundingRect.top}
+    }
+    const startPoint:PathAnnotationPoint = getPoint(e)
+    const handleDrawMove = (e:MouseEvent) => {
+      if (annotation.points.length === 0) {
+        annotation.points.push(startPoint)
+      }
+      annotation.points.push(getPoint(e))
+      this.setState({currentPosterAnnotation: annotation})
+    }
+    const handleDrawDone = (e:MouseEvent) => {
+      if (annotation.points.length > 0) {
+        posterAnnotationsRef.push(annotation)
+      }
+      this.setState({currentPosterAnnotation: null})
+
+      window.removeEventListener("mousemove", handleDrawMove)
+      window.removeEventListener("mouseup", handleDrawDone)
+    }
+    window.addEventListener("mousemove", handleDrawMove)
+    window.addEventListener("mouseup", handleDrawDone)
   }
 
   handleToggleViewArtifact = (artifact: FirebaseArtifact) => {
@@ -1061,9 +1145,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
-  renderReadonlyTemplateToolbar() {
-  }
-
   renderReadonlyToolbar() {
     if (this.state.posterView.enabled) {
       return <div className="readonly-message">View only.  Only teachers can edit the poster.</div>
@@ -1106,9 +1187,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   renderToolbarButtons() {
     const {document, group, portalUser} = this.props
-    const {documentInfo, isReadonly, posterView} = this.state
+    const {documentInfo, isReadonly, posterView, annotatingPoster} = this.state
     const isTeacher = portalUser && (portalUser.type === "teacher")
-    const showLeftButtons = !isReadonly && (!posterView.enabled || isTeacher)
+    const showLeftButtons = !isReadonly && (!posterView.enabled || (isTeacher && !annotatingPoster))
     const showCreateActivityButton = documentInfo && documentInfo.portalUrl && !documentInfo.portalEditUrl && !isReadonly
     const showEditActivityButton = documentInfo && documentInfo.portalUrl && documentInfo.portalEditUrl && !isReadonly && this.props.isTemplate
     const editActivityUrl = documentInfo && documentInfo.portalEditUrl
@@ -1125,7 +1206,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
           {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
-          {showLearningLogButton ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Artifacts Archive</button> : null}
+          {showLearningLogButton && !annotatingPoster ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Artifacts Archive</button> : null}
+          {posterView.enabled && isTeacher ? <button type="button" onClick={this.handleToggleAnnotatePoster}><i className="icon icon-stack" /> {annotatingPoster ? "Stop" : "Start"} Annotating Poster</button> : null}
+          {annotatingPoster ? <button type="button" onClick={this.handleClearPosterAnnotations}><i className="icon icon-cross" /> Clear Poster Annotations</button> : null}
           {showPosterViewButton && posterViewUrl ? <a className="button" href={posterViewUrl} target="_blank"><i className="icon icon-map2" /> Open Poster View</a> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}><i className="icon icon-newspaper" /> Publish All</button> : null}
         </div>
@@ -1393,6 +1476,36 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
+  renderPosterAnnotation(annotation:Annotation) {
+    switch (annotation.type) {
+      case "path":
+        const [first, ...rest] = annotation.points || []
+        if (first) {
+          const d = `M${first.x} ${first.y} ${rest.map((p) => `L${p.x} ${p.y}`).join(" ")}`
+          return <path key={annotation.id} d={d} stroke="#f00" strokeWidth="2" fill="none" />
+        }
+        break
+    }
+    return null
+  }
+
+  renderPosterAnnotations() {
+    const {posterAnnotationsElement} = this
+    const {posterAnnotations, currentPosterAnnotation, annotatingPoster} = this.state
+    const pointerEvents = annotatingPoster ? "all" : "none"
+    const [width, height] = posterAnnotationsElement ? [posterAnnotationsElement.clientWidth, posterAnnotationsElement.clientHeight] : ["100%", "100%"]
+    const currentAnnotationElement = currentPosterAnnotation ? this.renderPosterAnnotation(currentPosterAnnotation) : null
+    const annotationElements = Object.keys(posterAnnotations).map<JSX.Element|null>((key) => this.renderPosterAnnotation(posterAnnotations[key]))
+    return (
+      <div className="poster-annotations" ref={(el) => this.posterAnnotationsElement = el} style={{pointerEvents: pointerEvents}} onMouseDown={this.handlePosterAnnotationMouseDown}>
+        <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={width} height={height}>
+          {annotationElements}
+          {currentAnnotationElement}
+        </svg>
+      </div>
+    )
+  }
+
   render() {
     return (
       <div className="workspace" onDrop={this.handleDrop} onDragOver={this.handleDragOver}>
@@ -1406,6 +1519,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderLearningLog()}
         {this.renderModal()}
         {this.renderProgressMessage()}
+        {this.renderPosterAnnotations()}
         {this.renderReadonlyBlocker()}
       </div>
     )

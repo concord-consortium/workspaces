@@ -145,3 +145,11 @@ export const getFavoritesPath = (domain: string, classHash: string, userId:strin
 export const getFavoritesRef = (domain: string, classHash: string, userId:string, publicationId?: string, windowId?:string) => {
   return firebase.database().ref(getFavoritesPath(domain, classHash, userId, publicationId, windowId))
 }
+
+export const getPosterAnnotationsPath = (offering:PortalOffering) => {
+  return `${getClassPath(offering)}/posterAnnotations/offerings/${offering.id}`
+}
+
+export const getPosterAnnotationsRef = (offering:PortalOffering) => {
+  return firebase.database().ref(getPosterAnnotationsPath(offering))
+}
