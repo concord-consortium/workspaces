@@ -37,6 +37,7 @@ export interface AppComponentState {
   groups: FirebaseOfferingGroupMap|null
   supportsRef: firebase.database.Reference|null
   supportsSeenRef: firebase.database.Reference|null
+  posterDocument?: Document
 }
 
 export type HashActionParam = "create-template"
@@ -201,6 +202,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
     if (group !== "") {
       this.setState({groupChosen: true, group})
       if (this.state.template && this.state.portalOffering) {
+        // get the group document
         this.state.template.getGroupOfferingDocument(this.state.portalOffering, group)
           .then(([document, groupRef]) => {
             const supportsRef = this.state.portalOffering ? getSupportsRef(this.state.portalOffering) : null;
@@ -208,7 +210,13 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
             this.setState({document, groupRef, supportsRef, supportsSeenRef})
           })
           .catch((documentError) => this.setState({documentError}))
-        }
+
+        // get the poster document id
+        this.state.template.getGroupOfferingDocument(this.state.portalOffering, "poster")
+          .then(([posterDocument, groupRef]) => {
+            this.setState({posterDocument})
+          })
+      }
     }
   }
 
@@ -326,6 +334,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                   leaveGroup={this.handleLeaveGroup}
                   publication={null}
                   logManager={this.logManager}
+                  posterDocument={this.state.posterDocument}
                 />
               }
               return this.renderProgress("Loading collaborative space group document...")

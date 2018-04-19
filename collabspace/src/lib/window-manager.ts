@@ -360,7 +360,7 @@ export class WindowManager {
     return newTitle
   }
 
-  add(params:AddWindowParams) {
+  add(params:AddWindowParams, document?:Document) {
     //url: string, title:string, ownerId: string, iframeData?:any, dataSet?:FirebaseWindowDataSet) {
     const {url, title, ownerId, iframeData, annotations, dataSet, createNewDataSet} = params
     const attrs:FirebaseWindowAttrs = {
@@ -379,6 +379,8 @@ export class WindowManager {
 
     let dataSetCreatorRef:firebase.database.Reference
 
+    document = document || this.document
+
     if (dataSet) {
       attrs.dataSet = dataSet
     }
@@ -386,21 +388,21 @@ export class WindowManager {
       // we have a bit of a catch-22, we need the window id as the value of the creator but
       // we don't have that until we create it in Firebase so we just use a TDB value that we ignore
       // in the workspace client (since TDB is not a valid window id)
-      dataSetCreatorRef = this.document.getDataSetsDataRef().child(this.document.id).child("creators").push("TDB")
+      dataSetCreatorRef = document.getDataSetsDataRef().child(document.id).child("creators").push("TDB")
       if (dataSetCreatorRef.key) {
         const newDataSet:FirebaseWindowDataSet = {
-          documentId: this.document.id,
+          documentId: document.id,
           dataSetId: dataSetCreatorRef.key
         }
         attrs.dataSet = newDataSet
       }
     }
-    Window.CreateInFirebase({document: this.document, attrs}, iframeData, annotations)
+    Window.CreateInFirebase({document: document, attrs}, iframeData, annotations)
       .then((window) => {
         if (createNewDataSet && dataSetCreatorRef) {
           dataSetCreatorRef.set(window.id)
         }
-        this.moveToTop(window, true)
+        this.moveToTop(window, true, document)
         if (this.logManager && params.log) {
           const logParams = assign({}, {creator: this.logManager.userId(), private: !!ownerId}, params.log.params)
           this.logManager.logEvent(params.log.name, window.id, logParams)
@@ -409,7 +411,7 @@ export class WindowManager {
       .catch((err) => {})
   }
 
-  moveToTop(window:Window, forceSync:boolean = false) {
+  moveToTop(window:Window, forceSync:boolean = false, document?:Document) {
     const moveToTopInOrder = (order:string[]) => {
       const index = order.indexOf(window.id)
       if (index !== -1) {
@@ -419,12 +421,13 @@ export class WindowManager {
     }
 
     if (this.syncChanges || forceSync) {
-      this.orderRef.once("value", (snapshot) => {
+      let orderRef = document ? document.getWindowsDataRef("order") : this.orderRef
+      orderRef.once("value", (snapshot) => {
         const currentOrderMap:FirebaseOrderMap = snapshot.val() || {}
         const order = this.firebaseOrderMapToArray(currentOrderMap)
         moveToTopInOrder(order)
         const newOrderMap = this.arrayToFirebaseOrderMap(order)
-        this.orderRef.update(newOrderMap)
+        orderRef.update(newOrderMap)
       })
     }
     else {
@@ -599,12 +602,10 @@ export class WindowManager {
     })
   }
 
-  copyWindowFromPublication(portalOffering: PortalOffering, options: PublicationWindowOptions, title:string, ownerId?:string) {
+  copyWindowFromPublication(portalOffering: PortalOffering, options: PublicationWindowOptions, title:string, ownerId?:string, destDocument?:Document) {
     return new Promise<void>((resolve, reject) => {
       const {windowId} = options
-      // open the publication document
-      const documentDataRef = getDocumentRef(portalOffering, this.document.id).child("data")
-      // TODO:
+      const documentDataRef = getDocumentRef(portalOffering, destDocument ? destDocument.id : this.document.id).child("data")
       let publicationDataRef:firebase.database.Reference
       if (options.type === "offering") {
         publicationDataRef = getDocumentRef(options.offering, options.documentId).child("data")
@@ -632,7 +633,7 @@ export class WindowManager {
                   copiedFrom: windowId
                 }
               }
-              this.add({url, title, iframeData, annotations, dataSet, log: logParams, ownerId})
+              this.add({url, title, iframeData, annotations, dataSet, log: logParams, ownerId}, destDocument)
               resolve()
             }
             if (dataSet) {

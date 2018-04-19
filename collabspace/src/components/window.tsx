@@ -67,7 +67,7 @@ export interface WindowComponentProps {
   annotationsRef: firebase.database.Reference
   portalUser: PortalUser|null
   captureAnnotationsCallback?: CaptureAnnotationCallback|null
-  allowAnnotations: boolean
+  inPosterView: boolean
 }
 export interface WindowComponentState {
   editingTitle: boolean
@@ -313,7 +313,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   }
 
   canClose() {
-    return this.props.isTemplate || !!this.props.window.attrs.ownerId
+    return this.props.isTemplate || !!this.props.window.attrs.ownerId || this.props.inPosterView
   }
 
   renderIframeOverlay() {
@@ -355,7 +355,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   }
 
   renderSidebarMenu(left: number) {
-    const {allowAnnotations} = this.props
+    const {inPosterView} = this.props
     const {annotating, inited} = this.state
     const isPublic = !this.props.window.attrs.ownerId
     return (
@@ -363,8 +363,8 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         <div className="sidebar-menu-inner">
           {inited && isPublic ? <i className="icon icon-newspaper" title="Publish Window" onClick={this.handlePublishWindow} /> : null}
           {inited ? <i className="icon icon-copy" title="Copy Window" onClick={this.handleCopyWindow} /> : null}
-          {allowAnnotations ? <i className={`icon icon-stack ${annotating ? "annotation-tool-selected" : ""}`} title="Annotate Window" onClick={this.handleToggleAnnotateWindow} /> : null}
-          {allowAnnotations ? this.renderAnnotationTools() : null}
+          {!inPosterView ? <i className={`icon icon-stack ${annotating ? "annotation-tool-selected" : ""}`} title="Annotate Window" onClick={this.handleToggleAnnotateWindow} /> : null}
+          {!inPosterView ? this.renderAnnotationTools() : null}
           {inited ? <i className="icon icon-camera" title="Take Snapshot" onClick={this.handleSnapshotWindow} /> : null}
         </div>
       </div>
