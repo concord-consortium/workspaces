@@ -348,7 +348,7 @@ export interface SidebarComponentProps {
   portalTokens: PortalTokens
   portalOffering: PortalOffering
   portalUser: PortalUser
-  group: number
+  group: string
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
   publishing: boolean
   windowManager: WindowManager
@@ -358,7 +358,7 @@ export interface SidebarComponentProps {
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
   filter: SidebarFilter
-  filterGroup: number
+  filterGroup: string
   filterOffering: string
   filterSearch: string
   filterSearchTrimmed: string
@@ -376,7 +376,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     this.state = {
       publicationItems: [],
       filter: "offering",
-      filterGroup: 0,
+      filterGroup: "all",
       filterOffering: "all",
       filterSearch: "",
       filterSearchTrimmed: "",
@@ -437,7 +437,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
           }
           return publication.creator === filterOffering
         case "group":
-          return (filterGroup === 0) || (publication.group === filterGroup)
+          return (filterGroup === "all") || (publication.group === filterGroup)
         case "mine":
           return publication.creator === portalUser.id
         case "search":
@@ -494,7 +494,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   }
 
   handleGroupFilterChanged = (e:React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({filterGroup: parseInt(e.target.value, 10)})
+    this.setState({filterGroup: e.target.value})
   }
 
   handleSearchFilterChanged = (e:React.ChangeEvent<HTMLInputElement>) => {
@@ -519,7 +519,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
         )
         break
       case "group":
-        options.push(<option value={0} key="all-groups">All Groups</option>)
+        options.push(<option value="all" key="all-groups">All Groups</option>)
         options.push(<option value={this.props.group} key="me-group">My Group</option>)
         for (let i=1; i <= MAX_GROUPS; i++) {
           options.push(<option value={i} key={i}>Group {i}</option>)

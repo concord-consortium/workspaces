@@ -232,6 +232,14 @@ a {
       opacity: 0;
     }
 
+    .poster-annotations {
+      position: fixed;
+      top: $header-height + $toolbar-height;
+      right: $sidebar-width;
+      left: 0;
+      bottom: 0;
+    }
+
     .header {
       position: fixed;
       top: 0;
@@ -1513,4 +1521,7 @@ a {
 }
 .icon-search:before {
   content: "\e986";
+}
+.icon-map2:before {
+  content: "\e94c";
 }

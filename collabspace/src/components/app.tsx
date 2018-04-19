@@ -32,7 +32,7 @@ export interface AppComponentState {
   portalUser: PortalUser|null,
   portalOffering: PortalOffering|null,
   groupChosen: boolean
-  group: number
+  group: string
   groupRef: firebase.database.Reference|null
   groups: FirebaseOfferingGroupMap|null
   supportsRef: firebase.database.Reference|null
@@ -75,7 +75,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       portalUser: null,
       portalOffering: null,
       groupChosen: false,
-      group: 0,
+      group: "",
       groupRef: null,
       groups: null,
       supportsRef: null,
@@ -197,8 +197,8 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   }
 
   selectGroup(groupValue: string) {
-    const group = parseInt(groupValue)
-    if (group > 0) {
+    const group = groupValue
+    if (group !== "") {
       this.setState({groupChosen: true, group})
       if (this.state.template && this.state.portalOffering) {
         this.state.template.getGroupOfferingDocument(this.state.portalOffering, group)
@@ -220,32 +220,37 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   }
 
   handleLeaveGroup = () => {
-    this.setState({groupChosen: false, group: 0, document: null})
+    this.setState({groupChosen: false, group: "", document: null})
   }
 
-  renderChoseExistingGroup(groups: FirebaseOfferingGroupMap|null, groupKeys: string[]) {
+  renderChooseExistingGroup(groups: FirebaseOfferingGroupMap|null, groupKeys: string[]) {
     if (!groups || groupKeys.length == 0) {
       return null
     }
+    const groupElements:JSX.Element[] = []
+    groupKeys.forEach((key) => {
+      if (key !== "poster") {
+        const {users} = groups[key]
+        const chooseGroup = () => this.selectGroup(key)
+        groupElements.push(
+          <div className="group" key={key} onClick={chooseGroup}>
+            <div className="group-title">Group {key}</div>
+            {Object.keys(users).map((id) => {
+              const portalUser = this.userLookup.lookup(id)
+              const status = users[id].connected ? "" : " (disconnected)"
+              const className = users[id].connected ? "user" : "user disconnected"
+              return <span key={id} className={className} title={`${portalUser ? portalUser.fullName : `Unknown User`}${status}`}>{portalUser ? portalUser.initials : "?"}</span>
+            })}
+          </div>
+        )
+      }
+    })
+
     return (
       <div className="groups">
         <div>Click to select an existing group</div>
         <div className="group-list">
-          {groupKeys.map((key) => {
-            const {users} = groups[parseInt(key, 10)]
-            const chooseGroup = () => this.selectGroup(key)
-            return (
-              <div className="group" key={key} onClick={chooseGroup}>
-                <div className="group-title">Group {key}</div>
-                {Object.keys(users).map((id) => {
-                  const portalUser = this.userLookup.lookup(id)
-                  const status = users[id].connected ? "" : " (disconnected)"
-                  const className = users[id].connected ? "user" : "user disconnected"
-                  return <span key={id} className={className} title={`${portalUser ? portalUser.fullName : `Unknown User`}${status}`}>{portalUser ? portalUser.initials : "?"}</span>
-                })}
-              </div>
-            )
-          })}
+          {groupElements}
         </div>
       </div>
     )
@@ -278,7 +283,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
         <div className="join-title">Join Group</div>
         <div className="join-content">
           {portalUser ? <div className="welcome">Welcome {portalUser.fullName}</div> : null}
-          {this.renderChoseExistingGroup(groups, groupKeys)}
+          {this.renderChooseExistingGroup(groups, groupKeys)}
           {this.renderChoseNewGroup(groupKeys)}
         </div>
       </div>

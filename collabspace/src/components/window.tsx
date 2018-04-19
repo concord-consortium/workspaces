@@ -67,6 +67,7 @@ export interface WindowComponentProps {
   annotationsRef: firebase.database.Reference
   portalUser: PortalUser|null
   captureAnnotationsCallback?: CaptureAnnotationCallback|null
+  allowAnnotations: boolean
 }
 export interface WindowComponentState {
   editingTitle: boolean
@@ -74,8 +75,6 @@ export interface WindowComponentState {
   inited: boolean
   annotating: boolean
   annotationTool: AnnotationTool
-  annotationSVGWidth: number|string
-  annotationSVGHeight: number|string
   annontations: FirebaseAnnotationMap,
   currentAnnotation: Annotation|null
 }
@@ -91,8 +90,6 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       inited: false,
       annotating: false,
       annotationTool: "draw",
-      annotationSVGWidth: "100%",
-      annotationSVGHeight: "100%",
       annontations: {},
       currentAnnotation: null
     }
@@ -106,8 +103,6 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     const {annotationsRef} = this.props
 
     this.props.window.onAttrsChanged = this.handleAttrsChanged
-    window.addEventListener("resize", this.setSVGSize)
-    this.setSVGSize()
 
     annotationsRef.on("child_added", this.handleAnnotationChildAdded)
     annotationsRef.on("child_removed", this.handleAnnotationChildRemoved)
@@ -117,7 +112,6 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     const {annotationsRef} = this.props
 
     this.props.window.onAttrsChanged = null
-    window.removeEventListener("resize", this.setSVGSize)
 
     annotationsRef.off("child_added", this.handleAnnotationChildAdded)
     annotationsRef.off("child_removed", this.handleAnnotationChildRemoved)
@@ -145,10 +139,6 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         callback(e)
       })
     }
-  }
-
-  setSVGSize = () => {
-    this.setState({annotationSVGWidth: window.innerWidth, annotationSVGHeight: window.innerHeight - TITLEBAR_HEIGHT})
   }
 
   handleAnnotationChildAdded = (snapshot:firebase.database.DataSnapshot) => {
@@ -365,6 +355,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   }
 
   renderSidebarMenu(left: number) {
+    const {allowAnnotations} = this.props
     const {annotating, inited} = this.state
     const isPublic = !this.props.window.attrs.ownerId
     return (
@@ -372,8 +363,8 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         <div className="sidebar-menu-inner">
           {inited && isPublic ? <i className="icon icon-newspaper" title="Publish Window" onClick={this.handlePublishWindow} /> : null}
           {inited ? <i className="icon icon-copy" title="Copy Window" onClick={this.handleCopyWindow} /> : null}
-          <i className={`icon icon-stack ${annotating ? "annotation-tool-selected" : ""}`} title="Annotate Window" onClick={this.handleToggleAnnotateWindow} />
-          {this.renderAnnotationTools()}
+          {allowAnnotations ? <i className={`icon icon-stack ${annotating ? "annotation-tool-selected" : ""}`} title="Annotate Window" onClick={this.handleToggleAnnotateWindow} /> : null}
+          {allowAnnotations ? this.renderAnnotationTools() : null}
           {inited ? <i className="icon icon-camera" title="Take Snapshot" onClick={this.handleSnapshotWindow} /> : null}
         </div>
       </div>
@@ -394,13 +385,15 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   }
 
   renderAnnotations() {
-    const {annotationSVGWidth, annotationSVGHeight, annontations, currentAnnotation} = this.state
+    const {annontations, currentAnnotation} = this.state
+    const {attrs} = this.props.window
+    const {width, height} = attrs
     const pointerEvents = this.state.annotating ? "all" : "none"
     const currentAnnotationElement = currentAnnotation ? this.renderAnnotation(currentAnnotation) : null
     const annotationElements = Object.keys(annontations).map<JSX.Element|null>((key) => this.renderAnnotation(annontations[key]))
     return (
-      <div className="annotations" ref={(el) => this.annotationsElement = el} style={{pointerEvents: pointerEvents, width: annotationSVGWidth, height: annotationSVGHeight}} onMouseDown={this.handleAnnotationMouseDown}>
-        <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={annotationSVGWidth} height={annotationSVGHeight}>
+      <div className="annotations" ref={(el) => this.annotationsElement = el} style={{pointerEvents: pointerEvents, width, height}} onMouseDown={this.handleAnnotationMouseDown}>
+        <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={width} height={height}>
           {annotationElements}
           {currentAnnotationElement}
         </svg>

@@ -17,7 +17,7 @@ export interface DashboardTableRow {
   id: string
   document: DashboardTableRowDocument
   student: string
-  group: number
+  group: string
   groupMembers: string
   publishedAt: number
 }

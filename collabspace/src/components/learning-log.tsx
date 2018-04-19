@@ -92,7 +92,7 @@ export interface LearningLogTableRow {
   className: string
   creator: PortalUser
   sortCreator: string
-  group: number
+  groupAsNumber: number
   groupMembers: PortalUser[]
   sortGroupMembers: string
   publishedAt: number
@@ -290,7 +290,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
                     className: classData.info.name,
                     creator: this.lookupUser(publication.creator),
                     sortCreator: creator.fullName.toLowerCase(),
-                    group: publication.group,
+                    groupAsNumber: parseInt(publication.group, 10),
                     groupMembers,
                     sortGroupMembers: groupMembers.map((user) => user.initials).join(" "),
                     publishedAt: publication.createdAt as number,
@@ -339,7 +339,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
           sortResult = b.sortCreator.localeCompare(a.sortCreator)
           break
         case "Group":
-          sortResult = b.group - a.group
+          sortResult = b.groupAsNumber - a.groupAsNumber
           break
         case "Group Members":
           sortResult = b.sortGroupMembers.localeCompare(a.sortGroupMembers)
@@ -568,7 +568,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
                   <td>{tableRow.offeringName}</td>
                   <td>{tableRow.artifactName}</td>
                   <td><span className="initials" title={tableRow.creator.fullName}>{tableRow.creator.initials}</span></td>
-                  <td>{tableRow.group}</td>
+                  <td>{tableRow.groupAsNumber}</td>
                   <td>{tableRow.groupMembers.map((groupMember) => <span key={groupMember.id} title={groupMember.fullName}>{groupMember.initials}</span>)}</td>
                   <td>{tableRow.ownerId ? "Private" : "Public"}</td>
                   <td><LiveTimeAgoComponent timestamp={tableRow.publishedAt} /></td>

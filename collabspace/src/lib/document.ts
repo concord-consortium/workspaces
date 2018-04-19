@@ -49,7 +49,7 @@ export interface FirebaseOfferingMap {
 }
 
 export interface FirebaseOfferingGroupMap {
-  [key: number]: FirebaseOfferingGroup
+  [key: string]: FirebaseOfferingGroup
 }
 export interface FirebaseOfferingGroup {
   documentId: string
@@ -63,7 +63,7 @@ export interface FirebaseArtifactMap {
 export interface FirebasePublication {
   offeringId: number
   creator: string
-  group: number
+  group: string
   groupMembers: PortalUserConnectionStatusMap
   createdAt: number|object
   documentId: string
@@ -219,7 +219,7 @@ export class Document {
       })
   }
 
-  getGroupOfferingDocument(offering:PortalOffering, group:number) {
+  getGroupOfferingDocument(offering:PortalOffering, group:string) {
     return new Promise<[Document, firebase.database.Reference]>((resolve, reject) => {
 
       this.getFirebaseOffering(offering)

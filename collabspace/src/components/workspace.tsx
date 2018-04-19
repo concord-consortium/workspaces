@@ -4,7 +4,7 @@ import * as queryString from "query-string"
 import * as superagent from "superagent"
 
 import { FirebaseDocumentInfo, Document, FirebasePublication, FirebaseArtifact, FirebasePublicationWindowMap, FirebaseDocument } from "../lib/document"
-import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap, FirebaseAnnotationMap } from "../lib/window"
+import { Window, FirebaseWindowAttrs, FirebaseWindowAttrsMap, FirebaseAnnotationMap, Annotation, PathAnnotationPoint } from "../lib/window"
 import { WindowComponent, CaptureAnnotationCallbackMap } from "./window"
 import { MinimizedWindowComponent } from "./minimized-window"
 import { InlineEditorComponent } from "./inline-editor"
@@ -14,7 +14,7 @@ import { v4 as uuidV4} from "uuid"
 import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
-import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath, getFavoritesRef } from "../lib/refs"
+import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath, getFavoritesRef, getPosterAnnotationsRef } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
 import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
@@ -69,7 +69,7 @@ export interface WorkspaceComponentProps {
   groupRef: firebase.database.Reference|null
   supportsRef: firebase.database.Reference|null
   supportsSeenRef: firebase.database.Reference|null
-  group: number|null
+  group: string|null
   leaveGroup?: () => void
   publication: FirebasePublication|null
   logManager: LogManager|null
@@ -90,6 +90,14 @@ export interface WorkspaceComponentState extends WindowManagerState {
   showLearningLog: boolean
   progressMessage: string|null
   captureAnnotationsCallbacks: CaptureAnnotationCallbackMap
+  isReadonly: boolean
+  posterView: {
+    enabled: boolean
+    editable: boolean
+  }
+  posterAnnotations: FirebaseAnnotationMap
+  currentPosterAnnotation: Annotation|null
+  annotatingPoster: boolean
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -97,17 +105,24 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   connectedRef: firebase.database.Reference|null
   userRef: firebase.database.Reference|null
   groupUsersRef: firebase.database.Reference|null
+  posterAnnotationsRef: firebase.database.Reference|null
   windowManager: WindowManager
   userOnDisconnect: firebase.database.OnDisconnect|null
   userLookup: UserLookup
   modalDialogNewWindowTitle: HTMLInputElement|null
+  posterAnnotationsElement: HTMLDivElement|null
 
   constructor (props:WorkspaceComponentProps) {
     super(props)
 
-    const {portalOffering} = props
+    const {portalOffering, group, portalUser, document} = props
 
     this.userLookup = new UserLookup(portalOffering ? portalOffering.classInfo : undefined)
+
+    const posterView = {
+      enabled: group === "poster",
+      editable: !!(portalUser && (portalUser.type === "teacher"))
+    }
 
     this.state = {
       documentInfo: null,
@@ -127,7 +142,12 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       showUploadImageDialog: false,
       showLearningLog: false,
       progressMessage: null,
-      captureAnnotationsCallbacks: {}
+      captureAnnotationsCallbacks: {},
+      isReadonly: (props.isTemplate && document.isReadonly) || (posterView.enabled && !posterView.editable),
+      posterView,
+      posterAnnotations: {},
+      currentPosterAnnotation: null,
+      annotatingPoster: false
     }
   }
 
@@ -147,7 +167,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       onStateChanged: (newState) => {
         this.setState(newState)
       },
-      syncChanges: this.props.isTemplate,
+      syncChanges: this.props.isTemplate || this.state.posterView.enabled,
       tokens: this.props.portalTokens,
       nonPrivateWindow: this.nonPrivateWindow
     })
@@ -182,6 +202,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.addEventListener("mousedown", this.handleWindowMouseDown)
     window.addEventListener("mousemove", this.handleWindowMouseMove, true)
     window.addEventListener("mouseup", this.handleWindowMouseUp, true)
+
+    const {portalOffering} = this.props
+    if (portalOffering) {
+      this.posterAnnotationsRef = getPosterAnnotationsRef(portalOffering)
+      this.posterAnnotationsRef.on("child_added", this.handlePosterAnnotationChildAdded)
+      this.posterAnnotationsRef.on("child_removed", this.handlePosterAnnotationChildRemoved)
+    }
   }
 
   componentDidUpdate() {
@@ -216,6 +243,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     window.removeEventListener("mousedown", this.handleWindowMouseDown)
     window.removeEventListener("mousemove", this.handleWindowMouseMove, true)
     window.removeEventListener("mouseup", this.handleWindowMouseUp, true)
+
+    if (this.posterAnnotationsRef) {
+      this.posterAnnotationsRef.off("child_added", this.handlePosterAnnotationChildAdded)
+      this.posterAnnotationsRef.off("child_removed", this.handlePosterAnnotationChildRemoved)
+    }
   }
 
   userId() {
@@ -225,6 +257,70 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   nonPrivateWindow = (params: NonPrivateWindowParams) => {
     const ownerId = params.ownerId || (params.window ? params.window.attrs.ownerId : undefined)
     return !ownerId || (ownerId === this.userId())
+  }
+
+  handlePosterAnnotationChildAdded = (snapshot:firebase.database.DataSnapshot) => {
+    const {portalUser} = this.props
+    const annotation:Annotation|null = snapshot.val()
+    if (annotation && snapshot.key) {
+      const {posterAnnotations} = this.state
+      posterAnnotations[snapshot.key] = annotation
+      this.setState({posterAnnotations})
+    }
+  }
+
+  handlePosterAnnotationChildRemoved = (snapshot:firebase.database.DataSnapshot) => {
+    const {portalUser} = this.props
+    const annotation:Annotation|null = snapshot.val()
+    if (annotation && snapshot.key) {
+      const {posterAnnotations} = this.state
+      delete posterAnnotations[snapshot.key]
+      this.setState({posterAnnotations})
+    }
+  }
+
+  handleToggleAnnotatePoster = () => {
+    const {annotatingPoster} = this.state
+    this.setState({annotatingPoster: !annotatingPoster})
+  }
+
+  handleClearPosterAnnotations = () => {
+    const {posterAnnotationsRef} = this
+    if (posterAnnotationsRef && confirm("Are you sure you want to clear the poster annotations?")) {
+      posterAnnotationsRef.set(null)
+    }
+  }
+
+  handlePosterAnnotationMouseDown = (e:React.MouseEvent<HTMLDivElement>) => {
+    const {posterAnnotationsElement, posterAnnotationsRef} = this
+    if (!posterAnnotationsElement || !posterAnnotationsRef) {
+      return
+    }
+    const boundingRect = posterAnnotationsElement.getBoundingClientRect()
+
+    const annotation:Annotation = {type: "path", id: uuidV4(), points: []}
+    const getPoint = (e:React.MouseEvent<HTMLDivElement>|MouseEvent) => {
+      return {x: e.clientX - boundingRect.left, y: e.clientY - boundingRect.top}
+    }
+    const startPoint:PathAnnotationPoint = getPoint(e)
+    const handleDrawMove = (e:MouseEvent) => {
+      if (annotation.points.length === 0) {
+        annotation.points.push(startPoint)
+      }
+      annotation.points.push(getPoint(e))
+      this.setState({currentPosterAnnotation: annotation})
+    }
+    const handleDrawDone = (e:MouseEvent) => {
+      if (annotation.points.length > 0) {
+        posterAnnotationsRef.push(annotation)
+      }
+      this.setState({currentPosterAnnotation: null})
+
+      window.removeEventListener("mousemove", handleDrawMove)
+      window.removeEventListener("mouseup", handleDrawDone)
+    }
+    window.addEventListener("mousemove", handleDrawMove)
+    window.addEventListener("mouseup", handleDrawDone)
   }
 
   handleToggleViewArtifact = (artifact: FirebaseArtifact) => {
@@ -981,25 +1077,34 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderGroupInfo() {
-    const {portalOffering} = this.props
-    const {groupUsers} = this.state
-    if (!groupUsers || !portalOffering) {
-      return null
+    const {posterView} = this.state
+    const {portalOffering, group} = this.props
+
+    if (posterView.enabled) {
+      return (
+        <div className="group-info"><div className="group-name"><i className="icon icon-map2" /> Poster View</div></div>
+      )
     }
-    const users:JSX.Element[] = []
-    Object.keys(groupUsers).forEach((id) => {
-      const groupUser = groupUsers[id]
-      const portalUser = this.userLookup.lookup(id)
-      if (portalUser) {
-        const {connected} = groupUser
-        const className = `group-user ${groupUser.connected ? `connected ${portalUser.type}` : "disconnected"}`
-        const titleSuffix = groupUser.connected ? `connected` : `disconnected`
-        users.push(<div key={id} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
+    else {
+      const {groupUsers} = this.state
+      if (!groupUsers || !portalOffering) {
+        return null
       }
-    })
-    return (
-      <div className="group-info"><div className="group-name clickable" onClick={this.handlePromptToChangeGroup} title="Click to leave group">Group {this.props.group}</div>{users}</div>
-    )
+      const users:JSX.Element[] = []
+      Object.keys(groupUsers).forEach((id) => {
+        const groupUser = groupUsers[id]
+        const portalUser = this.userLookup.lookup(id)
+        if (portalUser) {
+          const {connected} = groupUser
+          const className = `group-user ${groupUser.connected ? `connected ${portalUser.type}` : "disconnected"}`
+          const titleSuffix = groupUser.connected ? `connected` : `disconnected`
+          users.push(<div key={id} className={className} title={`${portalUser.fullName}: ${titleSuffix}`}>{portalUser.initials}</div>)
+        }
+      })
+      return (
+        <div className="group-info"><div className="group-name clickable" onClick={this.handlePromptToChangeGroup} title="Click to leave group">Group {this.props.group}</div>{users}</div>
+      )
+    }
   }
 
   renderHeader() {
@@ -1040,38 +1145,71 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
-  renderReadonlyTemplateToolbar() {
+  renderReadonlyToolbar() {
+    if (this.state.posterView.enabled) {
+      return <div className="readonly-message">View only.  Only teachers can edit the poster.</div>
+    }
+    if (this.props.isTemplate) {
+      return <div className="readonly-message">View only.  You do not have edit access to this template.</div>
+    }
+    return this.renderPublicationToolbar()
+  }
+
+  getPosterViewUrl() {
+    const {portalTokens, portalUser, portalOffering} = this.props
+    if (portalTokens) {
+      const queryParams = queryString.parse(window.location.search)
+      const urlParams:any = {
+        portalJWT: portalTokens.rawPortalJWT,
+        group: "poster"
+      }
+      if (queryParams.demo) {
+        urlParams.demo = queryParams.demo
+      }
+      if (portalOffering && portalUser && (portalUser.type === "teacher")) {
+        urlParams.classInfoUrl = portalOffering.classInfoUrl
+        urlParams.offeringId = portalOffering.id
+      }
+      return `?${queryString.stringify(urlParams)}${window.location.hash}`
+    }
+  }
+
+  renderLeftToolbarButtons() {
     return (
-      <div className="readonly-message">View only.  You do not have edit access to this template.</div>
+      <div className="left-buttons">
+        <button type="button" onClick={this.handleAddDrawingButton}><i className="icon icon-pencil" /> Add Drawing</button>
+        <button type="button" onClick={this.handleUploadImageButton}><i className="icon icon-file-picture" /> Upload Image</button>
+        <button type="button" onClick={this.handleAddCaseTable}><i className="icon icon-table2" /> Add Table</button>
+        <button type="button" onClick={this.handleAddGraph}><i className="icon icon-stats-dots" /> Add Graph</button>
+      </div>
     )
   }
 
-  renderReadonlyToolbar() {
-    return this.props.isTemplate ? this.renderReadonlyTemplateToolbar() : this.renderPublicationToolbar()
-  }
-
   renderToolbarButtons() {
-    const {document} = this.props
-    const {documentInfo} = this.state
-    const showCreateActivityButton = documentInfo && documentInfo.portalUrl && !documentInfo.portalEditUrl && !document.isReadonly
-    const showEditActivityButton = documentInfo && documentInfo.portalUrl && documentInfo.portalEditUrl && !document.isReadonly && this.props.isTemplate
+    const {document, group, portalUser} = this.props
+    const {documentInfo, isReadonly, posterView, annotatingPoster} = this.state
+    const isTeacher = portalUser && (portalUser.type === "teacher")
+    const showLeftButtons = !isReadonly && (!posterView.enabled || (isTeacher && !annotatingPoster))
+    const showCreateActivityButton = documentInfo && documentInfo.portalUrl && !documentInfo.portalEditUrl && !isReadonly
+    const showEditActivityButton = documentInfo && documentInfo.portalUrl && documentInfo.portalEditUrl && !isReadonly && this.props.isTemplate
     const editActivityUrl = documentInfo && documentInfo.portalEditUrl
-    const showDemoButton = this.props.isTemplate && !document.isReadonly
-    const showPublishButton = !this.props.isTemplate && !document.isReadonly
-    const showLearningLogButton = !this.props.isTemplate
+    const showDemoButton = this.props.isTemplate && !isReadonly
+    const showPublishButton = !posterView.enabled && !this.props.isTemplate && !isReadonly
+    const showLearningLogButton = !this.props.isTemplate && (!posterView.enabled || isTeacher)
+    const showPosterViewButton = !posterView.enabled
+    const posterViewUrl = showPosterViewButton ? this.getPosterViewUrl() : null
+
     return (
       <div className="buttons">
-        <div className="left-buttons">
-          <button type="button" onClick={this.handleAddDrawingButton}><i className="icon icon-pencil" /> Add Drawing</button>
-          <button type="button" onClick={this.handleUploadImageButton}><i className="icon icon-file-picture" /> Upload Image</button>
-          <button type="button" onClick={this.handleAddCaseTable}><i className="icon icon-table2" /> Add Table</button>
-          <button type="button" onClick={this.handleAddGraph}><i className="icon icon-stats-dots" /> Add Graph</button>
-          </div>
+        {showLeftButtons ? this.renderLeftToolbarButtons() : null}
         <div className="right-buttons">
           {showCreateActivityButton ? <button type="button" onClick={this.handleCreateActivityButton}>Create Portal Activity</button> : null}
           {showEditActivityButton && editActivityUrl ? <a className="button" href={editActivityUrl} target="_blank">Edit Portal Activity</a> : null}
           {showDemoButton ? <button type="button" onClick={this.handleCreateDemoButton}>Create Demo</button> : null}
-          {showLearningLogButton ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Artifacts Archive</button> : null}
+          {showLearningLogButton && !annotatingPoster ? <button type="button" onClick={this.handleToggleLearningLogButton}><i className="icon icon-profile" /> Open Artifacts Archive</button> : null}
+          {posterView.enabled && isTeacher ? <button type="button" onClick={this.handleToggleAnnotatePoster}><i className="icon icon-stack" /> {annotatingPoster ? "Stop" : "Start"} Annotating Poster</button> : null}
+          {annotatingPoster ? <button type="button" onClick={this.handleClearPosterAnnotations}><i className="icon icon-cross" /> Clear Poster Annotations</button> : null}
+          {showPosterViewButton && posterViewUrl ? <a className="button" href={posterViewUrl} target="_blank"><i className="icon icon-map2" /> Open Poster View</a> : null}
           {showPublishButton ? <button type="button" disabled={this.state.publishing} onClick={this.handlePublishButton}><i className="icon icon-newspaper" /> Publish All</button> : null}
         </div>
       </div>
@@ -1081,13 +1219,13 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   renderToolbar() {
     return (
       <div className="toolbar">
-        {this.props.document.isReadonly ? this.renderReadonlyToolbar() : this.renderToolbarButtons()}
+        {this.state.isReadonly ? this.renderReadonlyToolbar() : this.renderToolbarButtons()}
       </div>
     )
   }
 
   renderAllWindows() {
-    const {allOrderedWindows, topWindow, captureAnnotationsCallbacks} = this.state
+    const {allOrderedWindows, topWindow, captureAnnotationsCallbacks, isReadonly, posterView} = this.state
     const {document, isTemplate, portalUser} = this.props
     const userId = this.userId()
     const nonPrivateWindows = allOrderedWindows.filter((orderedWindow: OrderedWindow) => this.nonPrivateWindow({window: orderedWindow.window}))
@@ -1100,13 +1238,14 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                zIndex={orderedWindow.order}
                windowManager={this.windowManager}
                isTemplate={isTemplate}
-               isReadonly={document.isReadonly}
+               isReadonly={isReadonly}
                publishWindow={this.handlePublish}
                copyWindow={this.handleCopy}
                snapshotWindow={this.handleSnapshot}
                annotationsRef={document.getWindowsDataRef("annotations").child(window.id)}
                portalUser={portalUser}
                captureAnnotationsCallback={captureAnnotationsCallbacks[window.id]}
+               allowAnnotations={!posterView.enabled}
              />
     })
   }
@@ -1128,7 +1267,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   renderWindowArea() {
     const hasMinmizedWindows = this.state.minimizedWindows.length > 0
     const nonMinimizedClassName = `non-minimized${hasMinmizedWindows ? " with-minimized" : ""}`
-    const className = `window-area${!this.props.isTemplate && !this.props.document.isReadonly ? " with-sidebar" : ""}`
+    const className = `window-area${!this.props.isTemplate && !this.state.isReadonly ? " with-sidebar" : ""}`
     return (
       <div className={className}>
         <div className={nonMinimizedClassName}>
@@ -1140,7 +1279,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderReadonlyBlocker() {
-    if (this.props.isTemplate && this.props.document.isReadonly) {
+    if (this.state.isReadonly) {
       return <div className="readonly-blocker" />
     }
     return null
@@ -1337,6 +1476,36 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     )
   }
 
+  renderPosterAnnotation(annotation:Annotation) {
+    switch (annotation.type) {
+      case "path":
+        const [first, ...rest] = annotation.points || []
+        if (first) {
+          const d = `M${first.x} ${first.y} ${rest.map((p) => `L${p.x} ${p.y}`).join(" ")}`
+          return <path key={annotation.id} d={d} stroke="#f00" strokeWidth="2" fill="none" />
+        }
+        break
+    }
+    return null
+  }
+
+  renderPosterAnnotations() {
+    const {posterAnnotationsElement} = this
+    const {posterAnnotations, currentPosterAnnotation, annotatingPoster} = this.state
+    const pointerEvents = annotatingPoster ? "all" : "none"
+    const [width, height] = posterAnnotationsElement ? [posterAnnotationsElement.clientWidth, posterAnnotationsElement.clientHeight] : ["100%", "100%"]
+    const currentAnnotationElement = currentPosterAnnotation ? this.renderPosterAnnotation(currentPosterAnnotation) : null
+    const annotationElements = Object.keys(posterAnnotations).map<JSX.Element|null>((key) => this.renderPosterAnnotation(posterAnnotations[key]))
+    return (
+      <div className="poster-annotations" ref={(el) => this.posterAnnotationsElement = el} style={{pointerEvents: pointerEvents}} onMouseDown={this.handlePosterAnnotationMouseDown}>
+        <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={width} height={height}>
+          {annotationElements}
+          {currentAnnotationElement}
+        </svg>
+      </div>
+    )
+  }
+
   render() {
     return (
       <div className="workspace" onDrop={this.handleDrop} onDragOver={this.handleDragOver}>
@@ -1350,6 +1519,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         {this.renderLearningLog()}
         {this.renderModal()}
         {this.renderProgressMessage()}
+        {this.renderPosterAnnotations()}
         {this.renderReadonlyBlocker()}
       </div>
     )
