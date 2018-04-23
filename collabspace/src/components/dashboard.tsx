@@ -3,8 +3,8 @@ import * as firebase from "firebase"
 import * as queryString from "query-string"
 import * as jwt from "jsonwebtoken"
 import { PortalJWT, getClassInfo, PortalClassInfo, PortalOffering, dashboardAuth, PortalUser, firebaseAuth, AuthQueryParams, PortalTokens } from "../lib/auth";
-import { Document, FirebasePublication } from "../lib/document"
-import { getDocumentPath, getPublicationsRef } from "../lib/refs"
+import { Document, FirebasePublication, FirebaseOffering } from "../lib/document"
+import { getDocumentPath, getPublicationsRef, getOfferingRef } from "../lib/refs"
 import { FirebaseConfig } from "../lib/firebase-config"
 import { WorkspaceComponent } from "./workspace"
 import { DashboardTableComponent } from "./dashboard-table"
@@ -12,6 +12,7 @@ import { DashboardSuportComponent } from "./dashboard-support"
 import { GroupListComponent } from "./group-list"
 import { LogManager } from "../../../shared/log-manager"
 import { JWTKeepalive } from "../lib/jwt-keepalive"
+import { getPosterViewUrl } from "./workspace"
 
 export interface DashboardQueryParams extends AuthQueryParams {
   document?: string
@@ -31,8 +32,9 @@ export interface DashboardComponentState {
   portalTokens: PortalTokens|null
   document: Document|null
   publication: FirebasePublication|null
-  view: "publications" | "support" | "groups" | "poster"
+  view: "publications" | "support" | "groups"
   isTeacher: boolean
+  template: string|null
 }
 
 export class DashboardComponent extends React.Component<DashboardComponentProps, DashboardComponentState> {
@@ -51,7 +53,8 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
       document: null,
       publication: null,
       view: "publications",
-      isTeacher: false
+      isTeacher: false,
+      template: null
     }
   }
 
@@ -73,6 +76,15 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
 
         const isTeacher = user.type === "teacher"
         this.setState({portalOffering: offering, portalUser: user, portalTokens: tokens, isTeacher})
+
+        const offeringRef = getOfferingRef(offering)
+        offeringRef.once("value", (snapshot) => {
+          const firebaseOffering:FirebaseOffering|null = snapshot.val()
+          if (firebaseOffering) {
+            const {templateId, userId} = firebaseOffering.template
+            this.setState({template: Document.StringifyTemplateHashParam(userId, templateId)})
+          }
+        })
 
         return firebaseAuth().then((firebaseUser) => {
           this.setState({firebaseUser})
@@ -132,7 +144,9 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
   }
 
   renderToolbar() {
-    //<button type="button" onClick={() => this.setState({view: "poster"})}>Poster View</button>
+    const {portalTokens, portalUser, portalOffering, template} = this.state
+    const posterViewUrl = template ? getPosterViewUrl(portalTokens, portalUser, portalOffering, template) : null
+
     return (
       <div className="toolbar">
         <div className="buttons">
@@ -140,6 +154,9 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
             <button type="button" onClick={() => this.setState({view: "publications"})}>Publications</button>
             {this.state.isTeacher ? <button type="button" onClick={() => this.setState({view: "groups"})}>Groups</button> : null}
             {this.state.isTeacher ? <button type="button" onClick={() => this.setState({view: "support"})}>Support</button> : null}
+          </div>
+          <div className="right-buttons" style={{marginTop: 5}}>
+            {posterViewUrl ? <a className="button" href={posterViewUrl} target="_blank">Open Poster View</a> : null}
           </div>
         </div>
       </div>
@@ -203,10 +220,6 @@ export class DashboardComponent extends React.Component<DashboardComponentProps,
             portalTokens={portalTokens}
           />
           break
-
-        case "poster":
-          // TODO
-          return null
       }
 
       return (

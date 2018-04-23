@@ -24,6 +24,28 @@ import { LiveTimeAgoComponent } from "./live-time-ago"
 import { UploadImageDialogComponent } from "./upload-image-dialog"
 import { LearningLogComponent } from "./learning-log"
 
+export const getPosterViewUrl = (portalTokens: PortalTokens|null, portalUser: PortalUser|null, portalOffering: PortalOffering|null, template?: string) => {
+  if (portalTokens) {
+    const queryParams = queryString.parse(window.location.search)
+    const urlParams:any = {
+      portalJWT: portalTokens.rawPortalJWT,
+      group: "poster"
+    }
+    if (queryParams.demo) {
+      urlParams.demo = queryParams.demo
+    }
+    if (portalOffering && portalUser && (portalUser.type === "teacher")) {
+      urlParams.classInfoUrl = portalOffering.classInfoUrl
+      urlParams.offeringId = portalOffering.id
+    }
+    const hashParams = queryString.parse(window.location.hash)
+    if (template) {
+      hashParams.template = template
+    }
+    return `index.html?${queryString.stringify(urlParams)}#${queryString.stringify(hashParams)}`
+  }
+}
+
 export type PublicationWindowOptions = PublicationWindowOptionsByOffering | PublicationWindowOptionsByClass
 
 export interface PublicationWindowOptionsByOffering {
@@ -1172,25 +1194,6 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return this.renderPublicationToolbar()
   }
 
-  getPosterViewUrl() {
-    const {portalTokens, portalUser, portalOffering} = this.props
-    if (portalTokens) {
-      const queryParams = queryString.parse(window.location.search)
-      const urlParams:any = {
-        portalJWT: portalTokens.rawPortalJWT,
-        group: "poster"
-      }
-      if (queryParams.demo) {
-        urlParams.demo = queryParams.demo
-      }
-      if (portalOffering && portalUser && (portalUser.type === "teacher")) {
-        urlParams.classInfoUrl = portalOffering.classInfoUrl
-        urlParams.offeringId = portalOffering.id
-      }
-      return `?${queryString.stringify(urlParams)}${window.location.hash}`
-    }
-  }
-
   renderLeftToolbarButtons() {
     return (
       <div className="left-buttons">
@@ -1203,7 +1206,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderToolbarButtons() {
-    const {document, group, portalUser} = this.props
+    const {document, group, portalUser, portalTokens, portalOffering} = this.props
     const {documentInfo, isReadonly, posterView, annotatingPoster} = this.state
     const isTeacher = portalUser && (portalUser.type === "teacher")
     const showLeftButtons = !isReadonly && (!posterView.enabled || (isTeacher && !annotatingPoster))
@@ -1214,7 +1217,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const showPublishButton = !posterView.enabled && !this.props.isTemplate && !isReadonly
     const showLearningLogButton = !this.props.isTemplate && (!posterView.enabled || isTeacher)
     const showPosterViewButton = !posterView.enabled
-    const posterViewUrl = showPosterViewButton ? this.getPosterViewUrl() : null
+    const posterViewUrl = showPosterViewButton ? getPosterViewUrl(portalTokens, portalUser, portalOffering) : null
 
     return (
       <div className="buttons">
