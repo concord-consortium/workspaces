@@ -6,6 +6,7 @@ import { WindowManager, DragType } from "../lib/window-manager"
 import { v4 as uuidV4 } from "uuid"
 import { PortalUser } from "../lib/auth";
 import * as html2canvas from "html2canvas"
+import * as queryString from "query-string"
 
 export const TITLEBAR_HEIGHT = 22
 
@@ -77,6 +78,8 @@ export interface WindowComponentState {
   annotationTool: AnnotationTool
   annontations: FirebaseAnnotationMap,
   currentAnnotation: Annotation|null
+  allowAnnotations: boolean
+  allowSnapshots: boolean
 }
 
 export class WindowComponent extends React.Component<WindowComponentProps, WindowComponentState> {
@@ -84,6 +87,9 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
 
   constructor (props:WindowComponentProps) {
     super(props)
+
+    const queryParams = queryString.parse(window.location.search)
+
     this.state = {
       editingTitle: false,
       attrs: props.window.attrs,
@@ -91,7 +97,9 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       annotating: false,
       annotationTool: "draw",
       annontations: {},
-      currentAnnotation: null
+      currentAnnotation: null,
+      allowAnnotations: !queryParams.disableWindowAnnotations,
+      allowSnapshots: !queryParams.disableWindowSnapshots
     }
   }
 
@@ -356,16 +364,17 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
 
   renderSidebarMenu(left: number) {
     const {inPosterView} = this.props
-    const {annotating, inited} = this.state
+    const {annotating, inited, allowAnnotations, allowSnapshots} = this.state
     const isPublic = !this.props.window.attrs.ownerId
+    const showAnnotationIcons = !inPosterView && allowAnnotations
     return (
       <div className="sidebar-menu" style={{left}}>
         <div className="sidebar-menu-inner">
           {inited && isPublic ? <i className="icon icon-newspaper" title="Publish Window" onClick={this.handlePublishWindow} /> : null}
           {inited ? <i className="icon icon-copy" title="Copy Window" onClick={this.handleCopyWindow} /> : null}
-          {!inPosterView ? <i className={`icon icon-stack ${annotating ? "annotation-tool-selected" : ""}`} title="Annotate Window" onClick={this.handleToggleAnnotateWindow} /> : null}
-          {!inPosterView ? this.renderAnnotationTools() : null}
-          {inited ? <i className="icon icon-camera" title="Take Snapshot" onClick={this.handleSnapshotWindow} /> : null}
+          {showAnnotationIcons ? <i className={`icon icon-stack ${annotating ? "annotation-tool-selected" : ""}`} title="Annotate Window" onClick={this.handleToggleAnnotateWindow} /> : null}
+          {showAnnotationIcons ? this.renderAnnotationTools() : null}
+          {inited && allowSnapshots ? <i className="icon icon-camera" title="Take Snapshot" onClick={this.handleSnapshotWindow} /> : null}
         </div>
       </div>
     )
