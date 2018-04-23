@@ -40,51 +40,6 @@ module.exports = [
         },
 
         plugins: [
-            new webpack.optimize.CommonsChunkPlugin({
-                name: "globals",
-                filename: jsFilename
-            }),
-            new HtmlWebpackPlugin({
-                filename: '../index.html',
-                template: 'src/index.template.html'
-            }),
-            new CopyWebpackPlugin([
-                {from: 'src/public', to: distPath}
-            ])
-        ]
-    },
-    {
-        entry: {
-            app: "./src/app.tsx",
-            globals: globalsList
-        },
-
-        output: {
-            filename: jsFilename,
-            path: distPath + "/assets"
-        },
-
-        devtool: isDev ? "source-map" : "",
-
-        resolve: {
-            extensions: [".webpack.js", ".web.js", ".ts", ".tsx", ".js"]
-        },
-
-        module: {
-            rules: [
-                { enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
-                { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
-                { test: /\.scss$/i, loaders: ['style-loader', 'css-loader', 'sass-loader']},
-                { test: /\.css$/, loaders: ['style-loader', 'css-loader']},
-                { test: /\.(png|woff|woff2|eot|ttf|svg)$/, loader: 'url-loader' }
-            ]
-        },
-
-        plugins: [
-            new webpack.optimize.CommonsChunkPlugin({
-                name: "globals",
-                filename: jsFilename
-            }),
             new HtmlWebpackPlugin({
                 filename: '../index.html',
                 template: 'src/index.template.html'
@@ -120,10 +75,6 @@ module.exports = [
         },
 
         plugins: [
-            new webpack.optimize.CommonsChunkPlugin({
-                name: "drawing-tool-globals",
-                filename: jsFilename
-            }),
             new HtmlWebpackPlugin({
                 filename: '../drawing-tool.html',
                 template: 'src/drawing-tool.template.html'
@@ -158,10 +109,6 @@ module.exports = [
         },
 
         plugins: [
-            new webpack.optimize.CommonsChunkPlugin({
-                name: "drawing-tool-v2-globals",
-                filename: jsFilename
-            }),
             new HtmlWebpackPlugin({
                 filename: '../drawing-tool-v2.html',
                 template: 'src/drawing-tool-v2.template.html'
@@ -190,15 +137,12 @@ module.exports = [
                 { enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
                 { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
                 { test: /\.scss$/i, loaders: ['style-loader', 'css-loader', 'sass-loader']},
-                { test: /\.css$/, loaders: ['style-loader', 'css-loader']}
+                { test: /\.css$/, loaders: ['style-loader', 'css-loader']},
+                { test: /\.(png|woff|woff2|eot|ttf|svg)$/, loader: 'url-loader' }
             ]
         },
 
         plugins: [
-            new webpack.optimize.CommonsChunkPlugin({
-                name: "dashboard-globals",
-                filename: jsFilename
-            }),
             new HtmlWebpackPlugin({
                 filename: '../dashboard.html',
                 template: 'src/dashboard.template.html'
@@ -254,10 +198,6 @@ module.exports = [
         },
 
         plugins: [
-            new webpack.optimize.CommonsChunkPlugin({
-                name: "neo-codap-globals",
-                filename: jsFilename
-            }),
             new HtmlWebpackPlugin({
                 filename: '../neo-codap.html',
                 template: 'src/neo-codap.template.html'
