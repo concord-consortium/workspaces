@@ -9,6 +9,9 @@ import * as queryString from "query-string"
 import * as superagent from "superagent"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import { PublicationWindowOptions } from "./workspace";
+import { times } from "lodash"
+
+const ROWS_PER_PAGE = 20
 
 const isDemo = require("../../functions/demo-info").demoInfo.isDemo
 
@@ -132,6 +135,7 @@ export interface LearningLogComponentState {
   filterActivity: string|number
   filterArtifact: string
   filterPublishedBy: string
+  page: number
 }
 
 export class LearningLogComponent extends React.Component<LearningLogComponentProps, LearningLogComponentState> {
@@ -152,7 +156,8 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
       filterClass: "all",
       filterActivity: "all",
       filterArtifact: "all",
-      filterPublishedBy: "all"
+      filterPublishedBy: "all",
+      page: 1
     }
   }
 
@@ -374,7 +379,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
   }
 
   handleSearch = () => {
-    this.forceUpdate()
+    this.setState({page: 1})
   }
 
   handleSelectRow = (selectedRow:LearningLogTableRow|null) => {
@@ -398,23 +403,23 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
   }
 
   handleFilterFavorites = (e:React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({filterFavorites: e.target.value})
+    this.setState({page: 1, filterFavorites: e.target.value})
   }
 
   handleFilterClasses = (e:React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({filterClass: e.target.value})
+    this.setState({page: 1, filterClass: e.target.value})
   }
 
   handleFilterActivities = (e:React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({filterActivity: e.target.value})
+    this.setState({page: 1, filterActivity: e.target.value})
   }
 
   handleFilterArtifacts = (e:React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({filterArtifact: e.target.value})
+    this.setState({page: 1, filterArtifact: e.target.value})
   }
 
   handleFilterPublisher = (e:React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({filterPublishedBy: e.target.value})
+    this.setState({page: 1, filterPublishedBy: e.target.value})
   }
 
   handleToggleFavorite = (e: React.MouseEvent<HTMLElement>, tableRow: LearningLogTableRow) => {
@@ -516,8 +521,27 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
     return <i className={className} onClick={(e) => this.handleToggleFavorite(e, tableRow)} />
   }
 
+  renderPagination(filteredRows: LearningLogTableRow[]) {
+    const {page} = this.state
+    const numPages = Math.ceil(filteredRows.length / ROWS_PER_PAGE)
+    if (numPages < 2) {
+      return null
+    }
+    const pageLinks:JSX.Element[] = times(numPages, (index) => {
+      const pageNum = index + 1
+      const active = pageNum === page
+      return <span key={index} className={active ? "active" : ""} onClick={() => this.setState({page: pageNum})}>{pageNum}</span>
+    })
+
+    return (
+      <div className="learning-log-pagination">
+        Page {pageLinks}
+      </div>
+    )
+  }
+
   renderWorkspace() {
-    const {error, loadingClasses, tableRows, selectedRow, sortBy, sortDir, filterFavorites, filterClass, filterActivity, filterArtifact, filterPublishedBy} = this.state
+    const {error, loadingClasses, tableRows, selectedRow, sortBy, sortDir, filterFavorites, filterClass, filterActivity, filterArtifact, filterPublishedBy, page} = this.state
     if (error) {
       return <div className="centered"><div className="error">{error.toString()}</div></div>
     }
@@ -536,6 +560,10 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
       return favoritesMatch && classMatch && activityMatch && artifactMatch && publishedByMatch && searchMatch
     })
 
+    const startPageIndex = (page - 1) * ROWS_PER_PAGE
+    const endPageIndex = startPageIndex + ROWS_PER_PAGE
+    const pageRows = filteredRows.slice(startPageIndex, endPageIndex)
+
     return (
       <div className="learning-log-table">
         <table>
@@ -553,7 +581,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((tableRow, index) => {
+            {pageRows.map((tableRow, index) => {
               const classNames = []
               if (index % 2 == 0) {
                 classNames.push("even")
@@ -577,6 +605,7 @@ export class LearningLogComponent extends React.Component<LearningLogComponentPr
             })}
           </tbody>
         </table>
+        {this.renderPagination(filteredRows)}
       </div>
     )
   }
