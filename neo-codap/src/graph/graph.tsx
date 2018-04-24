@@ -770,7 +770,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
         svg.append('g')
             .attr('class', 'x axis')
-            .attr('transform', 'translate(0,' + height + ')')
+            .attr('transform', 'translate(0,' + y(0)  + ')')
             .call(xAxis)
             .append('text')
             .attr('transform', 'translate(' + (width / 2) + ',' + (margin.bottom - 3) + ')')
@@ -780,6 +780,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
 
         svg.append('g')
             .attr('class', 'y axis')
+            .attr('transform', 'translate(' + x(0) + ',0)')
             .call(yAxis)
             .append('text')
             .attr('transform', 'rotate(-90)')
