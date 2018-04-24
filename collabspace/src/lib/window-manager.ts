@@ -39,6 +39,7 @@ export interface AddWindowParams {
   annotations?: any
   dataSet?: FirebaseWindowDataSet
   createNewDataSet?: boolean
+  copyDataSet?: boolean
   log?: AddWindowLogParams
 }
 
@@ -360,9 +361,10 @@ export class WindowManager {
     return newTitle
   }
 
-  add(params:AddWindowParams, document?:Document) {
-    //url: string, title:string, ownerId: string, iframeData?:any, dataSet?:FirebaseWindowDataSet) {
-    const {url, title, ownerId, iframeData, annotations, dataSet, createNewDataSet} = params
+  add(params:AddWindowParams, doc?:Document) {
+    let dataSetCreatorRef:firebase.database.Reference
+    const document = doc || this.document
+    const {url, title, ownerId, iframeData, annotations, dataSet, createNewDataSet, copyDataSet} = params
     const attrs:FirebaseWindowAttrs = {
       top: this.randInRange(50, 200),
       left: this.randInRange(50, 200),
@@ -377,38 +379,57 @@ export class WindowManager {
       attrs.ownerId = ownerId
     }
 
-    let dataSetCreatorRef:firebase.database.Reference
-
-    document = document || this.document
-
-    if (dataSet) {
-      attrs.dataSet = dataSet
-    }
-    else if (createNewDataSet) {
-      // we have a bit of a catch-22, we need the window id as the value of the creator but
-      // we don't have that until we create it in Firebase so we just use a TDB value that we ignore
-      // in the workspace client (since TDB is not a valid window id)
-      dataSetCreatorRef = document.getDataSetsDataRef().child(document.id).child("creators").push("TDB")
-      if (dataSetCreatorRef.key) {
-        const newDataSet:FirebaseWindowDataSet = {
-          documentId: document.id,
-          dataSetId: dataSetCreatorRef.key
+    const prepWindow = new Promise<void>((resolve, reject) => {
+      if (createNewDataSet || copyDataSet) {
+        // we have a bit of a catch-22, we need the window id as the value of the creator but
+        // we don't have that until we create it in Firebase so we just use a TDB value that we ignore
+        // in the workspace client (since TDB is not a valid window id)
+        dataSetCreatorRef = document.getDataSetsDataRef().child(document.id).child("creators").push("TDB")
+        const newDataSetId = dataSetCreatorRef.key
+        if (newDataSetId) {
+          const newDataSet:FirebaseWindowDataSet = {
+            documentId: document.id,
+            dataSetId: newDataSetId
+          }
+          attrs.dataSet = newDataSet
+          if (copyDataSet && dataSet && document) {
+            const dataRef = document.getDataSetsDataRef().child(document.id).child("data")
+            dataRef.child(dataSet.dataSetId).once("value", (snapshot) => {
+              dataRef.child(newDataSetId).set(snapshot.val())
+              resolve()
+            })
+          }
+          else {
+            resolve()
+          }
         }
-        attrs.dataSet = newDataSet
+        else {
+          reject()
+        }
       }
-    }
-    Window.CreateInFirebase({document: document, attrs}, iframeData, annotations)
-      .then((window) => {
-        if (createNewDataSet && dataSetCreatorRef) {
-          dataSetCreatorRef.set(window.id)
-        }
-        this.moveToTop(window, true, document)
-        if (this.logManager && params.log) {
-          const logParams = assign({}, {creator: this.logManager.userId(), private: !!ownerId}, params.log.params)
-          this.logManager.logEvent(params.log.name, window.id, logParams)
-        }
-      })
-      .catch((err) => {})
+      else if (dataSet) {
+        attrs.dataSet = dataSet
+        resolve()
+      }
+      else {
+        resolve()
+      }
+    })
+
+    prepWindow.then(() => {
+      Window.CreateInFirebase({document: document, attrs}, iframeData, annotations)
+        .then((window) => {
+          if ((createNewDataSet || copyDataSet) && dataSetCreatorRef) {
+            dataSetCreatorRef.set(window.id)
+          }
+          this.moveToTop(window, true, document)
+          if (this.logManager && params.log) {
+            const logParams = assign({}, {creator: this.logManager.userId(), private: !!ownerId}, params.log.params)
+            this.logManager.logEvent(params.log.name, window.id, logParams)
+          }
+        })
+        .catch((err) => {})
+    })
   }
 
   moveToTop(window:Window, forceSync:boolean = false, document?:Document) {
@@ -591,7 +612,7 @@ export class WindowManager {
               copiedFrom: window.id
             }
           }
-          const addWindowParams:AddWindowParams = {url, title, iframeData, annotations, dataSet, log: logParams}
+          const addWindowParams:AddWindowParams = {url, title, iframeData, annotations, dataSet, log: logParams, copyDataSet: !!dataSet}
           if (ownerId) {
             addWindowParams.ownerId = ownerId
           }
