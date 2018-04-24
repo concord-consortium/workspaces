@@ -403,6 +403,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   getGridCellFromCellIDs(cellIDs: ICellIDs): IGridCellDef | undefined {
     if (!cellIDs || !cellIDs.caseID) { return; }
     const rowNode = this.gridApi.getRowNode(cellIDs.caseID);
+    if (!rowNode) { return; }
     return {
       rowIndex: rowNode.rowIndex,
       column: this.gridColumnApi.getColumn(cellIDs.attrID)
