@@ -110,7 +110,7 @@ export class GroupListComponent extends React.Component<GroupListComponentProps,
         <tr key={groupKey}>
           <td>{groupKey}</td>
           <td>{this.renderUsers(group)}</td>
-          <td><a href={href} className="button" target="_blank">Join Group</a></td>
+          <td><a href={href} className="button" style={{whiteSpace: "pre"}} target="_blank">Join Group</a></td>
         </tr>
       )
     })
