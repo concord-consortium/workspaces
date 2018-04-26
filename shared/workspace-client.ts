@@ -317,6 +317,8 @@ export class WorkspaceClientPublication {
           resolve(canvas)
         })
         annotationImage.src = this.annotationImageDataUrl
+        annotationImage.width = canvas.width
+        annotationImage.height = canvas.height
       }
       else {
         resolve(canvas)
@@ -359,7 +361,7 @@ export class WorkspaceClientSnapshot {
         return reject("Nothing to snapshot!")
       }
 
-      return html2canvas(element)
+      return html2canvas(element, {width: element.clientWidth, height: element.clientHeight})
         .then((canvas: HTMLCanvasElement) => {
           return this.fromCanvas(canvas)
             .then(resolve)
@@ -381,6 +383,8 @@ export class WorkspaceClientSnapshot {
           resolve(canvas)
         })
         annotationImage.src = this.annotationImageDataUrl
+        annotationImage.width = canvas.width
+        annotationImage.height = canvas.height
       }
       else {
         resolve(canvas)
