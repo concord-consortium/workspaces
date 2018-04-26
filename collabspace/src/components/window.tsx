@@ -139,7 +139,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       callback(null, null)
     }
     else {
-      html2canvas(annotationsElement, {backgroundColor: null} as any)
+      html2canvas(annotationsElement, {backgroundColor: null, width: annotationsElement.clientWidth, height: annotationsElement.clientHeight} as any)
       .then((canvas) => {
         callback(null, canvas.toDataURL("image/png"))
       })
@@ -397,12 +397,13 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     const {annontations, currentAnnotation} = this.state
     const {attrs} = this.props.window
     const {width, height} = attrs
+    const innerHeight = height - TITLEBAR_HEIGHT
     const pointerEvents = this.state.annotating ? "all" : "none"
     const currentAnnotationElement = currentAnnotation ? this.renderAnnotation(currentAnnotation) : null
     const annotationElements = Object.keys(annontations).map<JSX.Element|null>((key) => this.renderAnnotation(annontations[key]))
     return (
-      <div className="annotations" ref={(el) => this.annotationsElement = el} style={{pointerEvents: pointerEvents, width, height}} onMouseDown={this.handleAnnotationMouseDown}>
-        <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={width} height={height}>
+      <div className="annotations" ref={(el) => this.annotationsElement = el} style={{pointerEvents: pointerEvents, width, height: innerHeight}} onMouseDown={this.handleAnnotationMouseDown}>
+        <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={width} height={innerHeight}>
           {annotationElements}
           {currentAnnotationElement}
         </svg>
