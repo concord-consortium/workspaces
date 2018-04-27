@@ -55,6 +55,9 @@ interface IGraphState extends IGraphData {
     graphMenuIsOpen: boolean;
     legendMenuIsOpen: boolean;
     legendHeight: number;
+    graphRect: ClientRect | null;
+    xAxisRect: ClientRect | null;
+    yAxisRect: ClientRect | null;
 }
 
 interface IAttributeLegendScore {
@@ -90,6 +93,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
     srcValuesChanged: boolean = false;
     legend: HTMLDivElement|null = null;
     idleTimer: number | null = null;
+    graphElement: HTMLDivElement | null = null;
 
     constructor(props: IGraphProps) {
         super(props);
@@ -99,7 +103,10 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
                                 yMenuIsOpen: false,
                                 graphMenuIsOpen: false,
                                 legendMenuIsOpen: false,
-                                legendHeight: 0
+                                legendHeight: 0,
+                                graphRect: null,
+                                xAxisRect: null,
+                                yAxisRect: null
                             });
 
         const {graphComponentData} = this.props;
@@ -391,6 +398,22 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         else if (this.state.legendHeight > 0) {
             this.setState({legendHeight: 0});
         }
+
+        const xAxisElement = document.getElementById('x_axis_element');
+        const yAxisElement = document.getElementById('y_axis_element');
+        if (this.graphElement && xAxisElement && yAxisElement) {
+            const curXAxisRect = xAxisElement.getBoundingClientRect();
+            const curYAxisRect = yAxisElement.getBoundingClientRect();
+            const curGraphRect = this.graphElement.getBoundingClientRect();
+            const {xAxisRect, yAxisRect} = this.state;
+            if (!this.isSameClientRect(curXAxisRect, xAxisRect) || !this.isSameClientRect(curYAxisRect, yAxisRect)) {
+                this.setState({xAxisRect: curXAxisRect, yAxisRect: curYAxisRect, graphRect: curGraphRect});
+            }
+        }
+    }
+
+    isSameClientRect(a: ClientRect|null, b: ClientRect|null) {
+        return a && b && (a.top === b.top) && (a.left === b.left) && (a.width === b.width) && (a.height === b.height);
     }
 
     handleBackgroundClicked = () => {
@@ -491,13 +514,15 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         const handlePopoverInteraction = (nextOpenState: boolean) => {
             this.setState({ xMenuIsOpen: nextOpenState });
         };
-        const style = {bottom: this.state.legendHeight};
+        const {xAxisRect, graphRect} = this.state;
+        const style = xAxisRect ? {top: xAxisRect.top, height: xAxisRect.height} : {bottom: this.state.legendHeight};
+        const topPosition = xAxisRect && graphRect ? xAxisRect.top > (graphRect.height / 2) : true;
         return (
             <div className="nc-popover-container nc-x-popover-container" style={style}>
                 <Popover
                     popoverClassName="nc-popover-menu nc-x-popover-menu"
                     content={this.renderAttributeMenu('x', 'X Axis')}
-                    position={Position.TOP}
+                    position={topPosition ? Position.TOP : Position.BOTTOM}
                     isOpen={this.state.xMenuIsOpen}
                     onInteraction={handlePopoverInteraction}
                 >
@@ -511,12 +536,15 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         const handlePopoverInteraction = (nextOpenState: boolean) => {
             this.setState({ yMenuIsOpen: nextOpenState });
         };
+        const {yAxisRect, graphRect} = this.state;
+        const style = yAxisRect ? {left: yAxisRect.left, width: yAxisRect.width} : {};
+        const rightPosition = yAxisRect && graphRect ? yAxisRect.left < (graphRect.width / 2) : true;
         return (
-            <div className="nc-popover-container nc-y-popover-container">
+            <div className="nc-popover-container nc-y-popover-container" style={style}>
                 <Popover
                     popoverClassName="nc-popover-menu nc-y-popover-menu"
                     content={this.renderAttributeMenu('y', 'Y Axis')}
-                    position={Position.RIGHT}
+                    position={rightPosition ? Position.RIGHT : Position.LEFT}
                     isOpen={this.state.yMenuIsOpen}
                     onInteraction={handlePopoverInteraction}
                 >
@@ -701,6 +729,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             xMax = graphCaseCount ? d3.max(xValues) : 10,
             yMax = graphCaseCount ? d3.max(yValues) : 10;
 
+        xMax = xMax === undefined ? 0 : xMax;
+        yMax = yMax === undefined ? 0 : (yMax < 0 ? 0 : yMax);
+
         // Just for fun plot a _lot_ of random points instead of the ones from dataset
 /*
         let xRandFunc = d3.randomNormal(xMax && xMax / 2, xMax && xMax/6),
@@ -718,11 +749,11 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             height: number = this.props.size.height - margin.top - margin.bottom - legendHeight,
             x = d3.scaleLinear()
                 .range([0, width])
-                .domain([xMin, xMax || 1]).nice(),
+                .domain([xMin, xMax]).nice(),
 
             y = d3.scaleLinear()
                 .range([height, 0])
-                .domain([yMin, yMax || 1]).nice(),
+                .domain([yMin, yMax]).nice(),
 
             coordinates: IGraphCoordinate[][] = [],
             colors = legendAttrType ? this.getNumericLegendColors(legendAttrType) : this.getLegendColors(),
@@ -769,6 +800,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .on('click', this.handleBackgroundClicked);
 
         svg.append('g')
+            .attr('id', 'x_axis_element')
             .attr('class', 'x axis')
             .attr('transform', 'translate(0,' + y(0)  + ')')
             .call(xAxis)
@@ -779,6 +811,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             .on('click', () => this.setState({ xMenuIsOpen: true }));
 
         svg.append('g')
+            .attr('id', 'y_axis_element')
             .attr('class', 'y axis')
             .attr('transform', 'translate(' + x(0) + ',0)')
             .call(yAxis)
@@ -808,7 +841,12 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
         // Note: the graph popover is conditionally rendered so that the SVG element can get all mouse
         // events for data point mouseovers and clicks.
         return (
-            <div className="neo-codap-graph" onDragOver={this.handleDragOver} onDrop={this.handleDrop}>
+            <div
+                className="neo-codap-graph"
+                onDragOver={this.handleDragOver}
+                onDrop={this.handleDrop}
+                ref={(el) => this.graphElement = el}
+            >
                 {node.toReact()}
                 {this.renderXAxisPopover()}
                 {this.renderYAxisPopover()}
