@@ -1147,8 +1147,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderHeader() {
-    const {firebaseUser, portalUser} = this.props
-    const className = `header${this.props.isTemplate ? " template" : ""}`
+    const {firebaseUser, portalUser, group} = this.props
+    const {posterView} = this.state
+    const className = `header${this.props.isTemplate ? " template" : (posterView.enabled ? " poster" : "")}`
     const userName = portalUser ? portalUser.fullName : (firebaseUser.isAnonymous ? "Anonymous User" : firebaseUser.displayName)
     return (
       <div className={className}>
