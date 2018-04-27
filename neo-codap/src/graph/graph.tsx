@@ -729,7 +729,7 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             xMax = graphCaseCount ? d3.max(xValues) : 10,
             yMax = graphCaseCount ? d3.max(yValues) : 10;
 
-        xMax = xMax === undefined ? 0 : xMax;
+        xMax = xMax === undefined ? 0 : (xMax < 0 ? 0 : xMax);
         yMax = yMax === undefined ? 0 : (yMax < 0 ? 0 : yMax);
 
         // Just for fun plot a _lot_ of random points instead of the ones from dataset
