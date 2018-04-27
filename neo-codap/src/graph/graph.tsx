@@ -701,6 +701,9 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             xMax = graphCaseCount ? d3.max(xValues) : 10,
             yMax = graphCaseCount ? d3.max(yValues) : 10;
 
+        xMax = xMax === undefined ? 0 : xMax;
+        yMax = yMax === undefined ? 0 : (yMax < 0 ? 0 : yMax);
+
         // Just for fun plot a _lot_ of random points instead of the ones from dataset
 /*
         let xRandFunc = d3.randomNormal(xMax && xMax / 2, xMax && xMax/6),
@@ -718,11 +721,11 @@ export class GraphComponent extends React.Component<IGraphProps, IGraphState> {
             height: number = this.props.size.height - margin.top - margin.bottom - legendHeight,
             x = d3.scaleLinear()
                 .range([0, width])
-                .domain([xMin, xMax || 1]).nice(),
+                .domain([xMin, xMax]).nice(),
 
             y = d3.scaleLinear()
                 .range([height, 0])
-                .domain([yMin, yMax || 1]).nice(),
+                .domain([yMin, yMax]).nice(),
 
             coordinates: IGraphCoordinate[][] = [],
             colors = legendAttrType ? this.getNumericLegendColors(legendAttrType) : this.getLegendColors(),
