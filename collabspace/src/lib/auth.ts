@@ -329,72 +329,108 @@ export const collabSpaceAuth = () => {
       if (decodedJWT) {
         const portalUserJWT:PortalUserJWT = decodedJWT
         const {domain, user_id, user_type, first_name, last_name} = portalUserJWT
-        return getFirebaseJWTWithBearerToken(domain, "Bearer/JWT", portalJWT, queryParams.demo)
-          .then(([rawFirebaseJWT, firebaseJWT]) => {
-            if (user_type === "user") {
-              // user launching editor from portal
-              const fullName = `${first_name} ${last_name}`
-              const user:User = {
-                type: "user",
-                id: user_id,
-                firstName: first_name,
-                lastName: last_name,
-                fullName,
-                initials: initials(fullName)
-              }
-              resolve({
-                user: user,
-                offering: null,
-                tokens: {
-                  domain,
-                  rawPortalJWT: portalJWT,
-                  portalJWT: portalUserJWT,
-                  rawFirebaseJWT,
-                  firebaseJWT
+          return getFirebaseJWTWithBearerToken(domain, "Bearer/JWT", portalJWT, queryParams.demo)
+            .then(([rawFirebaseJWT, firebaseJWT]) => {
+              if (user_type === "user") {
+                const fullName = `${first_name} ${last_name}`
+                const user:User = {
+                  type: "user",
+                  id: user_id,
+                  firstName: first_name,
+                  lastName: last_name,
+                  fullName,
+                  initials: initials(fullName)
                 }
-              })
-            }
-            else if (user_type === "teacher") {
-              // teacher joining group via dashboard
-              const {classInfoUrl , offeringId} = queryParams
-              if (!classInfoUrl || !offeringId) {
-                return reject("Missing parameters when joining group")
-              }
-
-              return getClassInfo(classInfoUrl, portalJWT)
-                .then((classInfo) => {
-                  let user:PortalUser|null = null
-                  classInfo.teachers.forEach((teacher) => {
-                    if (teacher.id === decodedJWT.user_id) {
-                      user = teacher
-                    }
-                  })
-                  if (!user) {
-                    reject("Teaching not found in class roster")
+                resolve({
+                  user: user,
+                  offering: null,
+                  tokens: {
+                    domain,
+                    rawPortalJWT: portalJWT,
+                    portalJWT: portalUserJWT,
+                    rawFirebaseJWT,
+                    firebaseJWT
                   }
-
-                  const domainParser = document.createElement("a")
-                  domainParser.href = decodedJWT.domain
-
-                  resolve({
-                    user: user,
-                    offering: {
-                      id: offeringId,
-                      domain: isDemo(domain) ? "demo" : domainParser.host,
-                      classInfo: classInfo,
-                      isDemo: isDemo(domain),
-                      classInfoUrl
-                    },
-                    tokens: {
-                      domain,
-                      rawPortalJWT: portalJWT,
-                      portalJWT: portalUserJWT,
-                      rawFirebaseJWT,
-                      firebaseJWT
-                    }
-                  })
                 })
-            }
+              }
+              else if (user_type === "learner") {
+                // learner joining group via open poster view
+                const portalLearnerJWT:PortalStudentJWT = decodedJWT
+                return getClassInfo(portalLearnerJWT.class_info_url, portalJWT)
+                  .then((classInfo) => {
+                    let user:PortalUser|null = null
+                    classInfo.students.forEach((student) => {
+                      if (student.id === decodedJWT.user_id) {
+                        user = student
+                      }
+                    })
+                    if (!user) {
+                      reject("Student not found in class roster")
+                    }
+
+                    const domainParser = document.createElement("a")
+                    domainParser.href = decodedJWT.domain
+
+                    resolve({
+                      user: user,
+                      offering: {
+                        id: portalLearnerJWT.offering_id,
+                        domain: isDemo(domain) ? "demo" : domainParser.host,
+                        classInfo: classInfo,
+                        isDemo: isDemo(domain),
+                        classInfoUrl: portalLearnerJWT.class_info_url
+                      },
+                      tokens: {
+                        domain,
+                        rawPortalJWT: portalJWT,
+                        portalJWT: portalUserJWT,
+                        rawFirebaseJWT,
+                        firebaseJWT
+                      }
+                    })
+                  })
+              }
+              else if (user_type === "teacher") {
+                // teacher joining group via dashboard
+                const {classInfoUrl , offeringId} = queryParams
+                if (!classInfoUrl || !offeringId) {
+                  return reject("Missing parameters when joining group")
+                }
+
+                return getClassInfo(classInfoUrl, portalJWT)
+                  .then((classInfo) => {
+                    let user:PortalUser|null = null
+                    classInfo.teachers.forEach((teacher) => {
+                      if (teacher.id === decodedJWT.user_id) {
+                        user = teacher
+                      }
+                    })
+                    if (!user) {
+                      reject("Teacher not found in class roster")
+                    }
+
+                    const domainParser = document.createElement("a")
+                    domainParser.href = decodedJWT.domain
+
+                    resolve({
+                      user: user,
+                      offering: {
+                        id: offeringId,
+                        domain: isDemo(domain) ? "demo" : domainParser.host,
+                        classInfo: classInfo,
+                        isDemo: isDemo(domain),
+                        classInfoUrl
+                      },
+                      tokens: {
+                        domain,
+                        rawPortalJWT: portalJWT,
+                        portalJWT: portalUserJWT,
+                        rawFirebaseJWT,
+                        firebaseJWT
+                      }
+                    })
+                  })
+              }
           })
       }
     }
@@ -573,6 +609,7 @@ export const dashboardAuth = () => {
             })
             .catch(reject)
         })
+        .catch(reject)
     }
     else if (offering && token) {
       const offeringParser = document.createElement("a")

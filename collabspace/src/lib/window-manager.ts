@@ -1,6 +1,6 @@
 import { Window, WindowMap, IFrame, FirebaseWindowAttrs } from "./window"
-import { Document, FirebasePublication } from "./document"
-import { FirebaseWindowAttrsMap, FirebaseWindows } from "./window"
+import { Document, FirebasePublication, FirebaseDataSet } from "./document"
+import { FirebaseWindowAttrsMap, FirebaseWindows, FirebaseWindowDataSet } from "./window"
 import { FirebaseConfig } from "./firebase-config"
 import { IFramePhoneLib,
   IFramePhoneParent,
@@ -10,14 +10,38 @@ import { IFramePhoneLib,
   WorkspaceClientInitRequestMessage,
   WorkspaceClientInitResponseMessage,
   WorkspaceClientInitRequest,
-  WorkspaceClientInitResponse
+  WorkspaceClientInitResponse,
+  WorkspaceClientSnapshotRequestMessage,
+  WorkspaceClientSnapshotResponseMessage,
+  WorkspaceClientSnapshotRequest,
+  WorkspaceClientSnapshotResponse
  } from "../../../shared/workspace-client"
 
  const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
 
 import * as firebase from "firebase"
 import { PortalOffering, PortalTokens } from "./auth";
-import { getDocumentRef } from "./refs"
+import { getDocumentRef, getRelativeRefPath, getDocumentRefByClass } from "./refs"
+import { NonPrivateWindowParams, PublicationWindowOptions } from "../components/workspace";
+import { LogManager } from "../../../shared/log-manager"
+import { assign } from "lodash"
+
+export interface AddWindowLogParams {
+  name: string
+  params?: any
+}
+
+export interface AddWindowParams {
+  url: string
+  title: string
+  ownerId?: string
+  iframeData?: any
+  annotations?: any
+  dataSet?: FirebaseWindowDataSet
+  createNewDataSet?: boolean
+  copyDataSet?: boolean
+  log?: AddWindowLogParams
+}
 
 export enum DragType { GrowLeft, GrowRight, GrowUp, GrowDown, GrowDownRight, GrowDownLeft, Position, None }
 export interface DragInfo {
@@ -51,6 +75,7 @@ export interface WindowManagerSettings {
   onStateChanged: WindowManagerStateChangeFn
   syncChanges: boolean
   tokens: PortalTokens|null
+  nonPrivateWindow: (nonPrivateWindowParams: NonPrivateWindowParams) => boolean
 }
 
 export interface FirebaseOrderMap {
@@ -74,12 +99,16 @@ export class WindowManager {
   minimizedWindowOrder: string[]
   lastAttrsQuery: firebase.database.Query
   tokens: PortalTokens|null
+  nonPrivateWindow: (nonPrivateWindowParams: NonPrivateWindowParams) => boolean
+  logManager: LogManager
+  listenOnlyForTitleAttrChanges: boolean
 
   constructor (settings: WindowManagerSettings) {
     this.document = settings.document
     this.onStateChanged = settings.onStateChanged
     this.syncChanges = settings.syncChanges
     this.tokens = settings.tokens
+    this.nonPrivateWindow = settings.nonPrivateWindow
 
     this.windows = {}
     this.windowOrder = []
@@ -98,10 +127,14 @@ export class WindowManager {
 
     // make sure the windows map is populated before checking the ordering
     this.attrsRef.once("value", (snapshot) => {
+      this.listenOnlyForTitleAttrChanges = false
       this.handleAttrsRef(snapshot)
 
+      // listen to attrs changes always since we allow title updates when this.synChanges is false
+      this.listenOnlyForTitleAttrChanges = !this.syncChanges
+      this.attrsRef.on("value", this.handleAttrsRef)
+
       if (this.syncChanges) {
-        this.attrsRef.on("value", this.handleAttrsRef)
         this.orderRef.on("value", this.handleOrderRef)
         this.minimizedOrderRef.on("value", this.handleMinimizedOrderRef)
       }
@@ -109,6 +142,9 @@ export class WindowManager {
         // listen to new windows being added
         this.lastAttrsQuery = this.attrsRef.limitToLast(1)
         this.lastAttrsQuery.on("child_added", this.handleAttrsRefChildAdded)
+
+        // listen to windows being removed (for private windows)
+        this.attrsRef.on("child_removed", this.handleAttrsRefChildRemoved)
 
         // just get the initial order
         this.orderRef.once("value", this.handleOrderRef)
@@ -118,14 +154,19 @@ export class WindowManager {
   }
 
   destroy() {
+    this.attrsRef.off("value", this.handleAttrsRef)
+
     if (this.syncChanges) {
-      this.attrsRef.off("value", this.handleAttrsRef)
       this.orderRef.off("value", this.handleOrderRef)
       this.minimizedOrderRef.off("value", this.handleMinimizedOrderRef)
     }
     else {
       this.lastAttrsQuery.off("child_added", this.handleAttrsRefChildAdded)
     }
+  }
+
+  setLogManager(logManager:LogManager) {
+    this.logManager = logManager
   }
 
   notifyStateChange() {
@@ -162,7 +203,16 @@ export class WindowManager {
         attrs
       })
       this.windows[windowId] = window
-      this.moveToTop(window)
+      if (this.nonPrivateWindow({window})) {
+        this.moveToTop(window)
+      }
+    }
+  }
+
+  handleAttrsRefChildRemoved = (snapshot:firebase.database.DataSnapshot) => {
+    const window = snapshot.key ? this.windows[snapshot.key] : null
+    if (window) {
+      this.close(window)
     }
   }
 
@@ -175,7 +225,12 @@ export class WindowManager {
         const window = this.windows[id]
         const attrs = attrsMap[id]
         if (attrs) {
-          if (window) {
+          if (this.listenOnlyForTitleAttrChanges) {
+            if (window) {
+              window.setLocalTitle(attrs.title)
+            }
+          }
+          else if (window) {
             window.setAttrs(attrs, false)
             updatedWindows[id] = window
           }
@@ -189,7 +244,9 @@ export class WindowManager {
       })
     }
 
-    this.windows = updatedWindows
+    if (!this.listenOnlyForTitleAttrChanges) {
+      this.windows = updatedWindows
+    }
 
     // NOTE: there is no state change notification here on purpose as
     // the window manager state is only concerned with the order of the windows.
@@ -224,7 +281,7 @@ export class WindowManager {
       const order = windowOrder.indexOf(window.id)
       if (window && (order !== -1)) {
         this.state.allOrderedWindows.push({order, window})
-        if (!window.attrs.minimized) {
+        if (!window.attrs.minimized && this.nonPrivateWindow({window})) {
           if (!this.state.topWindow || (order > topOrder)) {
             this.state.topWindow = window
             topOrder = order
@@ -304,8 +361,11 @@ export class WindowManager {
     return newTitle
   }
 
-  add(url: string, title:string, iframeData?:any) {
-    const attrs = {
+  add(params:AddWindowParams, doc?:Document) {
+    let dataSetCreatorRef:firebase.database.Reference
+    const document = doc || this.document
+    const {url, title, ownerId, iframeData, annotations, dataSet, createNewDataSet, copyDataSet} = params
+    const attrs:FirebaseWindowAttrs = {
       top: this.randInRange(50, 200),
       left: this.randInRange(50, 200),
       width: 700,
@@ -313,16 +373,66 @@ export class WindowManager {
       minimized: false,
       maximized: false,
       url,
-      title: this.ensureUniqueTitle(title),
+      title: this.ensureUniqueTitle(title)
     }
-    Window.CreateInFirebase({document: this.document, attrs}, iframeData)
-      .then((window) => {
-        this.moveToTop(window, true)
-      })
-      .catch((err) => {})
+    if (ownerId) {
+      attrs.ownerId = ownerId
+    }
+
+    const prepWindow = new Promise<void>((resolve, reject) => {
+      if (createNewDataSet || copyDataSet) {
+        // we have a bit of a catch-22, we need the window id as the value of the creator but
+        // we don't have that until we create it in Firebase so we just use a TDB value that we ignore
+        // in the workspace client (since TDB is not a valid window id)
+        dataSetCreatorRef = document.getDataSetsDataRef().child(document.id).child("creators").push("TDB")
+        const newDataSetId = dataSetCreatorRef.key
+        if (newDataSetId) {
+          const newDataSet:FirebaseWindowDataSet = {
+            documentId: document.id,
+            dataSetId: newDataSetId
+          }
+          attrs.dataSet = newDataSet
+          if (copyDataSet && dataSet && document) {
+            const dataRef = document.getDataSetsDataRef().child(document.id).child("data")
+            dataRef.child(dataSet.dataSetId).once("value", (snapshot) => {
+              dataRef.child(newDataSetId).set(snapshot.val())
+              resolve()
+            })
+          }
+          else {
+            resolve()
+          }
+        }
+        else {
+          reject()
+        }
+      }
+      else if (dataSet) {
+        attrs.dataSet = dataSet
+        resolve()
+      }
+      else {
+        resolve()
+      }
+    })
+
+    prepWindow.then(() => {
+      Window.CreateInFirebase({document: document, attrs}, iframeData, annotations)
+        .then((window) => {
+          if ((createNewDataSet || copyDataSet) && dataSetCreatorRef) {
+            dataSetCreatorRef.set(window.id)
+          }
+          this.moveToTop(window, true, document)
+          if (this.logManager && params.log) {
+            const logParams = assign({}, {creator: this.logManager.userId(), private: !!ownerId}, params.log.params)
+            this.logManager.logEvent(params.log.name, window.id, logParams)
+          }
+        })
+        .catch((err) => {})
+    })
   }
 
-  moveToTop(window:Window, forceSync:boolean = false) {
+  moveToTop(window:Window, forceSync:boolean = false, document?:Document) {
     const moveToTopInOrder = (order:string[]) => {
       const index = order.indexOf(window.id)
       if (index !== -1) {
@@ -332,12 +442,13 @@ export class WindowManager {
     }
 
     if (this.syncChanges || forceSync) {
-      this.orderRef.once("value", (snapshot) => {
+      let orderRef = document ? document.getWindowsDataRef("order") : this.orderRef
+      orderRef.once("value", (snapshot) => {
         const currentOrderMap:FirebaseOrderMap = snapshot.val() || {}
         const order = this.firebaseOrderMapToArray(currentOrderMap)
         moveToTopInOrder(order)
         const newOrderMap = this.arrayToFirebaseOrderMap(order)
-        this.orderRef.update(newOrderMap)
+        orderRef.update(newOrderMap)
       })
     }
     else {
@@ -412,14 +523,15 @@ export class WindowManager {
   changeTitle(window:Window, newTitle:string) {
     const {attrs} = window
     attrs.title = newTitle
-    window.setAttrs(attrs, this.syncChanges)
+    window.setAttrs(attrs, true)
   }
 
-  windowLoaded(window:Window, element:HTMLIFrameElement) {
+  windowLoaded(window:Window, element:HTMLIFrameElement, callback: () => void) {
     window.iframe = {
       window: window,
       element,
       connected: false,
+      inited: false,
       dataRef: this.document.getWindowsDataRef("iframeData").child(window.id),
       phone: IFramePhoneFactory.ParentEndpoint(element, () => {
         window.iframe.connected = true
@@ -427,26 +539,48 @@ export class WindowManager {
           type: "collabspace",
           version: "1.0.0",
           id: window.id,
+          documentId: this.document.id,
           readonly: this.document.isReadonly,
           firebase: {
             config: FirebaseConfig,
-            dataPath: window.iframe.dataRef.toString().substring(window.iframe.dataRef.root.toString().length)
+            dataPath: getRelativeRefPath(window.iframe.dataRef),
+            dataSet: window.attrs.dataSet,
+            dataSetsPath: getRelativeRefPath(this.document.getDataSetsDataRef()),
+            attrsPath: getRelativeRefPath(this.document.getWindowsDataRef("attrs"))
           },
           tokens: this.tokens
         }
         window.iframe.phone.addListener(WorkspaceClientInitResponseMessage, (resp:WorkspaceClientInitResponse) => {
-          // TODO
+          window.iframe.inited = true
+          callback()
         })
         window.iframe.phone.post(WorkspaceClientInitRequestMessage, initRequest)
       })
     }
   }
 
+  getWindow(windowId:string) {
+    return this.windows[windowId]
+  }
+
+  postToWindow(window:Window, message:string, request:object) {
+    if (window.iframe && window.iframe.connected) {
+      window.iframe.phone.post(message, request)
+    }
+  }
+
+  postToWindowIds(windowIds:string[], message:string, request:object) {
+    windowIds.forEach((windowId) => {
+      const window = this.windows[windowId]
+      if (window) {
+        this.postToWindow(window, message, request)
+      }
+    })
+  }
+
   postToAllWindows(message:string, request:object) {
     this.forEachWindow((window) => {
-      if (window.iframe.connected) {
-        window.iframe.phone.post(message, request)
-      }
+      this.postToWindow(window, message, request)
     })
   }
 
@@ -459,24 +593,117 @@ export class WindowManager {
     })
   }
 
-  copyWindowFromPublication(portalOffering:PortalOffering, publication:FirebasePublication, windowId: string, title:string) {
+  copyWindow(window: Window, title: string, ownerId?: string) {
     return new Promise<void>((resolve, reject) => {
-      // open the publication document
-      const documentWindowsRef = getDocumentRef(portalOffering, publication.documentId).child("data").child("windows")
+      const windowsRef = this.document.getWindowsRef()
+      windowsRef.once("value")
+        .then((snapshot) => {
+          const windows:FirebaseWindows|null = snapshot.val()
+          const firebaseWindow = windows && windows.attrs[window.id]
+          const iframeData = windows && windows.iframeData && windows.iframeData[window.id] ? windows.iframeData[window.id] : undefined
+          const annotations = windows && windows.annotations && windows.annotations[window.id] ? windows.annotations[window.id] : undefined
+          if (!firebaseWindow) {
+            return reject("Cannot find window in document")
+          }
+          const {dataSet, url} = firebaseWindow
+          const logParams: AddWindowLogParams = {
+            name: "Copied window",
+            params: {
+              copiedFrom: window.id
+            }
+          }
+          const addWindowParams:AddWindowParams = {url, title, iframeData, annotations, dataSet, log: logParams, copyDataSet: !!dataSet}
+          if (ownerId) {
+            addWindowParams.ownerId = ownerId
+          }
+          this.add(addWindowParams)
+          resolve()
+        })
+        .catch(reject)
+    })
+  }
+
+  copyWindowFromPublication(portalOffering: PortalOffering, options: PublicationWindowOptions, title:string, ownerId?:string, destDocument?:Document) {
+    return new Promise<void>((resolve, reject) => {
+      const {windowId} = options
+      const documentDataRef = getDocumentRef(portalOffering, destDocument ? destDocument.id : this.document.id).child("data")
+      let publicationDataRef:firebase.database.Reference
+      if (options.type === "offering") {
+        publicationDataRef = getDocumentRef(options.offering, options.documentId).child("data")
+      }
+      else {
+        publicationDataRef = getDocumentRefByClass(portalOffering.domain, options.classHash, options.documentId).child("data")
+      }
+      const documentWindowsRef = publicationDataRef.child("windows")
       documentWindowsRef.once("value")
         .then((snapshot) => {
           const windows:FirebaseWindows|null = snapshot.val()
           const attrs = windows && windows.attrs && windows.attrs[windowId] ? windows.attrs[windowId] : null
           const iframeData = windows && windows.iframeData && windows.iframeData[windowId] ? windows.iframeData[windowId] : undefined
+          const annotations = windows && windows.annotations && windows.annotations[windowId] ? windows.annotations[windowId] : undefined
 
           if (!attrs) {
             return reject("Cannot find window in publication!")
           }
           else {
-            this.add(attrs.url, title, iframeData)
+            const {dataSet, url} = attrs
+            const done = () => {
+              const logParams: AddWindowLogParams = {
+                name: "Copied window from publication",
+                params: {
+                  copiedFrom: windowId
+                }
+              }
+              this.add({url, title, iframeData, annotations, dataSet, log: logParams, ownerId}, destDocument)
+              resolve()
+            }
+            if (dataSet) {
+              // copy datasets from publication into document if it doesn't already exist
+              const existingRef = documentDataRef.child("datasets").child(dataSet.documentId)
+              existingRef.once("value", (snapshot) => {
+                const val = snapshot.val()
+                if (!val) {
+                  const copyRef = publicationDataRef.child("datasets").child(dataSet.documentId)
+                  copyRef.once("value", (snapshot) => {
+                    existingRef.set(snapshot.val())
+                    done()
+                  })
+                }
+                else {
+                  done()
+                }
+              })
+            }
+            else {
+              done()
+            }
           }
         })
         .catch(reject)
+    })
+  }
+
+  snapshotWindow(window: Window, snapshotPath: string, annotationImageDataUrl: string|null) {
+    return new Promise<string>((resolve, reject) => {
+      if (!window.iframe.inited) {
+        return reject("Window does not respond to snapshot requests")
+      }
+
+      const responseTimeout = setTimeout(() => {
+        reject("Window did not respond to snapshot request")
+      }, 5000)
+
+      const {phone} = window.iframe
+      const handleSnapshotResponse = (response: WorkspaceClientSnapshotResponse) => {
+        clearTimeout(responseTimeout)
+        resolve(response.snapshotUrl)
+        phone.removeListener(WorkspaceClientSnapshotResponseMessage)
+      }
+
+      phone.addListener(WorkspaceClientSnapshotResponseMessage, handleSnapshotResponse)
+
+      const request:WorkspaceClientSnapshotRequest = {snapshotPath, annotationImageDataUrl}
+      phone.post(WorkspaceClientSnapshotRequestMessage, request)
     })
   }
 }

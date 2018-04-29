@@ -4,8 +4,8 @@
   "private": true,
   "dependencies": {
     "@blueprintjs/core": "^1.35.0",
-    "ag-grid": "^16.0.1",
-    "ag-grid-react": "^16.0.0",
+    "ag-grid": "^17.0.0",
+    "ag-grid-react": "^17.0.0",
     "d3": "^4.12.0",
     "html2canvas": "^1.0.0-alpha.4",
     "lodash": "^4.17.4",

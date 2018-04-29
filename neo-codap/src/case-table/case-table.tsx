@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { onSnapshot, getSnapshot, types } from 'mobx-state-tree';
 import { ISerializedActionCall } from 'mobx-state-tree/dist/middlewares/on-action';
 import TableHeaderMenu from './table-header-menu';
 import { addAttributeToDataSet, addCanonicalCasesToDataSet,
@@ -6,22 +7,50 @@ import { addAttributeToDataSet, addCanonicalCasesToDataSet,
 import { IAttribute, IValueType } from '../data-manager/attribute';
 import { AgGridReact } from 'ag-grid-react';
 import { CellComp, CellEditingStartedEvent, CellEditingStoppedEvent, ColDef, Column,
-          ColumnApi, GridApi, GridReadyEvent, RowRenderer } from 'ag-grid';
+          ColumnApi, GridApi, GridReadyEvent, RowRenderer, RowNode, SortChangedEvent } from 'ag-grid';
 import { ValueGetterParams, ValueFormatterParams, ValueSetterParams } from 'ag-grid/dist/lib/entities/colDef';
 import { assign, cloneDeep, findIndex, isEqual, sortedIndexBy } from 'lodash';
 import 'ag-grid/dist/styles/ag-grid.css';
 import 'ag-grid/dist/styles/ag-theme-fresh.css';
 import './case-table.css';
 import { RowDataTransaction } from 'ag-grid/dist/lib/rowModels/inMemory/inMemoryRowModel';
+import { Strings } from '../strings';
+import { emitCaseTableEvent } from './case-table-events';
+
+export const CaseTableComponentSortModelData = types.model('CaseTableComponentSortModelData', {
+  colId: types.string,
+  sort: types.string
+});
+export type ICaseTableSortModelData = typeof CaseTableComponentSortModelData.Type;
+
+export const CaseTableComponentData = types.model('CaseTableComponentData',
+  {
+    sortModel: types.array(CaseTableComponentSortModelData)
+  })
+  .actions(self => ({
+    // tslint:disable-next-line:no-any
+    setSortModel(sortModel: any) {
+      self.sortModel = sortModel;
+    }
+  }));
+export type ICaseTableComponentData = typeof CaseTableComponentData.Type;
+
+interface IPos {
+  left: number;
+  top: number;
+}
 
 interface ICaseTableProps {
   dataSet?: IDataSet;
+  caseTableComponentData?: ICaseTableComponentData|null;
   onSampleData?: (name: string) => void;
+  strings: Strings;
 }
 
 interface ICaseTableState {
   rowSelection: string;
   rowModelType: string;
+  addAttributeButtonPos: IPos|null;
 }
 
 const LOCAL_CASE_ID = '__local__';
@@ -93,6 +122,11 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   savedEditCell?: ICellIDs;
   savedEditContent?: string;
 
+  gridElement: HTMLDivElement|null;
+  headerElement: HTMLDivElement|null;
+
+  sortedRowNodes: RowNode[];
+
   // we don't need to refresh for changes the table already knows about
   localChanges: IInputCase[] = [];
 
@@ -105,14 +139,29 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     this.state = {
       rowSelection: 'multiple',
       rowModelType: 'inMemory',
+      addAttributeButtonPos: null
     };
 
+    this.gridElement = null;
+    this.headerElement = null;
+
     this.updateGridState(dataSet);
+
+    this.sortedRowNodes = [];
   }
 
   onGridReady = (gridReadyParams: GridReadyEvent) => {
     this.gridApi = gridReadyParams.api;
     this.gridColumnApi = gridReadyParams.columnApi;
+
+    const {caseTableComponentData} = this.props;
+    if (caseTableComponentData) {
+      this.gridApi.setSortModel(getSnapshot(caseTableComponentData.sortModel));
+
+      onSnapshot(caseTableComponentData, (snapshot: ICaseTableComponentData) => {
+        this.gridApi.setSortModel(snapshot.sortModel);
+      });
+    }
   }
 
   getRowNodeId = (data: { id: string }) => data.id;
@@ -130,6 +179,11 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
             addAttributeToDataSet(this.props.dataSet, { name });
           }
         },
+        onRenameAttribute: (id: string, name: string) => {
+          if (this.props.dataSet) {
+            this.props.dataSet.setAttributeName(id, name);
+          }
+        },
         onNewCase: () => {
           if (this.props.dataSet) {
             addCanonicalCasesToDataSet(this.props.dataSet, [{}]);
@@ -145,7 +199,8 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
             this.props.dataSet.removeCases(ids);
           }
         },
-        onSampleData: this.props.onSampleData
+        onSampleData: this.props.onSampleData,
+        strings: this.props.strings
       },
       headerClass: 'cdp-case-index-header',
       cellClass: 'cdp-case-index-cell',
@@ -153,7 +208,14 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       width: 50,
       pinned: 'left',
       lockPosition: true,
-      valueGetter: 'String(node.rowIndex + 1)',
+      valueGetter: (params) => {
+        // if not yet sorted just return the row index
+        if (this.sortedRowNodes.length === 0) {
+          return params.node.rowIndex + 1;
+        }
+        // otherwise return the index after the last sort operation
+        return this.sortedRowNodes.indexOf(params.node) + 1;
+      },
       suppressMovable: true,
       suppressResize: true,
       suppressNavigable: true
@@ -181,6 +243,7 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       colId: attribute.id,
       editable: true,
       width: widths[attribute.name] || defaultWidth,
+      lockPosition: true,
       valueGetter: (params: ValueGetterParams) => {
         const { dataSet } = this.props,
               caseID = params.node.id,
@@ -235,6 +298,17 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
         this.localChanges.push(cloneDeep(caseValues));
         dataSet.setCanonicalCaseValues([caseValues]);
         return true;
+      },
+      // tslint:disable-next-line:no-any
+      comparator: function (valueA: any, valueB: any, nodeA: RowNode, nodeB: RowNode, descending: boolean) {
+        const floatA = parseFloat(valueA);
+        const floatB = parseFloat(valueB);
+        if (isNaN(floatA) || isNaN(floatB)) {
+          if (valueA < valueB) { return -1; }
+          if (valueA > valueB) { return 1; }
+          return 0;
+        }
+        return floatA - floatB;
       }
     });
   }
@@ -329,12 +403,13 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
   getGridCellFromCellIDs(cellIDs: ICellIDs): IGridCellDef | undefined {
     if (!cellIDs || !cellIDs.caseID) { return; }
     const rowNode = this.gridApi.getRowNode(cellIDs.caseID);
+    if (!rowNode) { return; }
     return {
       rowIndex: rowNode.rowIndex,
       column: this.gridColumnApi.getColumn(cellIDs.attrID)
     };
   }
-      
+
   saveCellEditState() {
     const focusedCell = this.gridApi.getFocusedCell(),
           rowIndex = this.editCellEvent && this.editCellEvent.rowIndex,
@@ -387,12 +462,22 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
       let columnDefs = null,
           rowTransaction: RowDataTransaction | null = null,
           shouldSaveEditState = true;
+      const attributeChanged = () => {
+        if (dataSet) {
+          columnDefs = this.getColumnDefs(dataSet);
+          setTimeout(() => this.handleSetAddAttributePos(), 1);
+        }
+      };
       switch (action.name) {
+        case '@APPLY_SNAPSHOT':
+          if (/^\/attributes\//.test(action.path || '')) {
+            attributeChanged();
+          }
+          break;
         case 'addAttributeWithID':
         case 'removeAttribute':
-          if (dataSet) {
-            columnDefs = this.getColumnDefs(dataSet);
-          }
+        case 'setAttributeName':
+          attributeChanged();
           break;
         case 'addCasesWithIDs':
         case 'addCanonicalCasesWithIDs':
@@ -478,6 +563,36 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     this.checkForEnterAfterCellEditingStopped = false;
   }
 
+  handlePostSort = (rowNodes: RowNode[]) => {
+    // move the entry row to the bottom
+    const localRow = rowNodes.find((rowNode) => rowNode.data.id === LOCAL_CASE_ID);
+    if (localRow) {
+      rowNodes.splice(rowNodes.indexOf(localRow), 1);
+      rowNodes.push(localRow);
+    }
+
+    // keep reference so we can keep index in ascending order
+    this.sortedRowNodes = rowNodes;
+    if (this.gridApi) {
+      // force update of the case index
+      this.gridApi.refreshCells({
+        columns: ['__CASE_INDEX__'],
+        force: true
+      });
+    }
+  }
+
+  handleSortChanged = (event: SortChangedEvent) => {
+    const { caseTableComponentData } = this.props;
+    if (caseTableComponentData) {
+      const currentSortModel = getSnapshot(caseTableComponentData.sortModel);
+      const newSortModel = event.api.getSortModel();
+      if (!isEqual(currentSortModel, newSortModel)) {
+        caseTableComponentData.setSortModel(newSortModel);
+      }
+    }
+  }
+
   componentWillMount() {
     window.addEventListener('keyup', this.handleKeyUp);
   }
@@ -495,13 +610,61 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
     }
   }
 
+  handleSetAddAttributePos = () => {
+    // console.log("handleSetAddAttributePos")
+    if (this.gridElement) {
+      const classes = this.gridElement.getElementsByClassName('ag-header-row');
+      this.headerElement = classes.item(classes.length - 1) as HTMLDivElement;
+      if (this.headerElement) {
+        const gridRect = this.gridElement.getBoundingClientRect();
+        const headerRect = this.headerElement.getBoundingClientRect();
+        const left = headerRect.right - gridRect.left;
+        const top = headerRect.top - gridRect.top;
+        const {addAttributeButtonPos} = this.state;
+        if (!addAttributeButtonPos || (addAttributeButtonPos.top !== top) || (addAttributeButtonPos.left !== left)) {
+          this.setState({addAttributeButtonPos: {top, left}});
+        }
+      }
+    }
+  }
+
   componentWillReact() {
     this.updateGridState(this.props.dataSet);
   }
 
+  handleAddAttributeButton = () => {
+    emitCaseTableEvent({type: 'add-attribute'});
+  }
+
+  renderAddAttributeButtonPos() {
+    const {addAttributeButtonPos} = this.state;
+    if (addAttributeButtonPos !== null) {
+      const {top, left} = addAttributeButtonPos;
+      return (
+        <span
+          onClick={this.handleAddAttributeButton}
+          style={{
+            position: 'absolute',
+            fontSize: 10,
+            top,
+            left,
+            marginLeft: 5,
+            marginTop: 3,
+            padding: '1px 4px',
+            border: '1px solid #777',
+            cursor: 'pointer'
+          }}
+        >
+          +
+        </span>
+      );
+    }
+    return null;
+  }
+
   render() {
     return (
-      <div className="neo-codap-case-table ag-theme-fresh">
+      <div className="neo-codap-case-table ag-theme-fresh" ref={(el) => this.gridElement = el}>
         <AgGridReact
           columnDefs={this.gridColumnDefs}
           enableColResize={true}
@@ -519,6 +682,10 @@ export class CaseTable extends React.Component<ICaseTableProps, ICaseTableState>
           enableCellChangeFlash={true}
           onCellEditingStarted={this.handleCellEditingStarted}
           onCellEditingStopped={this.handleCellEditingStopped}
+          enableSorting={true}
+          postSort={this.handlePostSort}
+          onSortChanged={this.handleSortChanged}
+          onViewportChanged={() => this.handleSetAddAttributePos()}
         />
       </div>
     );

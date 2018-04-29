@@ -1,7 +1,7 @@
 import * as React from "react"
 import * as firebase from "firebase"
 import * as queryString from "query-string"
-import { FirebaseDocument, Document, FirebaseDocumentInfo } from "../lib/document"
+import { FirebaseDocument, Document, FirebaseDocumentInfo, FirebaseOfferingGroupMap } from "../lib/document"
 import { FirebaseWindows } from "../lib/window"
 import { DocumentCrudComponent } from "./document-crud"
 import { WorkspaceComponent } from "./workspace"
@@ -11,6 +11,8 @@ import { PortalUser, PortalOffering, collabSpaceAuth, firebaseAuth, PortalTokens
 import { getUserTemplatePath, getSupportsRef, getSupportsSeenRef } from "../lib/refs"
 import { v4 as uuidV4 } from "uuid"
 import { LogManager } from "../../../shared/log-manager"
+import { JWTKeepalive } from "../lib/jwt-keepalive"
+import { UserLookup } from "../lib/user-lookup"
 
 export const MAX_GROUPS = 99;
 
@@ -30,10 +32,12 @@ export interface AppComponentState {
   portalUser: PortalUser|null,
   portalOffering: PortalOffering|null,
   groupChosen: boolean
-  group: number
+  group: string
   groupRef: firebase.database.Reference|null
+  groups: FirebaseOfferingGroupMap|null
   supportsRef: firebase.database.Reference|null
   supportsSeenRef: firebase.database.Reference|null
+  posterDocument?: Document
 }
 
 export type HashActionParam = "create-template"
@@ -54,6 +58,8 @@ export interface AppQueryParams {
 export class AppComponent extends React.Component<AppComponentProps, AppComponentState> {
   startingTitle: string
   logManager: LogManager
+  jwtKeepalive: JWTKeepalive
+  userLookup: UserLookup
 
   constructor (props:AppComponentProps) {
     super(props)
@@ -70,8 +76,9 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       portalUser: null,
       portalOffering: null,
       groupChosen: false,
-      group: 0,
+      group: "",
       groupRef: null,
+      groups: null,
       supportsRef: null,
       supportsSeenRef: null,
       templateId: null,
@@ -91,9 +98,13 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
 
     collabSpaceAuth().then((portalInfo) => {
       const {tokens} = portalInfo
+      const portalOffering =  portalInfo.offering
 
-      this.setState({portalUser: portalInfo.user, portalOffering: portalInfo.offering, portalTokens: tokens})
+      this.setState({portalUser: portalInfo.user, portalOffering, portalTokens: tokens})
       this.logManager = new LogManager({tokens, activity: "CollabSpace"})
+      this.jwtKeepalive = new JWTKeepalive(tokens, (portalTokens, expired, authError) => this.setState({portalTokens, authError}))
+
+      this.userLookup = new UserLookup(portalOffering ? portalOffering.classInfo : undefined)
 
       return firebaseAuth().then((firebaseUser) => {
         this.setState({firebaseUser})
@@ -105,7 +116,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       })
     })
     .catch((error) => {
-      this.setState({authError: error})
+      this.setState({authError: `Unable to authenticate: ${error.toString().replace("Signature", "Access token")}`})
     })
   }
 
@@ -160,6 +171,22 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
               if (params.group) {
                 this.selectGroup(params.group)
               }
+              else {
+                // keep a list of groups
+                const {template, portalOffering} = this.state
+                if (template && portalOffering) {
+                  template.getFirebaseOffering(portalOffering)
+                    .then(([firebaseOffering, offeringRef]) => {
+                      const groupRef = offeringRef.child("groups")
+                      groupRef.on("value", (snapshot) => {
+                        if (snapshot) {
+                          const groups:FirebaseOfferingGroupMap = snapshot.val()
+                          this.setState({groups})
+                        }
+                      })
+                    })
+                }
+              }
             })
           })
           .catch((documentError) => this.setState({documentError}))
@@ -171,10 +198,11 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   }
 
   selectGroup(groupValue: string) {
-    const group = parseInt(groupValue)
-    if (group > 0) {
+    const group = groupValue
+    if (group !== "") {
       this.setState({groupChosen: true, group})
       if (this.state.template && this.state.portalOffering) {
+        // get the group document
         this.state.template.getGroupOfferingDocument(this.state.portalOffering, group)
           .then(([document, groupRef]) => {
             const supportsRef = this.state.portalOffering ? getSupportsRef(this.state.portalOffering) : null;
@@ -182,7 +210,13 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
             this.setState({document, groupRef, supportsRef, supportsSeenRef})
           })
           .catch((documentError) => this.setState({documentError}))
-        }
+
+        // get the poster document id
+        this.state.template.getGroupOfferingDocument(this.state.portalOffering, "poster")
+          .then(([posterDocument, groupRef]) => {
+            this.setState({posterDocument})
+          })
+      }
     }
   }
 
@@ -194,24 +228,73 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
   }
 
   handleLeaveGroup = () => {
-    this.setState({groupChosen: false, group: 0, document: null})
+    this.setState({groupChosen: false, group: "", document: null})
+  }
+
+  renderChooseExistingGroup(groups: FirebaseOfferingGroupMap|null, groupKeys: string[]) {
+    if (!groups || groupKeys.length == 0) {
+      return null
+    }
+    const groupElements:JSX.Element[] = []
+    groupKeys.forEach((key) => {
+      if (key !== "poster") {
+        const {users} = groups[key]
+        const chooseGroup = () => this.selectGroup(key)
+        groupElements.push(
+          <div className="group" key={key} onClick={chooseGroup}>
+            <div className="group-title">Group {key}</div>
+            {Object.keys(users).map((id) => {
+              const portalUser = this.userLookup.lookup(id)
+              const status = users[id].connected ? "" : " (disconnected)"
+              const className = users[id].connected ? "user" : "user disconnected"
+              return <span key={id} className={className} title={`${portalUser ? portalUser.fullName : `Unknown User`}${status}`}>{portalUser ? portalUser.initials : "?"}</span>
+            })}
+          </div>
+        )
+      }
+    })
+
+    return (
+      <div className="groups">
+        <div>Click to select an existing group</div>
+        <div className="group-list">
+          {groupElements}
+        </div>
+      </div>
+    )
+  }
+
+  renderChoseNewGroup(groupKeys: string[]) {
+    const items:JSX.Element[] = []
+    const haveExistingGroups = groupKeys.length > 0
+    for (let i=1; i <= MAX_GROUPS; i++) {
+      if (groupKeys.indexOf(`${i}`) === -1) {
+        items.push(<option value={i} key={i}>Group {i}</option>)
+      }
+    }
+    return (
+      <form className="create-group" onSubmit={this.handleChoseGroup}>
+        <div>{haveExistingGroups ? "Or create a new group" : "Please create your group"}</div>
+        <div>
+          <select ref="group">{items}</select>
+          <input type="submit" className="button" value="Create Group" />
+        </div>
+      </form>
+    )
   }
 
   renderChoseGroup() {
-    const {portalUser} = this.state
-    const items:JSX.Element[] = []
-    for (let i=1; i <= MAX_GROUPS; i++) {
-      items.push(<option value={i} key={i}>{i}</option>)
-    }
+    const {portalUser, groups} = this.state
+    const groupKeys = groups ? Object.keys(groups) : []
     return (
-      <form className="select-group" onSubmit={this.handleChoseGroup}>
-        {portalUser ? <div className="welcome">Welcome {portalUser.fullName}</div> : null}
-        <div>Please select your group</div>
-        <div>
-          <select ref="group">{items}</select>
-          <input type="submit" value="Select" />
+      <div className="join">
+        <div className="join-title">Join Group</div>
+        <div className="join-content">
+          {portalUser ? <div className="welcome">Welcome {portalUser.fullName}</div> : null}
+          {this.renderChooseExistingGroup(groups, groupKeys)}
+          {this.renderChoseNewGroup(groupKeys)}
         </div>
-      </form>
+      </div>
     )
   }
 
@@ -251,6 +334,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
                   leaveGroup={this.handleLeaveGroup}
                   publication={null}
                   logManager={this.logManager}
+                  posterDocument={this.state.posterDocument}
                 />
               }
               return this.renderProgress("Loading collaborative space group document...")

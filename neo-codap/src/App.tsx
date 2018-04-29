@@ -1,10 +1,12 @@
 import * as React from 'react';
 import './App.css';
 import { addAttributeToDataSet, addCasesToDataSet, ICase, DataSet, IDataSet } from './data-manager/data-manager';
+import { IAppComponentData, createDefaultAppComponentData } from './app-data';
 import { CaseTable } from './case-table/case-table';
 import { Graph } from './graph/graph';
 import { FocusStyleManager } from '@blueprintjs/core';
 import * as queryString from 'query-string';
+import { Strings } from './strings';
 const isLocalHost = (window.location.hostname.indexOf('localhost') >= 0) ||
                     (window.location.hostname.indexOf('127.0.0.1') >= 0),
       urlParams = queryString.parse(location.search),
@@ -17,22 +19,29 @@ const isLocalHost = (window.location.hostname.indexOf('localhost') >= 0) ||
 
 interface IAppProps {
   dataSet?: IDataSet;
+  appComponentData?: IAppComponentData;
   onDOMNodeRef?: (ref: HTMLElement | null) => void;
+  inCollabSpace?: boolean;
 }
 
 interface IAppState {
   dataSet: IDataSet;
+  appComponentData: IAppComponentData;
 }
 
 class App extends React.Component<IAppProps, IAppState> {
+  strings: Strings;
 
   constructor(props: IAppProps) {
     super(props);
 
+    this.strings = new Strings('en-us', this.props.inCollabSpace ? 'collabspace' : '');
     const dataSet = this.props.dataSet || DataSet.create({ name: 'untitled' });
+    const appComponentData = this.props.appComponentData || createDefaultAppComponentData();
 
     this.state = {
-      dataSet
+      dataSet,
+      appComponentData
     };
 
     // cf. http://blueprintjs.com/docs/#core/accessibility.focus-management
@@ -67,7 +76,9 @@ class App extends React.Component<IAppProps, IAppState> {
                 <div className={classes}>
                   <CaseTable
                     dataSet={this.state.dataSet}
+                    caseTableComponentData={this.state.appComponentData.caseTableData}
                     onSampleData={isLocalHost ? this.handleSampleData : undefined}
+                    strings={this.strings}
                   />
                 </div>
               )
@@ -80,7 +91,10 @@ class App extends React.Component<IAppProps, IAppState> {
     return showGraph && this.state.dataSet
             ? (
               <div className={classes}>
-                  <Graph dataSet={this.state.dataSet} />
+                  <Graph
+                    dataSet={this.state.dataSet}
+                    graphComponentData={this.state.appComponentData.graphData}
+                  />
                 </div>
               )
             : null;

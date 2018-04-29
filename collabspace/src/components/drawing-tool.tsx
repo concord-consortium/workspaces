@@ -77,16 +77,15 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
 
       publish: (publication) => {
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
-          const drawingCanvas:HTMLCanvasElement = this.drawingTool.canvas.getElement()
-          drawingCanvas.toBlob((blob:Blob) => {
-            if (!blob) {
-              return reject("Couldn't get drawing from canvas!")
-            }
-            publication.saveArtifact({title: "Drawing", blob})
+          const canvas:HTMLCanvasElement = this.drawingTool.canvas.getElement()
+          publication.saveArtifact({title: "Drawing", canvas})
             .then((artifact) => resolve({}))
             .catch(reject)
-          }, "image/png")
         })
+      },
+
+      snapshot: (snapshot) => {
+        return snapshot.fromElement(this.drawingTool.canvas.getElement())
       }
     })
   }

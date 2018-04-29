@@ -1,8 +1,22 @@
 import * as React from "react"
 import * as firebase from "firebase"
 import { InlineEditorComponent } from "./inline-editor"
-import { Window, FirebaseWindowAttrs } from "../lib/window"
+import { Window, FirebaseWindowAttrs, FirebaseAnnotationMap, Annotation, PathAnnotation, PathAnnotationPoint } from "../lib/window"
 import { WindowManager, DragType } from "../lib/window-manager"
+import { v4 as uuidV4 } from "uuid"
+import { PortalUser } from "../lib/auth";
+import * as html2canvas from "html2canvas"
+import * as queryString from "query-string"
+
+export const TITLEBAR_HEIGHT = 22
+
+export type CaptureAnnotationCallback = (err: null, imageDataUrl: string|null) => void
+
+export interface CaptureAnnotationCallbackMap {
+  [key: string]: CaptureAnnotationCallback
+}
+
+export type AnnotationTool = "draw"
 
 export interface WindowIframeComponentProps {
   src: string | undefined
@@ -48,18 +62,44 @@ export interface WindowComponentProps {
   zIndex: number
   isTemplate: boolean
   isReadonly: boolean
+  publishWindow: (window:Window|null) => void
+  copyWindow: (window:Window) => void
+  snapshotWindow: (window:Window) => void
+  annotationsRef: firebase.database.Reference
+  portalUser: PortalUser|null
+  captureAnnotationsCallback?: CaptureAnnotationCallback|null
+  inPosterView: boolean
 }
 export interface WindowComponentState {
   editingTitle: boolean
   attrs: FirebaseWindowAttrs
+  inited: boolean
+  annotating: boolean
+  annotationTool: AnnotationTool
+  annontations: FirebaseAnnotationMap,
+  currentAnnotation: Annotation|null
+  allowAnnotations: boolean
+  allowSnapshots: boolean
 }
 
 export class WindowComponent extends React.Component<WindowComponentProps, WindowComponentState> {
+  annotationsElement: HTMLDivElement|null
+
   constructor (props:WindowComponentProps) {
     super(props)
+
+    const queryParams = queryString.parse(window.location.search)
+
     this.state = {
       editingTitle: false,
-      attrs: props.window.attrs
+      attrs: props.window.attrs,
+      inited: false,
+      annotating: false,
+      annotationTool: "draw",
+      annontations: {},
+      currentAnnotation: null,
+      allowAnnotations: !queryParams.disableWindowAnnotations,
+      allowSnapshots: !queryParams.disableWindowSnapshots
     }
   }
 
@@ -68,11 +108,65 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   }
 
   componentWillMount() {
+    const {annotationsRef} = this.props
+
     this.props.window.onAttrsChanged = this.handleAttrsChanged
+
+    annotationsRef.on("child_added", this.handleAnnotationChildAdded)
+    annotationsRef.on("child_removed", this.handleAnnotationChildRemoved)
   }
 
   componentWillUnmount() {
+    const {annotationsRef} = this.props
+
     this.props.window.onAttrsChanged = null
+
+    annotationsRef.off("child_added", this.handleAnnotationChildAdded)
+    annotationsRef.off("child_removed", this.handleAnnotationChildRemoved)
+  }
+
+  componentWillReceiveProps(nextProps:WindowComponentProps) {
+    if (nextProps.captureAnnotationsCallback && (nextProps.captureAnnotationsCallback !== this.props.captureAnnotationsCallback)) {
+      this.captureAnnotations(nextProps.captureAnnotationsCallback)
+    }
+  }
+
+  captureAnnotations(callback:Function) {
+    const {annotationsElement} = this
+    const {annontations} = this.state
+
+    if (!annotationsElement || (Object.keys(annontations).length === 0)) {
+      callback(null, null)
+    }
+    else {
+      html2canvas(annotationsElement, {backgroundColor: null, width: annotationsElement.clientWidth, height: annotationsElement.clientHeight} as any)
+      .then((canvas) => {
+        callback(null, canvas.toDataURL("image/png"))
+      })
+      .catch((e) => {
+        callback(e)
+      })
+    }
+  }
+
+  handleAnnotationChildAdded = (snapshot:firebase.database.DataSnapshot) => {
+    const {portalUser} = this.props
+    const annotation:Annotation|null = snapshot.val()
+    if (annotation && snapshot.key && portalUser && (!annotation.userId || (annotation.userId === portalUser.id))) {
+      const {annontations} = this.state
+      annontations[snapshot.key] = annotation
+      this.setState({annontations})
+    }
+  }
+
+  handleAnnotationChildRemoved = (snapshot:firebase.database.DataSnapshot) => {
+    const {portalUser} = this.props
+    const annotation:Annotation|null = snapshot.val()
+    if (annotation && snapshot.key && portalUser && (!annotation.userId || (annotation.userId === portalUser.id))) {
+      const {annontations} = this.state
+      delete annontations[snapshot.key]
+      this.setState({annontations})
+    }
   }
 
   handleAttrsChanged = (newAttrs:FirebaseWindowAttrs) => {
@@ -143,7 +237,91 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
   }
 
   handleIframeLoaded = (iframe:HTMLIFrameElement) => {
-    this.props.windowManager.windowLoaded(this.props.window, iframe)
+    const {window} = this.props
+    this.props.windowManager.windowLoaded(window, iframe, () => {
+      this.setState({inited: window.iframe.inited})
+    })
+  }
+
+  handlePublishWindow = () => {
+    this.props.publishWindow(this.props.window)
+  }
+
+  handleCopyWindow = () => {
+    this.props.copyWindow(this.props.window)
+  }
+
+  handleSnapshotWindow = () => {
+    this.props.snapshotWindow(this.props.window)
+  }
+
+  handleToggleAnnotateWindow = () => {
+    this.setState({annotating: !this.state.annotating})
+  }
+
+  handleDrawAnnotations = () => {
+    this.setState({annotationTool: "draw"})
+  }
+
+  handleClearAnnotations = () => {
+    if (confirm("Are you sure you want to clear the annotations in this window?")) {
+      const {portalUser} = this.props
+      if (portalUser) {
+        const {annontations} = this.state
+        const updates:any = {}
+        Object.keys(annontations).forEach((key) => {
+          const annotation = annontations[key]
+          if (annotation.userId === portalUser.id) {
+            updates[key] = null
+            delete annontations[key]
+          }
+        })
+        this.setState({annontations: annontations}, () => this.props.annotationsRef.update(updates))
+      }
+    }
+  }
+
+  handleAnnotationMouseDown = (e:React.MouseEvent<HTMLDivElement>) => {
+    const {annotationTool, attrs} = this.state
+    const {portalUser} = this.props
+    const {annotationsElement} = this
+
+    if (!annotationsElement || !portalUser) {
+      return
+    }
+    const boundingRect = annotationsElement.getBoundingClientRect()
+
+    switch (annotationTool) {
+      case "draw":
+        const annotation:Annotation = {type: "path", id: uuidV4(), userId: portalUser.id, points: []}
+        const getPoint = (e:React.MouseEvent<HTMLDivElement>|MouseEvent) => {
+          return {x: e.clientX - boundingRect.left, y: e.clientY - boundingRect.top}
+        }
+        const startPoint:PathAnnotationPoint = getPoint(e)
+        const handleDrawMove = (e:MouseEvent) => {
+          if (annotation.points.length === 0) {
+            annotation.points.push(startPoint)
+          }
+          annotation.points.push(getPoint(e))
+          this.setState({currentAnnotation: annotation})
+        }
+        const handleDrawDone = (e:MouseEvent) => {
+          if (annotation.points.length > 0) {
+            this.props.annotationsRef.push(annotation)
+          }
+          this.setState({currentAnnotation: null})
+
+          window.removeEventListener("mousemove", handleDrawMove)
+          window.removeEventListener("mouseup", handleDrawDone)
+        }
+        window.addEventListener("mousemove", handleDrawMove)
+        window.addEventListener("mouseup", handleDrawDone)
+        break
+    }
+  }
+
+  canClose() {
+    return this.props.isTemplate || !!this.props.window.attrs.ownerId || this.props.inPosterView
   }
 
   renderIframeOverlay() {
@@ -158,7 +336,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       <div className="buttons" ref="buttons">
         <span onClick={this.handleMinimize} title="Minimize Window">-</span>
         <span onClick={this.handleMaximize} title={this.props.window.attrs.maximized ? "Unmaximize Window" : "Maximize Window"}>+</span>
-        {this.props.isTemplate ? <span onClick={this.handleClose} title="Close Window">x</span> : null}
+        {this.canClose() ? <span onClick={this.handleClose} title="Close Window">x</span> : null}
       </div>
     )
   }
@@ -170,15 +348,79 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
     return null
   }
 
+  renderAnnotationTools() {
+    const {annotating, annotationTool, annontations} = this.state
+    if (!annotating) {
+      return null
+    }
+    const hasAnnotations = Object.keys(annontations).length > 0
+    return (
+      <div className="annotation-tools">
+        <i key="pencil" className={`icon icon-pencil ${annotationTool === "draw" ? "annotation-tool-selected" : ""}`} title="Draw Annotations" onClick={this.handleDrawAnnotations} />
+        <i key="pointer" className={`icon icon-cross ${!hasAnnotations ? "annotation-tool-disabled" : ""}`} title="Clear Annotations" onClick={this.handleClearAnnotations} />
+      </div>
+    )
+  }
+
+  renderSidebarMenu(left: number) {
+    const {inPosterView} = this.props
+    const {annotating, inited, allowAnnotations, allowSnapshots} = this.state
+    const isPublic = !this.props.window.attrs.ownerId
+    const showAnnotationIcons = !inPosterView && allowAnnotations
+    return (
+      <div className="sidebar-menu" style={{left}}>
+        <div className="sidebar-menu-inner">
+          {inited && isPublic ? <i className="icon icon-newspaper" title="Publish Window" onClick={this.handlePublishWindow} /> : null}
+          {inited ? <i className="icon icon-copy" title="Copy Window" onClick={this.handleCopyWindow} /> : null}
+          {showAnnotationIcons ? <i className={`icon icon-stack ${annotating ? "annotation-tool-selected" : ""}`} title="Annotate Window" onClick={this.handleToggleAnnotateWindow} /> : null}
+          {showAnnotationIcons ? this.renderAnnotationTools() : null}
+          {inited && allowSnapshots ? <i className="icon icon-camera" title="Take Snapshot" onClick={this.handleSnapshotWindow} /> : null}
+        </div>
+      </div>
+    )
+  }
+
+  renderAnnotation(annotation:Annotation) {
+    switch (annotation.type) {
+      case "path":
+        const [first, ...rest] = annotation.points || []
+        if (first) {
+          const d = `M${first.x} ${first.y} ${rest.map((p) => `L${p.x} ${p.y}`).join(" ")}`
+          return <path key={annotation.id} d={d} stroke="#f00" strokeWidth="2" fill="none" />
+        }
+        break
+    }
+    return null
+  }
+
+  renderAnnotations() {
+    const {annontations, currentAnnotation} = this.state
+    const {attrs} = this.props.window
+    const {width, height} = attrs
+    const innerHeight = height - TITLEBAR_HEIGHT
+    const pointerEvents = this.state.annotating ? "all" : "none"
+    const currentAnnotationElement = currentAnnotation ? this.renderAnnotation(currentAnnotation) : null
+    const annotationElements = Object.keys(annontations).map<JSX.Element|null>((key) => this.renderAnnotation(annontations[key]))
+    return (
+      <div className="annotations" ref={(el) => this.annotationsElement = el} style={{pointerEvents: pointerEvents, width, height: innerHeight}} onMouseDown={this.handleAnnotationMouseDown}>
+        <svg xmlnsXlink= "http://www.w3.org/1999/xlink" width={width} height={innerHeight}>
+          {annotationElements}
+          {currentAnnotationElement}
+        </svg>
+      </div>
+    )
+  }
+
   render() {
-    const {window, isTopWindow} = this.props
+    const {window, isTopWindow, isTemplate, isReadonly} = this.props
     const {attrs} = window
     const {title, maximized, minimized, url} = attrs
     const titlebarClass = `titlebar${isTopWindow ? " top" : ""}`
     let windowStyle:any = maximized
       ? {top: 0, right: 0, bottom: 0, left: 0, zIndex: this.props.zIndex}
       : {top: attrs.top, width: attrs.width, left: attrs.left, height: attrs.height, zIndex: this.props.zIndex}
-    const titleWidth = attrs.width - (this.props.isTemplate ? 65 : 55)
+    const titleWidth = attrs.width - (this.canClose() ? 65 : 55)
+    const privateWindow = !!attrs.ownerId
 
     if (minimized) {
       windowStyle.display = "none"
@@ -188,14 +430,17 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
       <div className="window" ref="window" key={window.id} style={windowStyle}>
         <div className={titlebarClass} onMouseDown={this.handleDragWindow}>
           <div className="title" style={{width: titleWidth}}>
-            {this.props.isTemplate ? <InlineEditorComponent text={title} changeText={this.handleChangeTitle} width={titleWidth} /> : <div className="static">{title}</div>}
+            <InlineEditorComponent text={title} changeText={this.handleChangeTitle} width={titleWidth} />
+            { privateWindow ? " [PRIVATE]" : null}
           </div>
           {this.renderButtons()}
         </div>
+
         <div className="iframe">
           <WindowIframeComponent key={window.id} src={url} loaded={this.handleIframeLoaded} />
           {this.renderReadonlyBlocker()}
         </div>
+        {this.renderAnnotations()}
         {this.renderIframeOverlay()}
         {!maximized ? <div className="left-drag" onMouseDown={this.handleDragLeft} /> : null}
         {!maximized ? <div className="right-drag" onMouseDown={this.handleDragRight} /> : null}
@@ -203,6 +448,7 @@ export class WindowComponent extends React.Component<WindowComponentProps, Windo
         {!maximized ? <div className="bottom-drag" onMouseDown={this.handleDragBottom} /> : null}
         {!maximized ? <div className="bottom-left-drag" onMouseDown={this.handleDragBottomLeft} /> : null}
         {!maximized ? <div className="bottom-right-drag" onMouseDown={this.handleDragBottomRight} /> : null}
+        {isTopWindow && !maximized && !isTemplate && !isReadonly ? this.renderSidebarMenu(windowStyle.width + 1) : null}
       </div>
     )
   }

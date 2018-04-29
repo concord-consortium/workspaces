@@ -1,11 +1,13 @@
 import * as React from 'react';
 import { Button, Dialog } from '@blueprintjs/core';
 import '@blueprintjs/core/dist/blueprint.css';
+import { Strings } from '../strings';
 
 interface INewAttributeDialogProps {
   isOpen: boolean;
   onNewAttribute: (name: string) => void;
   onClose: () => void;
+  strings: Strings;
 }
 
 interface INewAttributeDialogState {
@@ -40,19 +42,22 @@ class NewAttributeDialog extends React.Component<INewAttributeDialogProps, INewA
   }
 
   render() {
+    const {strings} = this.props;
+    const attribute = strings.translate('attribute');
+    const capitalizedAttribute = strings.translate('attribute', {capitalize: true});
     return (
       <Dialog
         iconName="pt-icon-add-column-right"
         isOpen={this.props.isOpen}
         onClose={this.props.onClose}
-        title="New Attribute"
+        title={`New ${capitalizedAttribute}`}
         canOutsideClickClose={false}
       >
-        <div className="nc-attribute-name-prompt">Enter a name for the new attribute:</div>
+        <div className="nc-attribute-name-prompt">Enter a name for the new {attribute}:</div>
         <input
           className="nc-attribute-name-input pt-input"
           type="text"
-          placeholder="Attribute name"
+          placeholder={`${capitalizedAttribute} name`}
           value={this.state.name}
           onChange={this.handleNameChange}
           onKeyDown={this.handleKeyDown}

@@ -1,0 +1,7 @@
+{
+  "ATTRIBUTE": "attribute",
+  "collabspace:ATTRIBUTE": "column",
+
+  "CASE": "case",
+  "collabspace:CASE": "row"
+}

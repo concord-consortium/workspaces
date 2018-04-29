@@ -3,18 +3,43 @@ import * as firebase from "firebase"
 import { Window } from "../lib/window"
 import { WindowManager } from "../lib/window-manager"
 import { PortalInfo, PortalOffering, PortalUser, getPortalJWTWithBearerToken, PortalTokens } from "../lib/auth"
-import { getPublicationsRef, getArtifactsRef } from "../lib/refs"
+import { getPublicationsRef, getArtifactsRef, getFavoritesRef } from "../lib/refs"
 import { FirebasePublication, FirebasePublicationWindow, FirebaseArtifact } from "../lib/document"
 import { WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
 import * as queryString from "query-string"
 import { UserLookup } from "../lib/user-lookup"
 import { MAX_GROUPS } from "./app"
-
-const timeago = require("timeago.js")
-const timeagoInstance = timeago()
+import { LiveTimeAgoComponent } from "./live-time-ago"
+import { PublicationWindowOptions } from "./workspace";
 
 const demoId = queryString.parse(window.location.search).demo
+
+type SidebarFilter = "offering" | "group" | "mine" | "search" | "favorites"
+
+export interface FirebaseFavorites {
+  users: FirebaseUserFavoritesMap
+}
+
+export interface FirebaseUserFavoritesMap {
+  [key: string]: FirebaseUserFavorites
+}
+
+export interface FirebaseUserFavorites {
+  publications: FirebaseUserFavoritesPublicationMap
+}
+
+export interface FirebaseUserFavoritesPublicationMap {
+  [key: string]: FirebaseUserFavoritesPublication
+}
+
+export interface FirebaseUserFavoritesPublication {
+  windows: FirebaseUserFavoritesPublicationWindowMap
+}
+
+export interface FirebaseUserFavoritesPublicationWindowMap {
+  [key: string]: boolean
+}
 
 export interface FirebasePublicationItem {
   id: string
@@ -66,6 +91,12 @@ export interface SidebarPublicationWindowComponentProps {
   portalOffering: PortalOffering
   windowManager: WindowManager
   creatorName: string
+  favorites: FirebaseUserFavoritesPublicationMap
+  toggleFavorite: (options: PublicationWindowOptions) => void
+  filter: SidebarFilter
+  copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
+  copyIntoPoster: (options: PublicationWindowOptions, title: string) => void
+  group: string
 }
 export interface SidebarPublicationWindowComponentState {
   artifactItems: FirebaseArtifactItem[]
@@ -100,9 +131,38 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
   }
 
   handleCopyIntoDocument = () => {
-    const title = `${this.props.window.title} by ${this.props.creatorName} in group ${this.props.publication.group}`
-    this.props.windowManager.copyWindowFromPublication(this.props.portalOffering, this.props.publication, this.props.windowId, title)
-      .catch((err:any) => alert(err.toString()))
+    const {publicationId, windowId, publication} = this.props
+    const title = `${this.props.window.title} (by ${this.props.creatorName} in group ${this.props.publication.group})`
+    this.props.copyIntoDocument({
+      type: "offering",
+      offering: this.props.portalOffering,
+      publicationId,
+      windowId,
+      documentId: publication.documentId
+    }, title)
+  }
+
+  handleCopyIntoPoster = () => {
+    const {publicationId, windowId, publication} = this.props
+    const title = `${this.props.window.title} (by ${this.props.creatorName} in group ${this.props.publication.group})`
+    this.props.copyIntoPoster({
+      type: "offering",
+      offering: this.props.portalOffering,
+      publicationId,
+      windowId,
+      documentId: publication.documentId
+    }, title)
+  }
+
+  handleToggleFavorite = () => {
+    const {publicationId, windowId, publication} = this.props
+    this.props.toggleFavorite({
+      type: "offering",
+      offering: this.props.portalOffering,
+      publicationId,
+      windowId,
+      documentId: publication.documentId
+    })
   }
 
   renderArtifacts() {
@@ -123,13 +183,25 @@ export class SidebarPublicationWindowComponent extends React.Component<SidebarPu
     )
   }
 
+  renderFavoriteStar(favorited:boolean) {
+    const className = favorited ? "icon icon-star-full favorite-star" : "icon icon-star-empty"
+    return <i className={className} onClick={this.handleToggleFavorite} />
+  }
+
   render() {
+    const {favorites, group} = this.props
+    const favorited = favorites[this.props.publicationId] && favorites[this.props.publicationId].windows[this.props.windowId]
+    if ((this.props.filter === "favorites") && !favorited) {
+      return null
+    }
+
     return (
       <div className="window">
-        <div className="window-title">{this.props.window.title}</div>
+        <div className="window-title">{this.renderFavoriteStar(favorited)} {this.props.window.title}</div>
         {this.renderArtifacts()}
         <div className="window-actions">
-          <div onClick={this.handleCopyIntoDocument} className="clickable">Copy Into Your Document</div>
+          {group !== "poster" ? <div onClick={this.handleCopyIntoDocument} className="clickable">Copy Into Your Document</div> : null}
+          <div onClick={this.handleCopyIntoPoster} className="clickable">Copy Into Poster View</div>
         </div>
       </div>
     )
@@ -144,6 +216,12 @@ export interface SidebarPublicationComponentProps {
   portalTokens: PortalTokens
   windowManager: WindowManager
   expandAll: boolean
+  favorites: FirebaseUserFavoritesPublicationMap
+  toggleFavorite: (options: PublicationWindowOptions) => void
+  filter: SidebarFilter
+  copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
+  copyIntoPoster: (options: PublicationWindowOptions, title: string) => void
+  group: string
 }
 export interface SidebarPublicationComponentState {
   expanded: boolean
@@ -180,27 +258,40 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
     const {publicationItem} = this.props
     const {publication} = publicationItem
     const windowIds = Object.keys(publication.windows)
+    const windows:JSX.Element[] = []
 
     if (windowIds.length === 0) {
       return null
     }
 
+    windowIds.forEach((windowId) => {
+      const window = publication.windows[windowId]
+      if (!window.ownerId) {
+        windows.push(
+          <SidebarPublicationWindowComponent
+            key={windowId}
+            publicationId={publicationItem.id}
+            publication={publication}
+            windowId={windowId}
+            window={window}
+            creatorName={this.state.creatorName}
+            toggleViewArtifact={this.props.toggleViewArtifact}
+            portalOffering={this.props.portalOffering}
+            windowManager={this.props.windowManager}
+            favorites={this.props.favorites}
+            toggleFavorite={this.props.toggleFavorite}
+            filter={this.props.filter}
+            copyIntoDocument={this.props.copyIntoDocument}
+            copyIntoPoster={this.props.copyIntoPoster}
+            group={this.props.group}
+          />
+        )
+      }
+    })
+
     return (
       <div className="windows">
-        {windowIds.map((windowId) => {
-          const window = publication.windows[windowId]
-          return <SidebarPublicationWindowComponent
-                   key={windowId}
-                   publicationId={publicationItem.id}
-                   publication={publication}
-                   windowId={windowId}
-                   window={window}
-                   creatorName={this.state.creatorName}
-                   toggleViewArtifact={this.props.toggleViewArtifact}
-                   portalOffering={this.props.portalOffering}
-                   windowManager={this.props.windowManager}
-                 />
-        })}
+        {windows}
       </div>
     )
   }
@@ -254,18 +345,19 @@ export class SidebarPublicationComponent extends React.Component<SidebarPublicat
   }
 
   render() {
-    const {publicationItem} = this.props
+    const {publicationItem, favorites} = this.props
     const {publication, index} = publicationItem
     const {group, createdAt} = publication
     const user = this.props.userLookup.lookup(publication.creator)
     const name = user ? user.fullName : "Unknown Student"
     const initials = user ? user.initials : "?"
+    const expanded = this.state.expanded || ((this.props.filter === "favorites") && favorites[publicationItem.id])
     return (
       <div className="publication">
         <div className="publication-header clickable" onClick={this.handleToggle}>
-          #{index} <span className="initials" title={name}>{initials}</span> in group {group} <span className="ago">{timeagoInstance.format(createdAt)}</span>
+          <span className="initials" title={name}>{initials}</span> in group {group} <span className="ago"><LiveTimeAgoComponent timestamp={createdAt} /></span>
         </div>
-        {this.state.expanded ? this.renderExpanded() : null}
+        {expanded ? this.renderExpanded() : null}
       </div>
     )
   }
@@ -275,53 +367,63 @@ export interface SidebarComponentProps {
   portalTokens: PortalTokens
   portalOffering: PortalOffering
   portalUser: PortalUser
-  group: number
+  group: string
   toggleViewArtifact: (artifact: FirebaseArtifact) => void
   publishing: boolean
   windowManager: WindowManager
+  toggleFavorite: (options: PublicationWindowOptions) => void
+  copyIntoDocument: (options: PublicationWindowOptions, title: string) => void
+  copyIntoPoster: (options: PublicationWindowOptions, title: string) => void
 }
 export interface SidebarComponentState {
   publicationItems: FirebasePublicationItem[]
-  filter: "offering" | "group" | "mine" | "search"
-  filterGroup: number
+  filter: SidebarFilter
+  filterGroup: string
   filterOffering: string
   filterSearch: string
   filterSearchTrimmed: string
   expandAll: boolean
+  favorites: FirebaseUserFavoritesPublicationMap
 }
 
 export class SidebarComponent extends React.Component<SidebarComponentProps, SidebarComponentState> {
   publicationsRef: firebase.database.Reference
   userLookup: UserLookup
+  favoritesRef: firebase.database.Reference
 
   constructor (props:SidebarComponentProps) {
     super(props)
     this.state = {
       publicationItems: [],
       filter: "offering",
-      filterGroup: 0,
+      filterGroup: "all",
       filterOffering: "all",
       filterSearch: "",
       filterSearchTrimmed: "",
-      expandAll: false
+      expandAll: false,
+      favorites: {}
     }
-    this.publicationsRef = getPublicationsRef(this.props.portalOffering)
+    const {portalOffering, portalUser} = this.props
+    this.publicationsRef = getPublicationsRef(portalOffering)
+    this.favoritesRef = getFavoritesRef(portalOffering.domain, portalOffering.classInfo.classHash, portalUser.id).child("publications")
 
-    this.userLookup = new UserLookup(this.props.portalOffering.classInfo)
+    this.userLookup = new UserLookup(portalOffering.classInfo)
   }
 
   componentWillMount() {
     this.publicationsRef.on("child_added", this.handlePublicationAdded)
+    this.favoritesRef.on("value", this.handleFavoritesRef)
   }
 
   componentWillUnmount() {
     this.publicationsRef.off("child_added", this.handlePublicationAdded)
+    this.favoritesRef.off("value", this.handleFavoritesRef)
   }
 
   handlePublicationAdded = (snapshot:firebase.database.DataSnapshot) => {
     const {publicationItems} = this.state
     const publication:FirebasePublication = snapshot.val()
-    if (publication.offeringId === this.props.portalOffering.id) {
+    if (publication.offeringId == this.props.portalOffering.id) {
       const publicationItem:FirebasePublicationItem = {
         index: publicationItems.length + 1,
         id: snapshot.key as string,
@@ -332,8 +434,15 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     }
   }
 
+  handleFavoritesRef = (snapshot:firebase.database.DataSnapshot|null) => {
+    if (snapshot) {
+      const favorites:FirebaseUserFavoritesPublicationMap = snapshot.val() || {}
+      this.setState({favorites})
+    }
+  }
+
   getFilteredPublicationItems() {
-    const {publicationItems, filter, filterGroup, filterOffering, filterSearch, filterSearchTrimmed} = this.state
+    const {publicationItems, filter, filterGroup, filterOffering, filterSearch, filterSearchTrimmed, favorites} = this.state
     const {portalOffering, portalUser, group} = this.props
     const canonicalSearch = filterSearchTrimmed.toLowerCase()
     return publicationItems.filter((publicationItem) => {
@@ -348,7 +457,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
           }
           return publication.creator === filterOffering
         case "group":
-          return (filterGroup === 0) || (publication.group === filterGroup)
+          return (filterGroup === "all") || (publication.group === filterGroup)
         case "mine":
           return publication.creator === portalUser.id
         case "search":
@@ -365,6 +474,8 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
             titleMatched = titleMatched || publicationWindow.title.toLowerCase().indexOf(canonicalSearch) !== -1
           })
           return titleMatched
+        case "favorites":
+          return !!favorites[publicationItem.id]
         default:
           return true
       }
@@ -375,8 +486,12 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     this.setState({expandAll: !this.state.expandAll})
   }
 
-  renderExpandContract() {
-    return <div className="sidebar-header-expand" onClick={this.handleToggleExpandContract}>{this.state.expandAll ? "▼" : "▲"}</div>
+  renderExpandContract(publicationItems: FirebasePublicationItem[]) {
+    const {filter, expandAll} = this.state
+    if ((filter === "favorites") || (publicationItems.length === 0)) {
+      return null
+    }
+    return <div className="sidebar-header-expand" onClick={this.handleToggleExpandContract}>{expandAll ? "▼" : "▲"}</div>
   }
 
   renderFilterSelector() {
@@ -386,9 +501,10 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     //<span className={className("mine")} onClick={() => this.setState({filter: "mine"})}>Mine</span>
     return (
       <div className="filter-selector">
-        <span className={className("offering")} onClick={() => this.setState({filter: "offering"})}>Users</span>
-        <span className={className("group")} onClick={() => this.setState({filter: "group"})}>Groups</span>
-        <span className={className("search")} onClick={() => this.setState({filter: "search"})}>Search</span>
+        <span className={className("offering")} onClick={() => this.setState({filter: "offering"})}><i className="icon icon-user" title="Users" /></span>
+        <span className={className("group")} onClick={() => this.setState({filter: "group"})}><i className="icon icon-users" title="Groups" /></span>
+        <span className={className("favorites")} onClick={() => this.setState({filter: "favorites"})}><i className="icon icon-star-full favorite-star" title="Favorites" /></span>
+        <span className={className("search")} onClick={() => this.setState({filter: "search"})}><i className="icon icon-search" title="Search" /></span>
       </div>
     )
   }
@@ -398,7 +514,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   }
 
   handleGroupFilterChanged = (e:React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({filterGroup: parseInt(e.target.value, 10)})
+    this.setState({filterGroup: e.target.value})
   }
 
   handleSearchFilterChanged = (e:React.ChangeEvent<HTMLInputElement>) => {
@@ -423,7 +539,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
         )
         break
       case "group":
-        options.push(<option value={0} key="all-groups">All Groups</option>)
+        options.push(<option value="all" key="all-groups">All Groups</option>)
         options.push(<option value={this.props.group} key="me-group">My Group</option>)
         for (let i=1; i <= MAX_GROUPS; i++) {
           options.push(<option value={i} key={i}>Group {i}</option>)
@@ -453,8 +569,7 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
     )
   }
 
-  renderPublications() {
-    const publicationItems = this.getFilteredPublicationItems()
+  renderPublications(publicationItems: FirebasePublicationItem[]) {
     if (publicationItems.length === 0) {
       if ((this.state.filter !== "search") || (this.state.filterSearchTrimmed.length > 0)) {
         return <div className="none-found">No publications were found</div>
@@ -474,6 +589,12 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
                    portalTokens={this.props.portalTokens}
                    windowManager={this.props.windowManager}
                    expandAll={this.state.expandAll}
+                   toggleFavorite={this.props.toggleFavorite}
+                   favorites={this.state.favorites}
+                   filter={this.state.filter}
+                   copyIntoDocument={this.props.copyIntoDocument}
+                   copyIntoPoster={this.props.copyIntoPoster}
+                   group={this.props.group}
                  />
         })}
       </div>
@@ -481,16 +602,18 @@ export class SidebarComponent extends React.Component<SidebarComponentProps, Sid
   }
 
   render() {
+    const publicationItems = this.getFilteredPublicationItems()
     return (
       <div className="sidebar">
         <div className="sidebar-header">
+          <i className="icon icon-newspaper" />
           Publications
-          {this.renderExpandContract()}
+          {this.renderExpandContract(publicationItems)}
         </div>
         {this.renderFilterSelector()}
         {this.renderFilter()}
         {this.renderPublishing()}
-        {this.renderPublications()}
+        {this.renderPublications(publicationItems)}
       </div>
     )
   }

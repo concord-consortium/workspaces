@@ -5,9 +5,7 @@ import { getClassOfferingsRef, getPublicationsRef } from "../lib/refs"
 import { FirebaseOfferingMap, FirebasePublicationMap, FirebasePublication } from "../lib/document"
 import { UserLookup } from "../lib/user-lookup"
 import * as queryString from "query-string"
-
-const timeago = require("timeago.js")
-const timeagoInstance = timeago()
+import { LiveTimeAgoComponent } from "./live-time-ago";
 
 export interface DashboardTableRowDocument {
   id: string
@@ -19,9 +17,8 @@ export interface DashboardTableRow {
   id: string
   document: DashboardTableRowDocument
   student: string
-  group: number
+  group: string
   groupMembers: string
-  published: string
   publishedAt: number
 }
 
@@ -128,7 +125,6 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
           student: student ? student.fullName : "Unknown Student",
           group: publication.group,
           groupMembers: groupMembers,
-          published: timeagoInstance.format(publication.createdAt),
           publishedAt: publication.createdAt as number
         }
         return row
@@ -175,14 +171,14 @@ export class DashboardTableComponent extends React.Component<DashboardTableCompo
           <tbody>
             {this.state.rows.map((row) => {
               const href = `?${row.document.url}`
-              const link = (label:string|number) => <a href={href} className="clickable" target="_blank">{label}</a>
+              const link = (label:string|number|JSX.Element) => <a href={href} className="clickable" target="_blank">{label}</a>
               return (
                 <tr className="data-row" key={row.id}>
                   <td>{link(row.document.name)}</td>
                   <td>{link(row.student)}</td>
                   <td>{link(row.group)}</td>
                   <td>{link(row.groupMembers)}</td>
-                  <td>{link(row.published)}</td>
+                  <td>{link(<LiveTimeAgoComponent timestamp={row.publishedAt} />)}</td>
                 </tr>
               )
             })}

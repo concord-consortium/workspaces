@@ -3,7 +3,21 @@ import { FirebaseWindows } from "./window"
 import { PortalInfo, PortalOffering, PortalUser, PortalUserConnectionStatusMap } from "./auth"
 import { getUserTemplatePath, getOfferingRef, getDocumentPath } from "./refs"
 
+export interface FirebaseDataSetCreatorMap {
+  [key: string]: string
+}
+
+export interface FirebaseDataSetMap {
+  [key: string]: FirebaseDataSet
+}
+
+export interface FirebaseDataSet {
+  creators: FirebaseDataSetCreatorMap
+  data: any
+}
+
 export interface FirebaseDocumentData {
+  datasets?: FirebaseDataSetMap
   windows: FirebaseWindows
 }
 
@@ -35,7 +49,7 @@ export interface FirebaseOfferingMap {
 }
 
 export interface FirebaseOfferingGroupMap {
-  [key: number]: FirebaseOfferingGroup
+  [key: string]: FirebaseOfferingGroup
 }
 export interface FirebaseOfferingGroup {
   documentId: string
@@ -49,11 +63,12 @@ export interface FirebaseArtifactMap {
 export interface FirebasePublication {
   offeringId: number
   creator: string
-  group: number
+  group: string
   groupMembers: PortalUserConnectionStatusMap
   createdAt: number|object
   documentId: string
   windows: FirebasePublicationWindowMap
+  partial: boolean
 }
 export interface FirebasePublicationMap {
   [key: string]: FirebasePublication
@@ -68,6 +83,7 @@ export interface FirebaseArtifact {
 
 export interface FirebasePublicationWindow {
   title:string
+  ownerId?:string
   artifacts: FirebaseArtifactMap
 }
 
@@ -155,10 +171,18 @@ export class Document {
     return Document.StringifyTemplateHashParam(this.ownerId, this.id)
   }
 
+  getWindowsRef() {
+    return this.dataRef.child("windows")
+  }
+
   // NOTE: the child should be a key in FirebaseWindow
   // TODO: figure out how to type check the child param in FirebaseWindow
-  getWindowsDataRef(child:"attrs"|"order"|"minimizedOrder"|"iframeData") {
-    return this.dataRef.child(`windows/${child}`)
+  getWindowsDataRef(child:"attrs"|"order"|"minimizedOrder"|"iframeData"|"annotations") {
+    return this.getWindowsRef().child(child)
+  }
+
+  getDataSetsDataRef() {
+    return this.dataRef.child("datasets")
   }
 
   getFirebaseOffering(offering:PortalOffering) {
@@ -195,7 +219,7 @@ export class Document {
       })
   }
 
-  getGroupOfferingDocument(offering:PortalOffering, group:number) {
+  getGroupOfferingDocument(offering:PortalOffering, group:string) {
     return new Promise<[Document, firebase.database.Reference]>((resolve, reject) => {
 
       this.getFirebaseOffering(offering)
@@ -232,7 +256,7 @@ export class Document {
     })
   }
 
-  copy(newBasePath:string, documentFilter?:(firebaseDocument:FirebaseDocument) => void): Promise<Document> {
+  copy(newBasePath:string, documentFilter?:(firebaseDocument:FirebaseDocument, newId: string) => void): Promise<Document> {
     return new Promise<Document>((resolve, reject) => {
       const newRef = firebase.database().ref(newBasePath).push()
       const newId = newRef.key as string
@@ -243,8 +267,33 @@ export class Document {
           reject("Cannot copy document")
         }
         else {
+          // update the dataset document ids
+          if (firebaseDocument.data) {
+            if (firebaseDocument.data.datasets) {
+              const {datasets} = firebaseDocument.data
+              const updatedDataSets:FirebaseDataSetMap = {}
+              Object.keys(firebaseDocument.data.datasets).forEach((dataSetId) => {
+                const updatedId = dataSetId === this.id ? newId : dataSetId
+                updatedDataSets[updatedId] = datasets[dataSetId]
+              })
+              firebaseDocument.data.datasets = updatedDataSets
+            }
+
+            const {attrs} = firebaseDocument.data.windows ? firebaseDocument.data.windows : {attrs:null}
+            if (attrs) {
+              Object.keys(attrs).forEach((windowId) => {
+                const windowAttrs = attrs[windowId]
+                if (windowAttrs && windowAttrs.dataSet) {
+                  if (windowAttrs.dataSet.documentId === this.id) {
+                    windowAttrs.dataSet.documentId = newId
+                  }
+                }
+              })
+            }
+          }
+
           if (documentFilter) {
-            documentFilter(firebaseDocument)
+            documentFilter(firebaseDocument, newId)
           }
 
           newRef.set(firebaseDocument, (err) => {

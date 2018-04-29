@@ -2,8 +2,9 @@ import * as React from "react"
 import * as firebase from "firebase"
 import * as CodeMirror from "codemirror"
 import { EventEmitter, Events } from "../lib/events"
-import { TOOLBAR_WIDTH, ImageButtonData, LineButtonData, PolygonButtonData, TextButtonData } from "./toolbar"
+import { TOOLBAR_WIDTH, ImageButtonData, LineButtonData, PolygonButtonData, TextButtonData, ToolbarSettings, DefaultToolbarSettings, computeStrokeDashArray} from "./toolbar"
 import { v4 as uuid } from "uuid"
+import { isEqual } from "lodash"
 
 const SELECTION_COLOR = "#777"
 const HOVER_COLOR = "#ccff00"
@@ -85,10 +86,11 @@ export interface DrawingLayerViewProps {
   firebaseRef: firebase.database.Reference
   events: EventEmitter
   imageSetItems: ImageSetItem[]
+  backgroundUrl: string|null
 }
 
 export interface DrawingLayerViewState {
-  currentDrawingObject: LineObject|RectangleObject|EllipseObject|null
+  currentDrawingObject: LineObject|RectangleObject|EllipseObject|VectorObject|null
   objects: ObjectMap
   selectedObjects: DrawingObject[]
   selectionBox: SelectionBox|null
@@ -96,6 +98,7 @@ export interface DrawingLayerViewState {
   svgWidth: number|string
   svgHeight: number|string
   imageDataUriCache: ImageDataUriMap
+  backgroundImageData: string|null
 }
 
 export interface BoundingBox {
@@ -109,6 +112,7 @@ export interface DrawingObjectOptions {
   drawingLayer: DrawingLayerView
 }
 export interface DrawingObject {
+  [key: string]: any
   type: string
   key: string|null
   x: number
@@ -120,8 +124,6 @@ export interface DrawingObject {
   render(options:DrawingObjectOptions): JSX.Element | null
 }
 
-export type DrawingObjectTypes = "line"
-
 export interface Point {x: number, y: number}
 export interface DeltaPoint {dx: number, dy: number}
 
@@ -132,19 +134,26 @@ export class LineObject implements DrawingObject {
   y: number
   deltaPoints: DeltaPoint[]
   color: string
+  strokeDashArray: string
+  strokeWidth: string
 
   constructor (json?:any) {
+    const {stroke, strokeDashArray, strokeWidth} = DefaultToolbarSettings
     this.type = "line"
     this.x = json ? (json.x || 0) : 0
     this.y = json ? (json.y || 0) : 0
     this.deltaPoints = json ? (json.deltaPoints || []) : []
-    this.color = json ? (json.color || "#000") : "#000"
+    this.color = json ? (json.color || stroke) : stroke
+    this.strokeDashArray = json ? (json.strokeDashArray || strokeDashArray) : strokeDashArray
+    this.strokeWidth = json ? (json.strokeWidth || strokeWidth) : strokeWidth
   }
 
   serialize() {
     return JSON.stringify({
       type: this.type,
       color: this.color,
+      strokeDashArray: this.strokeDashArray,
+      strokeWidth: this.strokeWidth,
       x: this.x,
       y: this.y,
       deltaPoints: this.deltaPoints
@@ -156,6 +165,8 @@ export class LineObject implements DrawingObject {
     this.y = json.y || this.y
     this.deltaPoints = json.deltaPoints || this.deltaPoints
     this.color = json.color || this.color
+    this.strokeDashArray = json.strokeDashArray || this.strokeDashArray
+    this.strokeWidth = json.strokeWidth || this.strokeWidth
   }
 
   inSelection(selectionBox:SelectionBox) {
@@ -193,8 +204,85 @@ export class LineObject implements DrawingObject {
               d={commands}
               stroke={this.color}
               fill="none"
-              strokeWidth="3"
+              strokeWidth={this.strokeWidth}
+              strokeDasharray={computeStrokeDashArray(this.strokeDashArray, this.strokeWidth)}
               onClick={(e) => handleClick ? handleClick(e, this) : null}
+              onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
+              onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
+             />
+  }
+}
+
+export class VectorObject implements DrawingObject {
+  type: string
+  key: string|null
+  x: number
+  y: number
+  x2: number
+  y2: number
+  stroke: string
+  strokeDashArray: string
+  strokeWidth: number
+
+  constructor (json?:any) {
+    const {stroke, fill, strokeDashArray, strokeWidth} = DefaultToolbarSettings
+    this.type = "vector"
+    this.x = json ? (json.x || 0) : 0
+    this.y = json ? (json.y || 0) : 0
+    this.x2 = json ? (json.x2 || 0) : 0
+    this.y2 = json ? (json.y2 || 0) : 0
+    this.stroke = json ? (json.stroke || stroke) : stroke
+    this.strokeDashArray = json ? (json.strokeDashArray || strokeDashArray) : strokeDashArray
+    this.strokeWidth = json ? (json.strokeWidth || strokeWidth) : strokeWidth
+  }
+
+  serialize() {
+    return JSON.stringify({
+      type: this.type,
+      x: this.x,
+      y: this.y,
+      x2: this.x2,
+      y2: this.y2,
+      stroke: this.stroke,
+      strokeDashArray: this.strokeDashArray,
+      strokeWidth: this.strokeWidth
+    })
+  }
+
+  update(json:any) {
+    this.x = json.x1 || this.x
+    this.y = json.y1 || this.y
+    this.x2 = json.x2 || this.x2
+    this.y2 = json.y2 || this.y2
+    this.stroke = json.stroke || this.stroke
+    this.strokeDashArray = json.strokeDashArray || this.strokeDashArray
+    this.strokeWidth = json.strokeWidth || this.strokeWidth
+  }
+
+  inSelection(selectionBox:SelectionBox) {
+    const {nw, se} = this.getBoundingBox()
+    return selectionBox.overlaps(nw, se)
+  }
+
+  getBoundingBox() {
+    const {x, y, x2, y2} = this
+    const nw:Point = {x: Math.min(x, x2), y: Math.min(y, y2)}
+    const se:Point = {x: Math.max(x, x2), y: Math.max(y, y2)}
+    return {nw, se}
+  }
+
+  render(options:DrawingObjectOptions) : JSX.Element|null {
+    const {key, handleClick, handleHover} = options
+    return <line
+              key={key}
+              x1={this.x}
+              y1={this.y}
+              x2={this.x2}
+              y2={this.y2}
+              stroke={this.stroke}
+              strokeWidth={this.strokeWidth}
+              strokeDasharray={computeStrokeDashArray(this.strokeDashArray, this.strokeWidth)}
+              onClick={(e) => handleClick ? handleClick(e, this) : null }
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
              />
@@ -210,15 +298,20 @@ export class RectangleObject implements DrawingObject {
   height: number
   stroke: string
   fill: string
+  strokeDashArray: string
+  strokeWidth: number
 
   constructor (json?:any) {
+    const {stroke, fill, strokeDashArray, strokeWidth} = DefaultToolbarSettings
     this.type = "rectangle"
     this.x = json ? (json.x || 0) : 0
     this.y = json ? (json.y || 0) : 0
     this.width = json ? (json.width || 0) : 0
     this.height = json ? (json.height || 0) : 0
-    this.stroke = json ? (json.stroke || "none") : "none"
-    this.fill = json ? (json.fill || "none") : "none"
+    this.stroke = json ? (json.stroke || stroke) : stroke
+    this.fill = json ? (json.fill || fill) : fill
+    this.strokeDashArray = json ? (json.strokeDashArray || strokeDashArray) : strokeDashArray
+    this.strokeWidth = json ? (json.strokeWidth || strokeWidth) : strokeWidth
   }
 
   serialize() {
@@ -230,6 +323,8 @@ export class RectangleObject implements DrawingObject {
       height: this.height,
       stroke: this.stroke,
       fill: this.fill,
+      strokeDashArray: this.strokeDashArray,
+      strokeWidth: this.strokeWidth
     })
   }
 
@@ -240,6 +335,8 @@ export class RectangleObject implements DrawingObject {
     this.height = json.height || this.height
     this.stroke = json.stroke || this.stroke
     this.fill = json.fill || this.fill
+    this.strokeDashArray = json.strokeDashArray || this.strokeDashArray
+    this.strokeWidth = json.strokeWidth || this.strokeWidth
   }
 
   inSelection(selectionBox:SelectionBox) {
@@ -264,7 +361,8 @@ export class RectangleObject implements DrawingObject {
               height={this.height}
               stroke={this.stroke}
               fill={this.fill}
-              strokeWidth="3"
+              strokeWidth={this.strokeWidth}
+              strokeDasharray={computeStrokeDashArray(this.strokeDashArray, this.strokeWidth)}
               onClick={(e) => handleClick ? handleClick(e, this) : null }
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
@@ -281,15 +379,20 @@ export class EllipseObject implements DrawingObject {
   ry: number
   stroke: string
   fill: string
+  strokeWidth: number
+  strokeDashArray: string
 
   constructor (json?:any) {
+    const {stroke, fill, strokeDashArray, strokeWidth} = DefaultToolbarSettings
     this.type = "ellipse"
     this.x = json ? (json.x || 0) : 0
     this.y = json ? (json.y || 0) : 0
     this.rx = json ? (json.rx || 0) : 0
     this.ry = json ? (json.ry || 0) : 0
-    this.stroke = json ? (json.stroke || "none") : "none"
-    this.fill = json ? (json.fill || "none") : "none"
+    this.stroke = json ? (json.stroke || stroke) : stroke
+    this.fill = json ? (json.fill || fill) : fill
+    this.strokeDashArray = json ? (json.strokeDashArray || strokeDashArray) : strokeDashArray
+    this.strokeWidth = json ? (json.strokeWidth || strokeWidth) : strokeWidth
   }
 
   serialize() {
@@ -301,6 +404,8 @@ export class EllipseObject implements DrawingObject {
       ry: this.ry,
       stroke: this.stroke,
       fill: this.fill,
+      strokeDashArray: this.strokeDashArray,
+      strokeWidth: this.strokeWidth
     })
   }
 
@@ -311,6 +416,8 @@ export class EllipseObject implements DrawingObject {
     this.ry = json.ry || this.ry
     this.stroke = json.stroke || this.stroke
     this.fill = json.fill || this.fill
+    this.strokeDashArray = json.strokeDashArray || this.strokeDashArray
+    this.strokeWidth = json.strokeWidth || this.strokeWidth
   }
 
   inSelection(selectionBox:SelectionBox) {
@@ -335,7 +442,8 @@ export class EllipseObject implements DrawingObject {
               ry={this.ry}
               stroke={this.stroke}
               fill={this.fill}
-              strokeWidth="3"
+              strokeWidth={this.strokeWidth}
+              strokeDasharray={computeStrokeDashArray(this.strokeDashArray, this.strokeWidth)}
               onClick={(e) => handleClick ? handleClick(e, this) : null}
               onMouseEnter={(e) => handleHover ? handleHover(e, this, true) : null }
               onMouseLeave={(e) => handleHover ? handleHover(e, this, false) : null }
@@ -416,14 +524,21 @@ export class TextObject implements DrawingObject {
   height: number
   color: string
   uuid: string
+  fontSize: number
+  fontWeight: string
+  fontStyle: string
 
   constructor (json?:any) {
+    const {stroke, fontSize, fontWeight, fontStyle} = DefaultToolbarSettings
     this.type = "text"
     this.x = json ? json.x : 0
     this.y = json ? json.y : 0
     this.width = json ? (json.width || 300) : 300
-    this.color = json ? (json.color || "#000") : "#000"
+    this.color = json ? (json.color || stroke) : stroke
     this.uuid = json ? (json.uuid || uuid()) : uuid()
+    this.fontSize = json ? json.fontSize : fontSize
+    this.fontWeight = json ? json.fontWeight : fontWeight
+    this.fontStyle = json ? json.fontStyle : fontStyle
   }
 
   serialize() {
@@ -434,7 +549,10 @@ export class TextObject implements DrawingObject {
       y: this.y,
       width: this.width,
       color: this.color,
-      uuid: this.uuid
+      uuid: this.uuid,
+      fontSize: this.fontSize,
+      fontWeight: this.fontWeight,
+      fontStyle: this.fontStyle
     })
   }
 
@@ -444,6 +562,9 @@ export class TextObject implements DrawingObject {
     this.width = json.width || this.width
     this.color = json.color || this.color
     this.uuid = json.uuid || this.uuid
+    this.fontSize = json.fontSize || this.fontSize
+    this.fontWeight = json.fontWeight || this.fontWeight
+    this.fontStyle = json.fontStyle || this.fontStyle
   }
 
   inSelection(selectionBox:SelectionBox) {
@@ -565,6 +686,7 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   codeMirror: CodeMirror.EditorFromTextArea
   wrapperElement: HTMLElement
   sizer: HTMLElement
+  addBorder: boolean
 
   constructor(props:TextEditorViewProps){
     super(props)
@@ -580,9 +702,10 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
   }
 
   styleWrapper(addBorder:boolean) {
-    const {color} = this.props.textObject
-    const style = addBorder ? `color: ${color}; border: 1px solid #aaa; padding: 0;` : `color: ${color}; border: none; padding: 1px;`
+    const {color, fontSize, fontWeight, fontStyle} = this.props.textObject
+    const style = `color: ${color}; font-size: ${fontSize}px; font-weight: ${fontWeight}; font-style: ${fontStyle}; border: ${addBorder ? "1px solid #aaa; padding: 0;" : "none; padding: 1px;"};`
     this.wrapperElement.setAttribute("style", style)
+    this.addBorder = addBorder
   }
 
   handleFocused = () => {
@@ -655,6 +778,9 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
     if (nextProps.resizing !== this.props.resizing) {
       this.styleWrapper(nextProps.resizing)
     }
+    else {
+      this.styleWrapper(this.addBorder)
+    }
   }
 
   shouldComponentUpdate() {
@@ -671,10 +797,11 @@ export class TextEditorView extends React.Component<TextEditorViewProps, TextEdi
 }
 
 interface ObjectConstructorMap {
-  [key: string]: (typeof LineObject)|(typeof ImageObject)|(typeof RectangleObject)|(typeof EllipseObject)|(typeof TextObject)|null
+  [key: string]: (typeof LineObject)|(typeof VectorObject)|(typeof ImageObject)|(typeof RectangleObject)|(typeof EllipseObject)|(typeof TextObject)|null
 }
 const objectConstructors:ObjectConstructorMap = {
   "line": LineObject,
+  "vector": VectorObject,
   "rectangle": RectangleObject,
   "ellipse": EllipseObject,
   "image": ImageObject,
@@ -689,30 +816,61 @@ export interface DrawingToolMap {
   [key: string]: DrawingTool
 }
 
-export interface DrawingTool {
+export interface IDrawingTool {
   handleMouseDown?(e:React.MouseEvent<HTMLDivElement>): void
   handleClick?(e:React.MouseEvent<HTMLDivElement>): void
   handleObjectClick?(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject): void
+  setSettings(settings:ToolbarSettings): IDrawingTool
 }
 
-export class LineDrawingTool implements DrawingTool {
-  drawingLayer:DrawingLayerView
-  color: string
+export class DrawingTool implements IDrawingTool {
+  drawingLayer: DrawingLayerView
+  settings: ToolbarSettings
 
   constructor(drawingLayer:DrawingLayerView) {
+    const {stroke, fill, strokeDashArray, strokeWidth, fontSize, fontStyle, fontWeight} = DefaultToolbarSettings
     this.drawingLayer = drawingLayer
-    this.color = "#000"
+    this.settings = {
+      stroke,
+      fill,
+      strokeDashArray,
+      strokeWidth,
+      fontSize,
+      fontStyle,
+      fontWeight
+    }
   }
 
-  setColor(color:string) {
-    this.color = color
+  handleMouseDown(e:React.MouseEvent<HTMLDivElement>): void {
+    // handled in subclass
+  }
+
+  handleClick(e:React.MouseEvent<HTMLDivElement>): void {
+    // handled in subclass
+  }
+
+  handleObjectClick(e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject): void   {
+    // handled in subclass
+  }
+
+  setSettings(settings:ToolbarSettings) {
+    this.settings = settings
     return this
+  }
+}
+
+export class LineDrawingTool extends DrawingTool {
+
+  constructor(drawingLayer:DrawingLayerView) {
+    super(drawingLayer)
+    this.drawingLayer = drawingLayer
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
     e.preventDefault()
     const start = getWorkspacePoint(e)
-    const line:LineObject = new LineObject({x: start.x, y: start.y, color: this.color})
+    const {stroke, strokeWidth, strokeDashArray} = this.settings
+    const line:LineObject = new LineObject({x: start.x, y: start.y, color: stroke, strokeWidth, strokeDashArray})
 
     let lastPoint = start
     const addPoint = (e:MouseEvent|React.MouseEvent<HTMLDivElement>) => {
@@ -745,25 +903,62 @@ export class LineDrawingTool implements DrawingTool {
   }
 }
 
-export class RectangleDrawingTool implements DrawingTool {
-  drawingLayer:DrawingLayerView
-  stroke: string|null
-  fill: string|null
+export class VectorDrawingTool extends DrawingTool {
 
   constructor(drawingLayer:DrawingLayerView) {
-    this.drawingLayer = drawingLayer
-  }
-
-  setColors(polygon:PolygonButtonData) {
-    this.stroke = polygon.stroke ? polygon.stroke : "none"
-    this.fill = polygon.fill ? polygon.fill : "none"
-    return this
+    super(drawingLayer)
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
     e.preventDefault()
     const start = getWorkspacePoint(e)
-    const rectangle:RectangleObject = new RectangleObject({x: start.x, y: start.y, width: 0, height: 0, stroke: this.stroke, fill: this.fill})
+    const {stroke, strokeWidth, strokeDashArray} = this.settings
+    const vector:VectorObject = new VectorObject({x: start.x, y: start.y, x2: start.x, y2: start.y, stroke, strokeWidth, strokeDashArray})
+
+    const handleMouseMove = (e:MouseEvent) => {
+      e.preventDefault()
+      const end = getWorkspacePoint(e)
+      vector.x2 = end.x
+      vector.y2 = end.y
+      if (e.ctrlKey || e.altKey) {
+        const dx = Math.abs(vector.x2 - vector.x)
+        const dy = Math.abs(vector.y2 - vector.y)
+        if (dx > dy) {
+          vector.y2 = vector.y
+        }
+        else {
+          vector.x2 = vector.x
+        }
+      }
+      this.drawingLayer.setState({currentDrawingObject: vector})
+    }
+    const handleMouseUp = (e:MouseEvent) => {
+      e.preventDefault()
+      if ((vector.x !== vector.x2) || (vector.y !== vector.y2)) {
+        this.drawingLayer.commandManager.execute(new ToggleObjectCommand(vector))
+      }
+      this.drawingLayer.setState({currentDrawingObject: null})
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+
+    this.drawingLayer.setState({currentDrawingObject: vector})
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+  }
+}
+
+export class RectangleDrawingTool extends DrawingTool {
+
+  constructor(drawingLayer:DrawingLayerView) {
+    super(drawingLayer)
+  }
+
+  handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault()
+    const start = getWorkspacePoint(e)
+    const {stroke, fill, strokeWidth, strokeDashArray} = this.settings
+    const rectangle:RectangleObject = new RectangleObject({x: start.x, y: start.y, width: 0, height: 0, stroke, fill, strokeWidth, strokeDashArray})
 
     const handleMouseMove = (e:MouseEvent) => {
       e.preventDefault()
@@ -811,25 +1006,17 @@ export class RectangleDrawingTool implements DrawingTool {
   }
 }
 
-export class EllipseDrawingTool implements DrawingTool {
-  drawingLayer:DrawingLayerView
-  stroke: string|null
-  fill: string|null
+export class EllipseDrawingTool extends DrawingTool {
 
   constructor(drawingLayer:DrawingLayerView) {
-    this.drawingLayer = drawingLayer
-  }
-
-  setColors(polygon:PolygonButtonData) {
-    this.stroke = polygon.stroke ? polygon.stroke : "none"
-    this.fill = polygon.fill ? polygon.fill : "none"
-    return this
+    super(drawingLayer)
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
     e.preventDefault()
     const start = getWorkspacePoint(e)
-    const ellipse:EllipseObject = new EllipseObject({x: start.x, y: start.y, rx: 0, ry: 0, stroke: this.stroke, fill: this.fill})
+    const {stroke, fill, strokeWidth, strokeDashArray} = this.settings
+    const ellipse:EllipseObject = new EllipseObject({x: start.x, y: start.y, rx: 0, ry: 0, stroke, fill, strokeWidth, strokeDashArray})
 
     const handleMouseMove = (e:MouseEvent) => {
       e.preventDefault()
@@ -857,11 +1044,9 @@ export class EllipseDrawingTool implements DrawingTool {
   }
 }
 
-export class SelectionDrawingTool implements DrawingTool {
-  drawingLayer:DrawingLayerView
-
+export class SelectionDrawingTool extends DrawingTool {
   constructor(drawingLayer:DrawingLayerView) {
-    this.drawingLayer = drawingLayer
+    super(drawingLayer)
   }
 
   handleMouseDown(e:React.MouseEvent<HTMLDivElement>) {
@@ -896,15 +1081,15 @@ export class SelectionDrawingTool implements DrawingTool {
       selectedObjects.splice(index, 1)
     }
     this.drawingLayer.setState({selectedObjects})
+    this.drawingLayer.emitSelectedObjects(selectedObjects)
   }
 }
 
-export class ImageDrawingTool implements DrawingTool {
-  drawingLayer:DrawingLayerView
+export class ImageDrawingTool extends DrawingTool {
   imageSetItem: ImageSetItem
 
   constructor(drawingLayer:DrawingLayerView) {
-    this.drawingLayer = drawingLayer
+    super(drawingLayer)
   }
 
   setImageSetItem(imageSetItem:ImageSetItem) {
@@ -920,17 +1105,10 @@ export class ImageDrawingTool implements DrawingTool {
   }
 }
 
-export class TextDrawingTool implements DrawingTool {
-  drawingLayer:DrawingLayerView
-  color: string
+export class TextDrawingTool extends DrawingTool {
 
   constructor(drawingLayer:DrawingLayerView) {
-    this.drawingLayer = drawingLayer
-  }
-
-  setColor(color:string) {
-    this.color = color
-    return this
+    super(drawingLayer)
   }
 
   handleClick(e:React.MouseEvent<HTMLDivElement>) {
@@ -944,7 +1122,8 @@ export class TextDrawingTool implements DrawingTool {
     }
 
     const p = getWorkspacePoint(e)
-    const text:TextObject = new TextObject({x: p.x, y: p.y - 26 /* to move it above cursor */, color: this.color, focused: true})
+    const {fontSize, fontWeight, fontStyle} = this.settings
+    const text:TextObject = new TextObject({x: p.x, y: p.y - 26 /* to move it above cursor */, color: this.settings.stroke, fontSize, fontWeight, fontStyle, focused: true})
     this.drawingLayer.autoFocusTextObject = text
     this.drawingLayer.commandManager.execute(new ToggleObjectCommand(text))
   }
@@ -1079,13 +1258,15 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
       hoverObject: null,
       svgWidth: "100%",
       svgHeight: "100%",
-      imageDataUriCache: {}
+      imageDataUriCache: {},
+      backgroundImageData: null
     }
 
     this.commandManager = new CommandManager(this)
 
     this.tools = {
       line: new LineDrawingTool(this),
+      vector: new VectorDrawingTool(this),
       selection: new SelectionDrawingTool(this),
       image: new ImageDrawingTool(this),
       rectangle: new RectangleDrawingTool(this),
@@ -1098,6 +1279,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
     this.objects = {}
     this.addListeners()
+
+    this.loadBackgroundImageData(this.props.backgroundUrl)
   }
 
   componentWillMount() {
@@ -1107,6 +1290,28 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
 
   componentWillReceiveProps(nextProps:DrawingLayerViewProps) {
     this.updateImageDataUriCache(nextProps.imageSetItems)
+  }
+
+  emitSelectedObjects(selectedObjects: DrawingObject[]) {
+    this.props.events.emit(Events.ObjectsSelected, selectedObjects)
+  }
+
+  loadBackgroundImageData(url: string|null) {
+    if (url) {
+      const img = new Image()
+      img.addEventListener("load", () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        const context = canvas.getContext('2d')
+        if (context) {
+          context.drawImage(img, 0, 0);
+          this.setState({backgroundImageData: canvas.toDataURL('image/png')})
+        }
+      })
+      img.crossOrigin="anonymous"
+      img.src = url
+    }
   }
 
   updateImageDataUriCache(imageSetItems:ImageSetItem[]) {
@@ -1154,13 +1359,18 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         }
       }
     })
-    this.props.events.listen(Events.TextToolSelected, (data:TextButtonData) => this.setCurrentTool((this.tools.text as TextDrawingTool).setColor(data.color)))
-    this.props.events.listen(Events.LineDrawingToolSelected, (data:LineButtonData) => this.setCurrentTool((this.tools.line as LineDrawingTool).setColor(data.lineColor.hex)))
+    this.props.events.listen(Events.SettingsChanged, (settings:ToolbarSettings) => {
+      this.updateSelectedObjects(settings)
+      this.setCurrentToolSettings(settings)
+    })
+    this.props.events.listen(Events.TextToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.text as TextDrawingTool).setSettings(data)))
+    this.props.events.listen(Events.LineDrawingToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.line as LineDrawingTool).setSettings(data)))
+    this.props.events.listen(Events.VectorToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.vector as VectorDrawingTool).setSettings(data)))
     this.props.events.listen(Events.SelectionToolSelected, () => this.setCurrentTool(this.tools.selection))
     this.props.events.listen(Events.ImageToolSelected, (data:ImageButtonData) => this.setCurrentTool((this.tools.image as ImageDrawingTool).setImageSetItem(data.imageSetItem)))
 
-    this.props.events.listen(Events.RectangleToolSelected, (data:PolygonButtonData) => this.setCurrentTool((this.tools.rectangle as RectangleDrawingTool).setColors(data)))
-    this.props.events.listen(Events.EllipseToolSelected, (data:PolygonButtonData) => this.setCurrentTool((this.tools.ellipse as EllipseDrawingTool).setColors(data)))
+    this.props.events.listen(Events.RectangleToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.rectangle as RectangleDrawingTool).setSettings(data)))
+    this.props.events.listen(Events.EllipseToolSelected, (data:ToolbarSettings) => this.setCurrentTool((this.tools.ellipse as EllipseDrawingTool).setSettings(data)))
 
     this.props.events.listen(Events.UndoPressed, () => this.commandManager.undo())
     this.props.events.listen(Events.RedoPressed, () => this.commandManager.redo())
@@ -1192,6 +1402,8 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         if (json && object) {
           object.update(json)
           this.forceUpdate()
+          // do a second forced update in case the bounding box changes due to a text font/weight change
+          setTimeout(() => this.forceUpdate())
         }
       }
     })
@@ -1207,6 +1419,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
           }
           delete this.state.objects[snapshot.key]
           this.setState({objects: this.state.objects, selectedObjects})
+          this.emitSelectedObjects(selectedObjects)
         }
       }
     })
@@ -1231,6 +1444,33 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   setCurrentTool(tool:DrawingTool|null) {
     this.currentTool = tool
     this.setState({selectionBox: null, selectedObjects: [], hoverObject: null})
+    this.emitSelectedObjects([])
+  }
+
+  setCurrentToolSettings(settings:ToolbarSettings) {
+    if (this.currentTool) {
+      this.currentTool.setSettings(settings)
+    }
+  }
+
+  updateSelectedObjects(settings:ToolbarSettings) {
+    const { selectedObjects } = this.state
+    const setProp = (selectedObject: DrawingObject, name:string, newValue:any) => {
+      if (selectedObject.hasOwnProperty(name)) {
+        selectedObject[name] = newValue
+      }
+    }
+    selectedObjects.forEach((selectedObject) => {
+      setProp(selectedObject, "color", settings.stroke),
+      setProp(selectedObject, "stroke", settings.stroke),
+      setProp(selectedObject, "fill", settings.fill),
+      setProp(selectedObject, "strokeDashArray", settings.strokeDashArray),
+      setProp(selectedObject, "strokeWidth", settings.strokeWidth),
+      setProp(selectedObject, "fontSize", settings.fontSize),
+      setProp(selectedObject, "fontStyle", settings.fontStyle),
+      setProp(selectedObject, "fontWeight", settings.fontWeight)
+      this.updateObject(selectedObject)
+    })
   }
 
   forEachObject(callback: (object:DrawingObject, key?:string) => void) {
@@ -1251,19 +1491,19 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   }
 
   handleMouseDown = (e:React.MouseEvent<HTMLDivElement>) => {
-    if (this.currentTool && this.currentTool.handleMouseDown) {
+    if (this.currentTool) {
       this.currentTool.handleMouseDown(e)
     }
   }
 
   handleClick = (e:React.MouseEvent<HTMLDivElement>) => {
-    if (this.currentTool && this.currentTool.handleClick) {
+    if (this.currentTool) {
       this.currentTool.handleClick(e)
     }
   }
 
   handleObjectClick = (e:MouseEvent|React.MouseEvent<any>, obj:DrawingObject) => {
-    if (this.currentTool && this.currentTool.handleObjectClick) {
+    if (this.currentTool) {
       this.currentTool.handleObjectClick(e, obj)
     }
   }
@@ -1341,6 +1581,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
         }
       })
       this.setState({selectionBox: null, selectedObjects})
+      this.emitSelectedObjects(selectedObjects)
     }
   }
 
@@ -1393,9 +1634,18 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
     )
   }
 
+  renderBackgroundUrl() {
+    const {backgroundImageData} = this.state
+    if (!backgroundImageData) {
+      return null
+    }
+    return <img src={backgroundImageData} className="background-image" />
+  }
+
   render() {
     return (
       <div className="drawing-layer" onMouseDown={this.handleMouseDown} onClick={this.handleClick}>
+        {this.renderBackgroundUrl()}
         {this.renderSVG()}
         {this.renderObjects((object) => object.type === "text")}
       </div>

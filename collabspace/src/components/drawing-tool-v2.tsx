@@ -1,6 +1,6 @@
 import * as React from "react"
 import { DrawingView } from "../../../drawing/src/components/drawing-view"
-import { WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
+import { WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth, WorkspaceClientSnapshotResponse } from "../../../shared/workspace-client"
 import * as firebase from "firebase"
 import * as queryString from "query-string"
 
@@ -12,6 +12,7 @@ export interface DrawingToolComponentState {
   drawingRef: firebase.database.Reference|null
   imageSetUrl: string|null
   captureScreenCallback: Function|null
+  backgroundUrl: string|null
 }
 
 export class DrawingToolComponent extends React.Component<DrawingToolComponentProps, DrawingToolComponentState> {
@@ -24,6 +25,7 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
       readonly: false,
       drawingRef: null,
       imageSetUrl: this.getImageSetUrl(),
+      backgroundUrl: this.getBackgroundUrl(),
       captureScreenCallback: null
     }
   }
@@ -39,6 +41,10 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
     return queryString.parse(search).drawingImageSet
   }
 
+  getBackgroundUrl() {
+    return queryString.parse(window.location.search).backgroundUrl
+  }
+
   componentDidMount() {
 
     this.workspaceClient = new WorkspaceClient({
@@ -49,31 +55,61 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
 
       publish: (publication) => {
         return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
-          const captureScreenCallback = (err:any, canvas:HTMLCanvasElement) => {
-            this.setState({captureScreenCallback: null})
-            if (err) {
-              reject(err)
-            }
-            else {
-              canvas.toBlob((blob:Blob) => {
-                if (!blob) {
-                  return reject("Couldn't get drawing from canvas!")
-                }
-                publication.saveArtifact({title: "Drawing", blob})
+          this.captureScreen()
+            .then((canvas) => {
+              publication.saveArtifact({title: "Drawing", canvas})
                 .then((artifact) => resolve({}))
                 .catch(reject)
-              }, "image/png")
-            }
-          }
-          this.setState({captureScreenCallback})
+            })
+            .catch(reject)
+        })
+      },
+
+      snapshot: (snapshot) => {
+        return new Promise<WorkspaceClientSnapshotResponse>((resolve, reject) => {
+          this.captureScreen()
+            .then((canvas) => {
+              snapshot.fromCanvas(canvas)
+                .then(resolve)
+                .catch(reject)
+            })
+            .catch(reject)
         })
       }
     })
   }
 
+  captureScreen() {
+    return new Promise<HTMLCanvasElement>((resolve, reject) => {
+      let captured = false
+      const captureScreenCallback = (err:any, canvas:HTMLCanvasElement) => {
+        if (captured) {
+          return
+        }
+
+        captured = true
+        this.setState({captureScreenCallback: null})
+
+        if (err) {
+          reject(err)
+        }
+        else {
+          resolve(canvas)
+        }
+      }
+      this.setState({captureScreenCallback})
+    })
+  }
+
   render() {
     if (this.state.drawingRef) {
-      return <DrawingView readonly={this.state.readonly} firebaseRef={this.state.drawingRef} imageSetUrl={this.state.imageSetUrl} captureScreenCallback={this.state.captureScreenCallback} />
+      return <DrawingView
+                readonly={this.state.readonly}
+                firebaseRef={this.state.drawingRef}
+                imageSetUrl={this.state.imageSetUrl}
+                backgroundUrl={this.state.backgroundUrl}
+                captureScreenCallback={this.state.captureScreenCallback}
+              />
     }
     return <div className="loading">Loading...</div>
   }
