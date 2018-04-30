@@ -342,6 +342,7 @@ export class WorkspaceClientPublication {
             }
           }, "image/png")
         })
+        .catch(reject)
     })
   }
 }
