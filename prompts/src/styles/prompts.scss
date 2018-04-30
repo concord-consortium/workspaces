@@ -6,7 +6,7 @@ body {
   padding: 0;
 }
 
-.prompts {
+#prompts, .activity {
   position: fixed;
   top: 0;
   right: 0;
@@ -54,7 +54,7 @@ body {
 }
 
 .activity {
-  margin: 10px 20px;
+  padding: 10px 20px;
 
   .accordian {
     position: fixed;
