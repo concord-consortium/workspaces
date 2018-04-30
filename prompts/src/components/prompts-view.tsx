@@ -4,7 +4,8 @@ import * as firebase from "firebase"
 import { FirebaseConfig } from "../../../collabspace/src/lib/firebase-config"
 import { v1 as uuid } from "uuid"
 import { LogManager } from "../../../shared/log-manager"
-import { WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth } from "../../../shared/workspace-client"
+import { WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth, WorkspaceClientSnapshotResponse } from "../../../shared/workspace-client"
+import * as html2canvas from "html2canvas"
 
 interface ActivityListItem {
   name: string
@@ -139,6 +140,7 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
   activityListRef: firebase.database.Reference
   workspaceClient: WorkspaceClient
   logManager: LogManager|null
+  activityElement: HTMLElement|null
 
   constructor(props:PromptsViewProps){
     super(props)
@@ -180,6 +182,30 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
               this.logManager = new LogManager({tokens: req.tokens, activity: "CollabSpace"})
             }
             return {}
+          },
+
+          publish: (publication) => {
+            return new Promise<WorkspaceClientPublishResponse>( (resolve, reject) => {
+              this.captureScreen()
+                .then((canvas) => {
+                  publication.saveArtifact({title: "Prompts", canvas})
+                    .then((artifact) => resolve({}))
+                    .catch(reject)
+                })
+                .catch(reject)
+            })
+          },
+
+          snapshot: (snapshot) => {
+            return new Promise<WorkspaceClientSnapshotResponse>((resolve, reject) => {
+              this.captureScreen()
+                .then((canvas) => {
+                  snapshot.fromCanvas(canvas)
+                    .then(resolve)
+                    .catch(reject)
+                })
+                .catch(reject)
+            })
           }
         })
 
@@ -198,6 +224,17 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
       .catch((err) => {
         alert(err)
       })
+  }
+
+  captureScreen() {
+    return new Promise<HTMLCanvasElement>((resolve, reject) => {
+      if (this.activityElement) {
+        html2canvas(this.activityElement).then(resolve).catch(reject)
+      }
+      else {
+        reject("Activity not available")
+      }
+    })
   }
 
   getRefKey(suffix:string) {
@@ -261,7 +298,7 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
     }
 
     return (
-      <div className="activity">
+      <div className="activity" ref={(el) => this.activityElement = el}>
         {this.renderAccordian(activity)}
         {activity.pages.map(this.renderPage)}
       </div>
