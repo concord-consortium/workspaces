@@ -243,7 +243,7 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
         groupElements.push(
           <div className="group" key={key} onClick={chooseGroup}>
             <div className="group-title">Group {key}</div>
-            {Object.keys(users).map((id) => {
+            {Object.keys(users || {}).map((id) => {
               const portalUser = this.userLookup.lookup(id)
               const status = users[id].connected ? "" : " (disconnected)"
               const className = users[id].connected ? "user" : "user disconnected"
