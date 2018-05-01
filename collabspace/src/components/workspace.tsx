@@ -14,7 +14,7 @@ import { v4 as uuidV4} from "uuid"
 import { PortalUser, PortalOffering, PortalUserConnectionStatusMap, PortalUserConnected, PortalUserDisconnected, PortalTokens, AuthQueryParams } from "../lib/auth"
 import { AppHashParams } from "./app"
 import escapeFirebaseKey from "../lib/escape-firebase-key"
-import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath, getFavoritesRef, getPosterAnnotationsRef } from "../lib/refs"
+import { getDocumentPath, getPublicationsRef, getArtifactsPath, getPublicationsPath, getArtifactsStoragePath, getSnapshotStoragePath, getFavoritesRef, getPosterAnnotationsRef, getRelativeRefPath } from "../lib/refs"
 import { WorkspaceClientPublishRequest, WorkspaceClientPublishRequestMessage } from "../../../shared/workspace-client"
 import { UserLookup } from "../lib/user-lookup"
 import { Support, SupportTypeStrings, FirebaseSupportMap, FirebaseSupportSeenUsersSupportMap } from "./dashboard-support"
@@ -23,6 +23,7 @@ import { merge } from "lodash"
 import { LiveTimeAgoComponent } from "./live-time-ago"
 import { UploadImageDialogComponent } from "./upload-image-dialog"
 import { LearningLogComponent } from "./learning-log"
+import { listDataSetsInDocument, WorkspaceDataSet } from "../lib/list-datasets"
 
 export const getPosterViewUrl = (portalTokens: PortalTokens|null, portalUser: PortalUser|null, portalOffering: PortalOffering|null, template?: string) => {
   if (portalTokens) {
@@ -582,18 +583,28 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   handleAddGraph = () => {
-    this.setState({
-      modalWindowOptions: {
-        type: "add-graph",
-        onOk: (title, ownerId) => {
-          this.windowManager.add({
-            url: this.constructRelativeUrl("neo-codap.html?mode=graph"),
-            title,
-            ownerId,
-            log: {name: "Added graph window", params: this.getAddWindowLogParams({ownerId})}
-          })
-        }
+    const cancelListDataSets = listDataSetsInDocument(this.props.document, (dataSets: WorkspaceDataSet[]) => {
+      cancelListDataSets()
+
+      let title:string|undefined = undefined
+      if (dataSets.length > 0) {
+        title = `Untitled Graph for ${dataSets.map((dataSet) => dataSet.name).join(" or ")}`
       }
+
+      this.setState({
+        modalWindowOptions: {
+          title,
+          type: "add-graph",
+          onOk: (title, ownerId) => {
+            this.windowManager.add({
+              url: this.constructRelativeUrl("neo-codap.html?mode=graph"),
+              title,
+              ownerId,
+              log: {name: "Added graph window", params: this.getAddWindowLogParams({ownerId})}
+            })
+          }
+        }
+      })
     })
   }
 
