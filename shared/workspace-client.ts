@@ -3,6 +3,7 @@ import * as firebase from "firebase"
 import { v4 as uuidV4 } from "uuid"
 import { PortalTokens } from "../collabspace/src/lib/auth";
 import { FirebaseWindowAttrsMap, FirebaseWindowDataSet } from "../collabspace/src/lib/window"
+import { WorkspaceDataSet, listDataSets } from "../collabspace/src/lib/list-datasets"
 import * as html2canvas from "html2canvas"
 
 const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
@@ -12,11 +13,6 @@ export const WorkspaceClientThumbnailWidth = 50
 export interface IFramePhoneLib {
   ParentEndpoint(iframe:HTMLIFrameElement, afterConnectedCallback?: (args:any) => void):  IFramePhoneParent
   getIFrameEndpoint: () => IFramePhoneChild
-}
-
-export interface WorkspaceDataSet {
-  name: string
-  ref: firebase.database.Reference
 }
 
 export type MessageContent = any
@@ -191,42 +187,9 @@ export class WorkspaceClient {
     return dataSetRef
   }
 
-  listDataSets(callback:(dataSets: WorkspaceDataSet[]) => void) {
-    let attrs:FirebaseWindowAttrsMap = {}
-    let creators:FirebaseDataSetCreatorMap = {}
-    let loadedAttrs = false
-    let loadedCreators = false
-    const onChange = () => {
-      if (!loadedCreators || !loadedAttrs) {
-        return
-      }
-      const dataSets: WorkspaceDataSet[] = []
-      Object.keys(creators).forEach((dataSetId) => {
-        const windowId = creators[dataSetId]
-        const windowAttrs = attrs[windowId]
-        if (windowAttrs) {
-          dataSets.push({
-            name: windowAttrs.title,
-            ref: this.dataSetDataRef.child(dataSetId)
-          })
-        }
-      })
-      callback(dataSets)
-    }
-    const onCreatorsValueChange = this.dataSetCreatorsRef.on("value", (snapshot) => {
-      creators = (snapshot ? snapshot.val() : {}) || {}
-      loadedCreators = true
-      onChange()
-    })
-    const onAttrsValueChange = this.attrsRef.on("value", (snapshot) => {
-      attrs = (snapshot ? snapshot.val() : {}) || {}
-      loadedAttrs = true
-      onChange()
-    })
-    return () => {
-      this.dataSetCreatorsRef.off("value", onCreatorsValueChange)
-      this.attrsRef.off("value", onAttrsValueChange)
-    }
+  listDataSets(callback:(dataSets: WorkspaceDataSet[]) => void): Function {
+    const {dataSetDataRef, dataSetCreatorsRef, attrsRef} = this
+    return listDataSets({dataSetDataRef, dataSetCreatorsRef, attrsRef, callback})
   }
 }
 

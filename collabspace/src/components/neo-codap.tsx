@@ -2,13 +2,14 @@ import * as React from "react";
 import NeoCodapApp from "../../../neo-codap/src/App";
 import { addAttributeToDataSet, addCasesToDataSet, ICase, IDataSet }
         from "../../../neo-codap/src/data-manager/data-manager";
-import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth, WorkspaceDataSet} from "../../../shared/workspace-client"
+import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth} from "../../../shared/workspace-client"
 import { loadDataSetFromFirebase } from "../../../shared/firebase-dataset";
 import * as firebase from "firebase";
 import sizeMe from "react-sizeme";
 import * as queryString from 'query-string';
 import { IAppComponentData, AppComponentData, createDefaultAppComponentData } from "../../../neo-codap/src/app-data";
 import { applySnapshot, getSnapshot, onSnapshot } from "mobx-state-tree";
+import { WorkspaceDataSet, listDataSets } from "../../../collabspace/src/lib/list-datasets"
 import * as html2canvas from "html2canvas"
 
 interface ISizeMeSize {
