@@ -110,9 +110,9 @@ export class WorkspaceClient {
   dataSet?: FirebaseWindowDataSet
   dataRef: firebase.database.Reference
   dataSetsRef: firebase.database.Reference
-  protected dataSetCreatorsRef: firebase.database.Reference
-  protected dataSetDataRef: firebase.database.Reference
-  protected attrsRef: firebase.database.Reference
+  dataSetCreatorsRef: firebase.database.Reference
+  dataSetDataRef: firebase.database.Reference
+  attrsRef: firebase.database.Reference
 
   constructor (config:WorkspaceClientConfig) {
     this.config = config
@@ -165,9 +165,10 @@ export class WorkspaceClient {
     }
   }
 
-  getDataSetRef() {
-    if (this.dataSet) {
-      return this.dataSetsRef.child(this.dataSet.documentId).child("data").child(this.dataSet.dataSetId)
+  getDataSetRef(dataSet?: FirebaseWindowDataSet) {
+    dataSet = dataSet || this.dataSet
+    if (dataSet) {
+      return this.dataSetsRef.child(dataSet.documentId).child("data").child(dataSet.dataSetId)
     }
     return null
   }
@@ -178,12 +179,16 @@ export class WorkspaceClient {
     return ref.key ? this.dataSetDataRef.child(ref.key) : null
   }
 
+  getWindowDataSetAttr() {
+    return this.attrsRef.child(this.windowId).child("dataSet")
+  }
+
   selectDataSetRef(dataSetRef: firebase.database.Reference) {
     const windowDataSet:FirebaseWindowDataSet = {
       documentId: this.documentId,
       dataSetId: dataSetRef.key as string
     }
-    this.attrsRef.child(this.windowId).child("dataSet").set(windowDataSet)
+    this.getWindowDataSetAttr().set(windowDataSet)
     return dataSetRef
   }
 
