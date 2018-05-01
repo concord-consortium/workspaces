@@ -11,7 +11,7 @@ import '@blueprintjs/core/dist/blueprint.css';
 
 interface ITableHeaderMenuProps {
   dataSet?: IDataSet;
-  gridApi: GridApi;
+  api: GridApi;
   onNewAttribute: (name: string) => void;
   onRenameAttribute: (id: string, name: string) => void;
   onNewCase: () => void;
@@ -99,7 +99,7 @@ class TableHeaderMenu extends React.Component<ITableHeaderMenuProps, ITableHeade
   }
 
   getSelectedRowNodes() {
-    return this.props.gridApi && this.props.gridApi.getSelectedNodes();
+    return this.props.api && this.props.api.getSelectedNodes();
   }
 
   getSelectedRowNodeCount() {
