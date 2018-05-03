@@ -2,6 +2,7 @@ import * as firebase from "firebase"
 import { FirebaseWindowAttrsMap, FirebaseWindowDataSet } from "./window"
 import { FirebaseDataSetCreatorMap, Document } from "./document"
 import { getRelativeRefPath } from "./refs";
+import { PortalUser } from "./auth";
 
 export interface WorkspaceDataSet {
   name: string
@@ -14,10 +15,20 @@ export type ListDataSetsOptions = {
   dataSetCreatorsRef: firebase.database.Reference
   attrsRef: firebase.database.Reference
   dataSetDataRef: firebase.database.Reference
+  user: PortalUser|null
+  includePrivate: boolean
   callback: ListDataSetsCallback
 }
 
-export const listDataSetsInDocument = (document: Document, callback: ListDataSetsCallback): Function => {
+export type ListDataSetsInDocumentOptions = {
+  document: Document
+  user: PortalUser|null
+  includePrivate: boolean
+  callback: ListDataSetsCallback
+}
+
+export const listDataSetsInDocument = (options: ListDataSetsInDocumentOptions): Function => {
+  const {document, user, includePrivate, callback} = options
   const dataSetsPath = getRelativeRefPath(document.getDataSetsDataRef())
   const attrsPath = getRelativeRefPath(document.getWindowsDataRef("attrs"))
   const documentDataSet = firebase.database().ref(dataSetsPath).child(document.id)
@@ -25,11 +36,11 @@ export const listDataSetsInDocument = (document: Document, callback: ListDataSet
   const dataSetDataRef = documentDataSet.child("data")
   const attrsRef = firebase.database().ref(attrsPath)
 
-  return listDataSets({dataSetCreatorsRef, attrsRef, dataSetDataRef, callback})
+  return listDataSets({dataSetCreatorsRef, attrsRef, dataSetDataRef, user, includePrivate, callback})
 }
 
 export const listDataSets = (options: ListDataSetsOptions): Function => {
-  const {dataSetCreatorsRef, attrsRef, dataSetDataRef, callback} = options
+  const {dataSetCreatorsRef, attrsRef, dataSetDataRef, user, includePrivate, callback} = options
   let attrs:FirebaseWindowAttrsMap = {}
   let creators:FirebaseDataSetCreatorMap = {}
   let loadedAttrs = false
@@ -43,10 +54,14 @@ export const listDataSets = (options: ListDataSetsOptions): Function => {
       const windowId = creators[dataSetId]
       const windowAttrs = attrs[windowId]
       if (windowAttrs) {
-        dataSets.push({
-          name: windowAttrs.title,
-          ref: dataSetDataRef.child(dataSetId)
-        })
+        const {ownerId, title} = windowAttrs
+        // only list datasets that are public or are owned by the user
+        if (!user || !ownerId || (includePrivate && (ownerId === user.id))) {
+          dataSets.push({
+            name: title,
+            ref: dataSetDataRef.child(dataSetId)
+          })
+        }
       }
     })
     callback(dataSets)

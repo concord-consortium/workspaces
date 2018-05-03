@@ -192,6 +192,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         this.setState(newState)
       },
       syncChanges: this.props.isTemplate || this.state.posterView.enabled,
+      user: this.props.portalUser,
       tokens: this.props.portalTokens,
       nonPrivateWindow: this.nonPrivateWindow
     })
@@ -583,7 +584,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   handleAddGraph = () => {
-    const cancelListDataSets = listDataSetsInDocument(this.props.document, (dataSets: WorkspaceDataSet[]) => {
+    const {document, portalUser} = this.props
+    const cancelListDataSets = listDataSetsInDocument({document, user: portalUser, includePrivate: true, callback: (dataSets: WorkspaceDataSet[]) => {
       cancelListDataSets()
 
       let title:string|undefined = undefined
@@ -605,7 +607,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
           }
         }
       })
-    })
+    }})
   }
 
   handleCreateDemoButton = () => {
@@ -1411,13 +1413,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         title = title || "Untitled Table"
         titlebar = "Add Table"
         okButton = "Add"
-        enableVisibiltyOptions = false
         break
       case "add-graph":
         title = title || "Untitled Graph"
         titlebar = "Add Graph"
         okButton = "Add"
-        enableVisibiltyOptions = false
         break
       case "add-snapshot":
         title = title || "Untitled Snapshot"

@@ -20,7 +20,7 @@ import { IFramePhoneLib,
  const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
 
 import * as firebase from "firebase"
-import { PortalOffering, PortalTokens } from "./auth";
+import { PortalOffering, PortalTokens, PortalUser } from "./auth";
 import { getDocumentRef, getRelativeRefPath, getDocumentRefByClass } from "./refs"
 import { NonPrivateWindowParams, PublicationWindowOptions } from "../components/workspace";
 import { LogManager } from "../../../shared/log-manager"
@@ -74,6 +74,7 @@ export interface WindowManagerSettings {
   document: Document
   onStateChanged: WindowManagerStateChangeFn
   syncChanges: boolean
+  user: PortalUser|null
   tokens: PortalTokens|null
   nonPrivateWindow: (nonPrivateWindowParams: NonPrivateWindowParams) => boolean
 }
@@ -99,6 +100,7 @@ export class WindowManager {
   minimizedWindowOrder: string[]
   lastAttrsQuery: firebase.database.Query
   tokens: PortalTokens|null
+  user: PortalUser|null
   nonPrivateWindow: (nonPrivateWindowParams: NonPrivateWindowParams) => boolean
   logManager: LogManager
   listenOnlyForTitleAttrChanges: boolean
@@ -107,6 +109,7 @@ export class WindowManager {
     this.document = settings.document
     this.onStateChanged = settings.onStateChanged
     this.syncChanges = settings.syncChanges
+    this.user = settings.user
     this.tokens = settings.tokens
     this.nonPrivateWindow = settings.nonPrivateWindow
 
@@ -541,6 +544,7 @@ export class WindowManager {
           id: window.id,
           documentId: this.document.id,
           readonly: this.document.isReadonly,
+          private: !!(this.user && (window.attrs.ownerId === this.user.id)),
           firebase: {
             config: FirebaseConfig,
             dataPath: getRelativeRefPath(window.iframe.dataRef),
@@ -548,6 +552,7 @@ export class WindowManager {
             dataSetsPath: getRelativeRefPath(this.document.getDataSetsDataRef()),
             attrsPath: getRelativeRefPath(this.document.getWindowsDataRef("attrs"))
           },
+          user: this.user,
           tokens: this.tokens
         }
         window.iframe.phone.addListener(WorkspaceClientInitResponseMessage, (resp:WorkspaceClientInitResponse) => {
