@@ -1,7 +1,7 @@
 import { FirebaseArtifact, FirebasePublication, FirebaseDataSetCreatorMap, FirebaseDataSet } from "../collabspace/src/lib/document"
 import * as firebase from "firebase"
 import { v4 as uuidV4 } from "uuid"
-import { PortalTokens } from "../collabspace/src/lib/auth";
+import { PortalTokens, PortalUser } from "../collabspace/src/lib/auth";
 import { FirebaseWindowAttrsMap, FirebaseWindowDataSet } from "../collabspace/src/lib/window"
 import { WorkspaceDataSet, listDataSets } from "../collabspace/src/lib/list-datasets"
 import * as html2canvas from "html2canvas"
@@ -39,6 +39,10 @@ export interface IFramePhoneParent {
   targetOrigin: string
 }
 
+export interface WorkspaceClientListDataSetsOptions {
+  includePrivate: boolean
+  callback:(dataSets: WorkspaceDataSet[]) => void
+}
 
 export const WorkspaceClientInitRequestMessage = "WorkspaceClientInitRequest"
 export const WorkspaceClientInitResponseMessage = "WorkspaceClientInitResponse"
@@ -57,6 +61,7 @@ export interface WorkspaceClientCollabSpaceInitRequest {
   id: string
   documentId: string
   readonly: boolean
+  private: boolean
   firebase: {
     config: any,
     dataPath: string,
@@ -64,6 +69,7 @@ export interface WorkspaceClientCollabSpaceInitRequest {
     dataSetsPath: string,
     attrsPath: string
   },
+  user: PortalUser|null
   tokens?: PortalTokens|null
 }
 export interface WorkspaceClientStandaloneInitRequest {
@@ -113,6 +119,7 @@ export class WorkspaceClient {
   dataSetCreatorsRef: firebase.database.Reference
   dataSetDataRef: firebase.database.Reference
   attrsRef: firebase.database.Reference
+  user: PortalUser|null
 
   constructor (config:WorkspaceClientConfig) {
     this.config = config
@@ -137,6 +144,7 @@ export class WorkspaceClient {
       this.dataSetCreatorsRef = documentDataSet.child("creators")
       this.dataSetDataRef = documentDataSet.child("data")
       this.attrsRef = firebase.database().ref(req.firebase.attrsPath)
+      this.user = req.user
     }
 
     const resp = this.config.init(req)
@@ -192,9 +200,10 @@ export class WorkspaceClient {
     return dataSetRef
   }
 
-  listDataSets(callback:(dataSets: WorkspaceDataSet[]) => void): Function {
-    const {dataSetDataRef, dataSetCreatorsRef, attrsRef} = this
-    return listDataSets({dataSetDataRef, dataSetCreatorsRef, attrsRef, callback})
+  listDataSets(options: WorkspaceClientListDataSetsOptions): Function {
+    const {includePrivate, callback} = options
+    const {dataSetDataRef, dataSetCreatorsRef, attrsRef, user} = this
+    return listDataSets({dataSetDataRef, dataSetCreatorsRef, attrsRef, user, includePrivate, callback})
   }
 }
 

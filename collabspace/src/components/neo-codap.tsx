@@ -37,6 +37,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   cancelListDataSets?: Function
   dataSetAttr?: firebase.database.Reference
   loadedDataSet: boolean
+  includePrivateDataSets: boolean
 
   constructor (props:NeoCodapProps) {
     super(props)
@@ -53,6 +54,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   componentDidMount() {
     this.workspaceClient = new WorkspaceClient({
       init: (req) => {
+        this.includePrivateDataSets = (req.type === "collabspace") && req.private
         this.setState({readonly: req.readonly}, () => {
           this.loadAppComponentData();
           if (req.type === "collabspace") {
@@ -136,14 +138,14 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
         }
       })
 
-      this.cancelListDataSets = this.workspaceClient.listDataSets((workspaceDataSets) => {
+      this.cancelListDataSets = this.workspaceClient.listDataSets({includePrivate: this.includePrivateDataSets, callback: (workspaceDataSets) => {
         if (workspaceDataSets.length === 1) {
           this.handleSelectedWorkspaceDataSet(workspaceDataSets[0])
         }
         else {
           this.setState({workspaceDataSets, loadedWorkspaceDataSets: true})
         }
-      })
+      }})
     }
     else {
       dataSetRef = dataSetRef || this.workspaceClient.createDataSetRef()
