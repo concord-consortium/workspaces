@@ -82,7 +82,7 @@ export class JWTKeepalive {
       return
     }
 
-    if (this.startedAt + DURATION_BEFORE_IDLE_CHECK < rightNow) {
+    if (this.startedAt + DURATION_BEFORE_IDLE_CHECK + MAX_IDLE_DURATION < rightNow) {
       if (this.idle && (rightNow - this.idleAt > MAX_IDLE_DURATION)) {
         this.callback(tokens, true, "Your session has been idle for too long.  Please log in again.")
         return
@@ -99,6 +99,7 @@ export class JWTKeepalive {
           firebaseJWT,
           domain
         }
+        this.tokens = newTokens
         this.callback(newTokens, false, null)
       })
       .catch((err) => {
