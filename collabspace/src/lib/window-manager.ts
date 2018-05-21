@@ -17,7 +17,8 @@ import { IFramePhoneLib,
   WorkspaceClientSnapshotResponse
  } from "../../../shared/workspace-client"
 
- const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
+const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
+declare var Rollbar: any;
 
 import * as firebase from "firebase"
 import { PortalOffering, PortalTokens, PortalUser } from "./auth";
@@ -559,7 +560,7 @@ export class WindowManager {
           window.iframe.inited = true
           callback()
         })
-        window.iframe.phone.post(WorkspaceClientInitRequestMessage, initRequest)
+        this.postToPhoneIfActive(window, WorkspaceClientInitRequestMessage, initRequest, "WindowManager#windowLoaded")
       })
     }
   }
@@ -568,24 +569,24 @@ export class WindowManager {
     return this.windows[windowId]
   }
 
-  postToWindow(window:Window, message:string, request:object) {
+  postToWindow(window:Window, message:string, request:object, debugOrigin: string) {
     if (window.iframe && window.iframe.connected) {
-      window.iframe.phone.post(message, request)
+      this.postToPhoneIfActive(window, message, request, debugOrigin)
     }
   }
 
-  postToWindowIds(windowIds:string[], message:string, request:object) {
+  postToWindowIds(windowIds:string[], message:string, request:object, debugOrigin: string) {
     windowIds.forEach((windowId) => {
       const window = this.windows[windowId]
       if (window) {
-        this.postToWindow(window, message, request)
+        this.postToWindow(window, message, request, debugOrigin)
       }
     })
   }
 
-  postToAllWindows(message:string, request:object) {
+  postToAllWindows(message:string, request:object, debugOrigin: string) {
     this.forEachWindow((window) => {
-      this.postToWindow(window, message, request)
+      this.postToWindow(window, message, request, debugOrigin)
     })
   }
 
@@ -708,7 +709,20 @@ export class WindowManager {
       phone.addListener(WorkspaceClientSnapshotResponseMessage, handleSnapshotResponse)
 
       const request:WorkspaceClientSnapshotRequest = {snapshotPath, annotationImageDataUrl}
-      phone.post(WorkspaceClientSnapshotRequestMessage, request)
+      this.postToPhoneIfActive(window, WorkspaceClientSnapshotRequestMessage, request, "WindowManager#snapshotWindow")
     })
+  }
+
+  postToPhoneIfActive(window: Window, message: string, request: any, debugOrigin: string) {
+    const {iframe} = window
+    if (iframe.element.contentWindow) {
+      iframe.phone.post(message, request)
+    }
+    else {
+      console.error("Iframe contentWindow is not available!")
+      if (Rollbar && Rollbar.log) {
+        Rollbar.log("error", "Iframe contentWindow is not available!", {windowUrl: window.attrs.url, message, request, debugOrigin});
+      }
+    }
   }
 }
