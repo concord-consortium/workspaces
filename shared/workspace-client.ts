@@ -1,8 +1,9 @@
 import { FirebaseArtifact, FirebasePublication, FirebaseDataSetCreatorMap, FirebaseDataSet } from "../collabspace/src/lib/document"
 import * as firebase from "firebase"
 import { v4 as uuidV4 } from "uuid"
-import { PortalTokens } from "../collabspace/src/lib/auth";
+import { PortalTokens, PortalUser } from "../collabspace/src/lib/auth";
 import { FirebaseWindowAttrsMap, FirebaseWindowDataSet } from "../collabspace/src/lib/window"
+import { WorkspaceDataSet, listDataSets } from "../collabspace/src/lib/list-datasets"
 import * as html2canvas from "html2canvas"
 
 const IFramePhoneFactory:IFramePhoneLib = require("iframe-phone")
@@ -12,11 +13,6 @@ export const WorkspaceClientThumbnailWidth = 50
 export interface IFramePhoneLib {
   ParentEndpoint(iframe:HTMLIFrameElement, afterConnectedCallback?: (args:any) => void):  IFramePhoneParent
   getIFrameEndpoint: () => IFramePhoneChild
-}
-
-export interface WorkspaceDataSet {
-  name: string
-  ref: firebase.database.Reference
 }
 
 export type MessageContent = any
@@ -43,6 +39,10 @@ export interface IFramePhoneParent {
   targetOrigin: string
 }
 
+export interface WorkspaceClientListDataSetsOptions {
+  includePrivate: boolean
+  callback:(dataSets: WorkspaceDataSet[]) => void
+}
 
 export const WorkspaceClientInitRequestMessage = "WorkspaceClientInitRequest"
 export const WorkspaceClientInitResponseMessage = "WorkspaceClientInitResponse"
@@ -61,6 +61,7 @@ export interface WorkspaceClientCollabSpaceInitRequest {
   id: string
   documentId: string
   readonly: boolean
+  private: boolean
   firebase: {
     config: any,
     dataPath: string,
@@ -68,6 +69,7 @@ export interface WorkspaceClientCollabSpaceInitRequest {
     dataSetsPath: string,
     attrsPath: string
   },
+  user: PortalUser|null
   tokens?: PortalTokens|null
 }
 export interface WorkspaceClientStandaloneInitRequest {
@@ -114,9 +116,10 @@ export class WorkspaceClient {
   dataSet?: FirebaseWindowDataSet
   dataRef: firebase.database.Reference
   dataSetsRef: firebase.database.Reference
-  protected dataSetCreatorsRef: firebase.database.Reference
-  protected dataSetDataRef: firebase.database.Reference
-  protected attrsRef: firebase.database.Reference
+  dataSetCreatorsRef: firebase.database.Reference
+  dataSetDataRef: firebase.database.Reference
+  attrsRef: firebase.database.Reference
+  user: PortalUser|null
 
   constructor (config:WorkspaceClientConfig) {
     this.config = config
@@ -141,6 +144,7 @@ export class WorkspaceClient {
       this.dataSetCreatorsRef = documentDataSet.child("creators")
       this.dataSetDataRef = documentDataSet.child("data")
       this.attrsRef = firebase.database().ref(req.firebase.attrsPath)
+      this.user = req.user
     }
 
     const resp = this.config.init(req)
@@ -169,9 +173,10 @@ export class WorkspaceClient {
     }
   }
 
-  getDataSetRef() {
-    if (this.dataSet) {
-      return this.dataSetsRef.child(this.dataSet.documentId).child("data").child(this.dataSet.dataSetId)
+  getDataSetRef(dataSet?: FirebaseWindowDataSet) {
+    dataSet = dataSet || this.dataSet
+    if (dataSet) {
+      return this.dataSetsRef.child(dataSet.documentId).child("data").child(dataSet.dataSetId)
     }
     return null
   }
@@ -182,51 +187,23 @@ export class WorkspaceClient {
     return ref.key ? this.dataSetDataRef.child(ref.key) : null
   }
 
+  getWindowDataSetAttr() {
+    return this.attrsRef.child(this.windowId).child("dataSet")
+  }
+
   selectDataSetRef(dataSetRef: firebase.database.Reference) {
     const windowDataSet:FirebaseWindowDataSet = {
       documentId: this.documentId,
       dataSetId: dataSetRef.key as string
     }
-    this.attrsRef.child(this.windowId).child("dataSet").set(windowDataSet)
+    this.getWindowDataSetAttr().set(windowDataSet)
     return dataSetRef
   }
 
-  listDataSets(callback:(dataSets: WorkspaceDataSet[]) => void) {
-    let attrs:FirebaseWindowAttrsMap = {}
-    let creators:FirebaseDataSetCreatorMap = {}
-    let loadedAttrs = false
-    let loadedCreators = false
-    const onChange = () => {
-      if (!loadedCreators || !loadedAttrs) {
-        return
-      }
-      const dataSets: WorkspaceDataSet[] = []
-      Object.keys(creators).forEach((dataSetId) => {
-        const windowId = creators[dataSetId]
-        const windowAttrs = attrs[windowId]
-        if (windowAttrs) {
-          dataSets.push({
-            name: windowAttrs.title,
-            ref: this.dataSetDataRef.child(dataSetId)
-          })
-        }
-      })
-      callback(dataSets)
-    }
-    const onCreatorsValueChange = this.dataSetCreatorsRef.on("value", (snapshot) => {
-      creators = (snapshot ? snapshot.val() : {}) || {}
-      loadedCreators = true
-      onChange()
-    })
-    const onAttrsValueChange = this.attrsRef.on("value", (snapshot) => {
-      attrs = (snapshot ? snapshot.val() : {}) || {}
-      loadedAttrs = true
-      onChange()
-    })
-    return () => {
-      this.dataSetCreatorsRef.off("value", onCreatorsValueChange)
-      this.attrsRef.off("value", onAttrsValueChange)
-    }
+  listDataSets(options: WorkspaceClientListDataSetsOptions): Function {
+    const {includePrivate, callback} = options
+    const {dataSetDataRef, dataSetCreatorsRef, attrsRef, user} = this
+    return listDataSets({dataSetDataRef, dataSetCreatorsRef, attrsRef, user, includePrivate, callback})
   }
 }
 

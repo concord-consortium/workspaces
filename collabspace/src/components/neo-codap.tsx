@@ -2,14 +2,16 @@ import * as React from "react";
 import NeoCodapApp from "../../../neo-codap/src/App";
 import { addAttributeToDataSet, addCasesToDataSet, ICase, IDataSet }
         from "../../../neo-codap/src/data-manager/data-manager";
-import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth, WorkspaceDataSet} from "../../../shared/workspace-client"
+import {WorkspaceClient, WorkspaceClientInitRequest, WorkspaceClientPublishResponse, WorkspaceClientThumbnailWidth} from "../../../shared/workspace-client"
 import { loadDataSetFromFirebase } from "../../../shared/firebase-dataset";
 import * as firebase from "firebase";
 import sizeMe from "react-sizeme";
 import * as queryString from 'query-string';
 import { IAppComponentData, AppComponentData, createDefaultAppComponentData } from "../../../neo-codap/src/app-data";
 import { applySnapshot, getSnapshot, onSnapshot } from "mobx-state-tree";
+import { WorkspaceDataSet, listDataSets } from "../../../collabspace/src/lib/list-datasets"
 import * as html2canvas from "html2canvas"
+import { FirebaseWindowDataSet } from "../lib/window";
 
 interface ISizeMeSize {
   width:number|null;
@@ -33,6 +35,9 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   workspaceClient: WorkspaceClient;
   appDOMNodeRef: HTMLElement | null;
   cancelListDataSets?: Function
+  dataSetAttr?: firebase.database.Reference
+  loadedDataSet: boolean
+  includePrivateDataSets: boolean
 
   constructor (props:NeoCodapProps) {
     super(props)
@@ -49,6 +54,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   componentDidMount() {
     this.workspaceClient = new WorkspaceClient({
       init: (req) => {
+        this.includePrivateDataSets = (req.type === "collabspace") && req.private
         this.setState({readonly: req.readonly}, () => {
           this.loadAppComponentData();
           if (req.type === "collabspace") {
@@ -120,14 +126,26 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   determineDataSet() {
     let dataSetRef = this.workspaceClient.getDataSetRef()
     if (!dataSetRef && (this.state.mode === "graph")) {
-      this.cancelListDataSets = this.workspaceClient.listDataSets((workspaceDataSets) => {
+      // listen for either current user or other user choosing the dataset
+      this.dataSetAttr = this.workspaceClient.getWindowDataSetAttr()
+      this.dataSetAttr.on("value", (snapshot) => {
+        if (snapshot) {
+          const dataSet:FirebaseWindowDataSet|null = snapshot.val()
+          const dataSetRef = dataSet ? this.workspaceClient.getDataSetRef(dataSet) : null
+          if (dataSetRef) {
+            this.loadDataSet(dataSetRef)
+          }
+        }
+      })
+
+      this.cancelListDataSets = this.workspaceClient.listDataSets({includePrivate: this.includePrivateDataSets, callback: (workspaceDataSets) => {
         if (workspaceDataSets.length === 1) {
           this.handleSelectedWorkspaceDataSet(workspaceDataSets[0])
         }
         else {
           this.setState({workspaceDataSets, loadedWorkspaceDataSets: true})
         }
-      })
+      }})
     }
     else {
       dataSetRef = dataSetRef || this.workspaceClient.createDataSetRef()
@@ -138,6 +156,18 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   }
 
   loadDataSet(dataSetRef: firebase.database.Reference) {
+    if (this.loadedDataSet) {
+      return
+    }
+    this.loadedDataSet = true
+    if (this.dataSetAttr) {
+      this.dataSetAttr.off("value")
+      this.dataSetAttr = undefined
+    }
+    if (this.cancelListDataSets) {
+      this.cancelListDataSets()
+      this.cancelListDataSets = undefined
+    }
     loadDataSetFromFirebase(dataSetRef, this.state.readonly)
       .then((dataSet) => {
         this.setState({ dataSet });
@@ -145,11 +175,7 @@ class NeoCodapComponent extends React.Component<NeoCodapProps, NeoCodapState> {
   }
 
   handleSelectedWorkspaceDataSet = (workspaceDataSet: WorkspaceDataSet) => {
-    if (this.cancelListDataSets) {
-      this.cancelListDataSets()
-      this.cancelListDataSets = undefined
-    }
-    this.loadDataSet(this.workspaceClient.selectDataSetRef(workspaceDataSet.ref))
+    this.workspaceClient.selectDataSetRef(workspaceDataSet.ref)
   }
 
   renderSelectDataSet() {
