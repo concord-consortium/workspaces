@@ -796,7 +796,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
                     this.windowManager.postToWindow(
                       windowsToPublish[index],
                       WorkspaceClientPublishRequestMessage,
-                      windowPublishRequest
+                      windowPublishRequest,
+                      "Workspace#handlePublish"
                     )
                   })
                 })
