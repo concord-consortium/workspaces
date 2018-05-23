@@ -1335,7 +1335,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   }
 
   setSVGSize = () => {
-    this.setState({svgWidth: window.innerWidth - TOOLBAR_WIDTH, svgHeight: window.innerHeight})
+    this.setState({svgWidth: Math.max(window.innerWidth - TOOLBAR_WIDTH, 0), svgHeight: window.innerHeight})
   }
 
   addListeners() {
