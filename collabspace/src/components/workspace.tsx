@@ -35,6 +35,9 @@ export const getPosterViewUrl = (portalTokens: PortalTokens|null, portalUser: Po
     if (queryParams.demo) {
       urlParams.demo = queryParams.demo
     }
+    if (queryParams.drawingImageSet) {
+      urlParams.drawingImageSet = queryParams.drawingImageSet
+    }
     if (portalOffering && portalUser && (portalUser.type === "teacher")) {
       urlParams.classInfoUrl = portalOffering.classInfoUrl
       urlParams.offeringId = portalOffering.id
