@@ -116,7 +116,14 @@ export class AppComponent extends React.Component<AppComponentProps, AppComponen
       })
     })
     .catch((error) => {
-      this.setState({authError: `Unable to authenticate: ${error.toString().replace("Signature", "Access token")}`})
+      let authError = error.toString()
+      if ((authError.indexOf("Cannot find AccessGrant") !== -1) || (authError.indexOf("AccessGrant has expired") !== -1)) {
+        authError = "Your authorization has expired.  Please close this window and re-run the activity."
+      }
+      else {
+        authError = `Unable to authenticate: ${authError.replace("Signature", "Access token")}`
+      }
+      this.setState({authError})
     })
   }
 
