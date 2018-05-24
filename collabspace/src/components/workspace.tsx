@@ -1181,7 +1181,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
     if (posterView.enabled) {
       return (
-        <div className="group-info"><div className="group-name"><i className="icon icon-map2" /> Poster View</div></div>
+        <div className="group-info" ref={(el) => this.headerRefs.groupInfoRef = el}><div className="group-name"><i className="icon icon-map2" /> Poster View</div></div>
       )
     }
     else {
