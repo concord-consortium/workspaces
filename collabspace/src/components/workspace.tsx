@@ -1080,10 +1080,10 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     const {userInfoRef, groupInfoRef, supportsRef} = this.headerRefs
     let infoWidth: number|string = "auto"
     if (windowWidth !== 0) {
-      const userInfoWidth = userInfoRef ? userInfoRef.offsetWidth : 0
-      const groupInfoWidth = groupInfoRef ? groupInfoRef.offsetWidth : 0
-      const supportsWidth = supportsRef ? supportsRef.offsetWidth : 0
-      infoWidth = Math.max(0, windowWidth - supportsWidth - groupInfoWidth - userInfoWidth - 45) // 45 is for the header padding
+      const userInfoWidth = userInfoRef ? userInfoRef.offsetWidth + 25 : 0
+      const groupInfoWidth = groupInfoRef ? groupInfoRef.offsetWidth + 25 : 0
+      const supportsWidth = supportsRef ? supportsRef.offsetWidth + 25 : 0
+      infoWidth = Math.max(0, windowWidth - supportsWidth - groupInfoWidth - userInfoWidth)
     }
     return (
       <div className="document-info" style={{width: infoWidth}}>
