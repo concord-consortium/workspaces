@@ -519,7 +519,18 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   constructRelativeUrl(filename:string) {
     const {location} = window
-    return `${location.origin}${location.pathname.replace("/index.html", "/")}${filename}`
+
+    // take off trailing html file if it exists
+    const parts = location.pathname.split("/")
+    const last = parts.pop() || ""
+    if (last.indexOf(".html") === -1) {
+      parts.push(last)
+    }
+    else if (parts.length === 1) {
+      parts.push("")
+    }
+
+    return `${location.origin}${parts.join("/")}${filename}`
   }
 
   handleUploadImageButton = () => {
