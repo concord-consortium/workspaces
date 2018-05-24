@@ -265,6 +265,9 @@ a {
           font-size: 18px;
           font-weight: bold;
           margin-bottom: 4px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          overflow: hidden;
 
           .static {
             display: inline-block;
@@ -284,6 +287,9 @@ a {
         }
         .instance-info {
           font-size: 12px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          overflow: hidden;
         }
       }
       .user-info {
