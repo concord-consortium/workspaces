@@ -4,6 +4,7 @@ export interface InlineEditorComponentProps {
   text: string
   changeText: (newText: string) => void
   width?: number
+  suffix?: string
 }
 
 export interface InlineEditorComponentState {
@@ -77,10 +78,12 @@ export class InlineEditorComponent extends React.Component<InlineEditorComponent
   }
 
   render() {
-    const {text} = this.state
+    let {text} = this.state
+    const {suffix} = this.props
     const style = this.props.width ? {width: this.props.width} : {}
 
     if (!this.state.editing) {
+      text = suffix ? `${text} ${suffix}` : text
       return <div className="static" onDoubleClick={this.handleDoubleClick} style={style}><span className="clickable editable">{text}</span></div>
     }
 

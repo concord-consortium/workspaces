@@ -35,6 +35,9 @@ export const getPosterViewUrl = (portalTokens: PortalTokens|null, portalUser: Po
     if (queryParams.demo) {
       urlParams.demo = queryParams.demo
     }
+    if (queryParams.drawingImageSet) {
+      urlParams.drawingImageSet = queryParams.drawingImageSet
+    }
     if (portalOffering && portalUser && (portalUser.type === "teacher")) {
       urlParams.classInfoUrl = portalOffering.classInfoUrl
       urlParams.offeringId = portalOffering.id
@@ -122,6 +125,13 @@ export interface WorkspaceComponentState extends WindowManagerState {
   posterAnnotations: FirebaseAnnotationMap
   currentPosterAnnotation: Annotation|null
   annotatingPoster: boolean
+  windowWidth: number
+}
+
+interface WorkspaceHeaderRefs {
+  userInfoRef: HTMLDivElement|null
+  groupInfoRef: HTMLDivElement|null
+  supportsRef: HTMLDivElement|null
 }
 
 export class WorkspaceComponent extends React.Component<WorkspaceComponentProps, WorkspaceComponentState> {
@@ -135,6 +145,11 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   userLookup: UserLookup
   modalDialogNewWindowTitle: HTMLInputElement|null
   posterAnnotationsElement: HTMLDivElement|null
+  headerRefs: WorkspaceHeaderRefs = {
+    userInfoRef: null,
+    groupInfoRef: null,
+    supportsRef: null
+  }
 
   constructor (props:WorkspaceComponentProps) {
     super(props)
@@ -171,7 +186,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       posterView,
       posterAnnotations: {},
       currentPosterAnnotation: null,
-      annotatingPoster: false
+      annotatingPoster: false,
+      windowWidth: 0
     }
   }
 
@@ -236,6 +252,15 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     }
   }
 
+  componentDidMount() {
+    window.addEventListener("resize", this.handleResize, false)
+    this.handleResize()
+  }
+
+  handleResize = () => {
+    this.setState({windowWidth: window.innerWidth})
+  }
+
   componentDidUpdate() {
     if (this.modalDialogNewWindowTitle) {
       this.modalDialogNewWindowTitle.select()
@@ -250,6 +275,8 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   componentWillUnmount() {
+    window.removeEventListener("resize", this.handleResize, false)
+
     this.windowManager.destroy()
 
     if (this.userRef) {
@@ -516,7 +543,18 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
 
   constructRelativeUrl(filename:string) {
     const {location} = window
-    return `${location.origin}${location.pathname.replace("/index.html", "/")}${filename}`
+
+    // take off trailing html file if it exists
+    const parts = location.pathname.split("/")
+    const last = parts.pop() || ""
+    if (last.indexOf(".html") === -1) {
+      parts.push(last)
+    }
+    else if (parts.length === 1) {
+      parts.push("")
+    }
+
+    return `${location.origin}${parts.join("/")}${filename}`
   }
 
   handleUploadImageButton = () => {
@@ -1035,12 +1073,20 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
   }
 
   renderDocumentInfo() {
-    const {documentInfo} = this.state
+    const {documentInfo, windowWidth} = this.state
     if (!documentInfo) {
       return null
     }
+    const {userInfoRef, groupInfoRef, supportsRef} = this.headerRefs
+    let infoWidth: number|string = "auto"
+    if (windowWidth !== 0) {
+      const userInfoWidth = userInfoRef ? userInfoRef.offsetWidth : 0
+      const groupInfoWidth = groupInfoRef ? groupInfoRef.offsetWidth : 0
+      const supportsWidth = supportsRef ? supportsRef.offsetWidth : 0
+      infoWidth = Math.max(0, windowWidth - supportsWidth - groupInfoWidth - userInfoWidth - 45) // 45 is for the header padding
+    }
     return (
-      <div className="document-info">
+      <div className="document-info" style={{width: infoWidth}}>
         <div className="document-name">
           {this.props.setTitle ? <InlineEditorComponent text={documentInfo.name} changeText={this.handleChangeDocumentName} /> : documentInfo.name}
         </div>
@@ -1121,7 +1167,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
       }
     })
     return (
-      <div className="supports" onClick={this.handleSupportToggle}>
+      <div className="supports" onClick={this.handleSupportToggle} ref={(el) => this.headerRefs.supportsRef = el}>
         <div className="supports-icon-large">?</div>
         {numUnseen > 0 ? <div className="supports-icon-count">{numUnseen}</div> : null}
         {showSupportsDropdown ? this.renderSupportsDropdown(supports, supportKeys) : null}
@@ -1155,7 +1201,9 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
         }
       })
       return (
-        <div className="group-info"><div className="group-name clickable" onClick={this.handlePromptToChangeGroup} title="Click to leave group">Group {this.props.group}</div>{users}</div>
+        <div className="group-info" ref={(el) => this.headerRefs.groupInfoRef = el}>
+          <div className="group-name clickable" onClick={this.handlePromptToChangeGroup} title="Click to leave group">Group {this.props.group}</div>{users}
+        </div>
       )
     }
   }
@@ -1168,7 +1216,7 @@ export class WorkspaceComponent extends React.Component<WorkspaceComponentProps,
     return (
       <div className={className}>
         {this.renderDocumentInfo()}
-        <div className="user-info">
+        <div className="user-info" ref={(el) => this.headerRefs.userInfoRef = el}>
           <div className="user-name" title={firebaseUser.uid}>{userName}</div>
         </div>
         {this.renderGroupInfo()}
