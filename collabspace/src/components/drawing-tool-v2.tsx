@@ -31,6 +31,10 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
   }
 
   getImageSetUrl () {
+    // for now force the MSU stamps as this parameter is not known in the teacher dashboard
+    return "/drawing/imagesets/msu/msu.json"
+
+    /*
     // if in an iframe get the image set url from the collaspace parameters
     let search = window.location.search
     try {
@@ -39,6 +43,7 @@ export class DrawingToolComponent extends React.Component<DrawingToolComponentPr
       }
     } catch (e) {}
     return queryString.parse(search).drawingImageSet
+    */
   }
 
   getBackgroundUrl() {
