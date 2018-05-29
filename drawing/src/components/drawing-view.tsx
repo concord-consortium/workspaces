@@ -78,7 +78,7 @@ export class DrawingView extends React.Component<DrawingViewProps, DrawingViewSt
           }
         }
         else {
-          alert("Cannot load image set at " + imageSetUrl + ": " + xhr.responseText)
+          console.error("Cannot load image set at " + imageSetUrl + ": " + xhr.responseText)
         }
       }
     })
