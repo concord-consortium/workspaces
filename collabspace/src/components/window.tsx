@@ -50,8 +50,13 @@ export class WindowIframeComponent extends React.Component<WindowIframeComponent
     return false
   }
 
+  srcWithoutScheme() {
+    const {src} = this.props
+    return src ? src.replace(/^https?:/, "") : src
+  }
+
   render() {
-    return <iframe ref='iframe' src={this.props.src} onLoad={this.handleLoaded}></iframe>
+    return <iframe ref='iframe' src={this.srcWithoutScheme()} onLoad={this.handleLoaded}></iframe>
   }
 }
 
