@@ -496,7 +496,7 @@ export class ImageObject implements DrawingObject {
   render(options:DrawingObjectOptions) : JSX.Element|null {
     const {key, handleClick, handleHover, drawingLayer} = options
     const {imageSetItem} = this
-    const src = drawingLayer && drawingLayer.state.imageDataUriCache[imageSetItem.src]
+    const src = drawingLayer && drawingLayer.state.imageDataUriCache[imageSetItem.src.replace(/^https?:/, "")]
     if (!src) {
       return null
     }
@@ -1317,6 +1317,7 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
   updateImageDataUriCache(imageSetItems:ImageSetItem[]) {
     imageSetItems.forEach((imageSetItem) => {
       if (!this.state.imageDataUriCache[imageSetItem.src]) {
+        const src = imageSetItem.src.replace(/^https?:/, "")
         const image = new Image()
         image.onload = () => {
           const canvas = document.createElement("canvas") as HTMLCanvasElement
@@ -1325,11 +1326,11 @@ export class DrawingLayerView extends React.Component<DrawingLayerViewProps, Dra
           const context = canvas.getContext("2d")
           if (context) {
             context.drawImage(image, 0, 0)
-            this.state.imageDataUriCache[imageSetItem.src] = canvas.toDataURL("image/png")
+            this.state.imageDataUriCache[src] = canvas.toDataURL("image/png")
             this.setState({imageDataUriCache: this.state.imageDataUriCache})
           }
         }
-        image.src = imageSetItem.src
+        image.src = src
       }
     })
   }
