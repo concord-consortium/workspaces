@@ -24,14 +24,61 @@ interface ActivityEmbeddable {
   type: string
   content: string
 }
+interface ActivityWrappedEmbeddable {
+  embeddable: ActivityEmbeddable
+}
 interface ActivityPage {
   name: string
   text: string
-  embeddables: ActivityEmbeddable[]
+  embeddables: (ActivityEmbeddable | ActivityWrappedEmbeddable)[]
 }
 interface Activity {
   name: string
   pages: ActivityPage[]
+  version?: string
+}
+
+export interface ActivityDebugProps {
+  activityKey: string
+  handleView: (item: ActivityListItem|null) => void
+}
+export interface ActivityDebugState {
+  activityJSON: string|null
+}
+
+export class ActivityDebugView extends React.Component<ActivityDebugProps, ActivityDebugState> {
+  constructor(props:ActivityDebugProps){
+    super(props)
+    this.state = {
+      activityJSON: null
+    }
+    this.close = this.close.bind(this)
+  }
+
+  close() {
+    this.props.handleView(null)
+  }
+
+  componentWillMount() {
+    firebase.database().ref(this.props.activityKey).once("value", (snapshot) => {
+      const activity:Activity|null = snapshot.val()
+      this.setState({activityJSON: JSON.stringify(activity, null, 2)})
+    })
+  }
+
+  render() {
+    return (
+      <div className='activity-debug'>
+        <button onClick={this.close}>Close</button>
+        <pre>
+          {this.props.activityKey}
+        </pre>
+        <pre>
+          {this.state.activityJSON || "Loading..."}
+        </pre>
+      </div>
+    )
+  }
 }
 
 export interface EmbeddableProps {
@@ -100,6 +147,7 @@ export interface ActivityListItemProps {
   item: ActivityListItem
   handleUpdate: (item: ActivityListItem) => void
   handleDelete: (item: ActivityListItem) => void
+  handleDebug: (item: ActivityListItem) => void
 }
 export interface ActivityListItemState {}
 
@@ -110,6 +158,7 @@ export class ActivityListItemView extends React.Component<ActivityListItemProps,
 
   render() {
     const { item } = this.props
+    const debug = window.location.search.indexOf("debug") !== -1
     const href = `#activity=${item.id}`
     return (
       <tr>
@@ -117,6 +166,7 @@ export class ActivityListItemView extends React.Component<ActivityListItemProps,
         <td className="buttons">
           <button onClick={() => this.props.handleUpdate(this.props.item)}>Update</button>
           <button onClick={() => this.props.handleDelete(this.props.item)}>Delete</button>
+          {debug ? <button onClick={() => this.props.handleDebug(this.props.item)}>Debug</button> : null}
         </td>
       </tr>
     )
@@ -128,6 +178,7 @@ export interface PromptsViewProps {}
 export interface PromptsViewState {
   authenticated: boolean,
   updateActivity: ActivityListItem|null
+  debugActivity: ActivityListItem|null
   activityId: string|null
   activity: Activity|null
   activitiesList: ActivityListMap
@@ -150,11 +201,13 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
     this.handleDragOver = this.handleDragOver.bind(this)
     this.handleUpdate = this.handleUpdate.bind(this)
     this.handleDelete = this.handleDelete.bind(this)
+    this.handleDebug = this.handleDebug.bind(this)
     this.renderPage = this.renderPage.bind(this)
 
     this.state = {
       authenticated: false,
       updateActivity: null,
+      debugActivity: null,
       activityId: null,
       activity: null,
       activitiesList: {},
@@ -281,12 +334,18 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
   }
 
   renderPage(page:ActivityPage, index:number) {
+    const {activity} = this.state
+    const version = activity ? activity.version : undefined
     const style = {display: page === this.state.currentPage ? "block" : "none"}
+    const embeddables:ActivityEmbeddable[] = !page || !page.embeddables ? [] : page.embeddables.map((embeddable) => {
+      const wrappedEmbeddable = embeddable as ActivityWrappedEmbeddable
+      return wrappedEmbeddable.embeddable ? wrappedEmbeddable.embeddable : embeddable as ActivityEmbeddable
+    })
     //{this.ifNotEmpty(page, "name", () => <h2>{page.name}</h2>)}
     return (
       <div className="page" key={index} style={style}>
         {this.ifNotEmpty(page, "text", () => <p dangerouslySetInnerHTML={{__html: page.text}}></p>)}
-        {this.ifNotEmpty(page, "embeddables", () => page.embeddables.map((embeddable, index) => <EmbeddableView key={index} embeddable={embeddable} ifNotEmpty={this.ifNotEmpty} logManager={this.logManager} />))}
+        {this.ifNotEmpty(page, "embeddables", () => embeddables.map((embeddable, index) => <EmbeddableView key={index} embeddable={embeddable} ifNotEmpty={this.ifNotEmpty} logManager={this.logManager} />))}
       </div>
     )
   }
@@ -296,6 +355,8 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
     if (!activity || !currentPage) {
       return <div className="loading">Loading...</div>
     }
+
+    document.title = activity.name
 
     return (
       <div className="activity" ref={(el) => this.activityElement = el}>
@@ -332,6 +393,10 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
     }
   }
 
+  handleDebug(item:ActivityListItem|null) {
+    this.setState({debugActivity: item})
+  }
+
   renderActivityList() {
     const keys = Object.keys(this.state.activitiesList)
     if (keys.length === 0) {
@@ -344,7 +409,7 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
           <tbody>
             {keys.map((key) => {
               const item = this.state.activitiesList[key]
-              return <ActivityListItemView key={item.id} item={item} handleDelete={this.handleDelete} handleUpdate={this.handleUpdate} />
+              return <ActivityListItemView key={item.id} item={item} handleDelete={this.handleDelete} handleUpdate={this.handleUpdate} handleDebug={this.handleDebug} />
             })}
           </tbody>
         </table>
@@ -415,9 +480,19 @@ export class PromptsView extends React.Component<PromptsViewProps, PromptsViewSt
     )
   }
 
+  renderDebugActivity() {
+    if (!this.state.debugActivity) {
+      return null
+    }
+    return <ActivityDebugView activityKey={this.getActivityKey(this.state.debugActivity.id)} handleView={this.handleDebug} />
+  }
+
   render() {
     if (!this.state.authenticated) {
       return <div className="loading">Authenticating...</div>
+    }
+    if (this.state.debugActivity) {
+      return this.renderDebugActivity()
     }
     if (this.state.activityId !== null) {
       return this.renderActivity()
